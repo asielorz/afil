@@ -224,7 +224,10 @@ namespace parser
 				};
 				auto const if_nothing_found = [&](lookup_result::NothingFound)
 				{
-					declare_unreachable();
+					// Try the global scope.
+					std::visit(
+						overload(if_var_found, if_fn_found, [](lookup_result::NothingFound) { declare_unreachable(); }), 
+						lookup_name(program.global_scope, tokens[index].source));
 				};
 				auto const lookup = lookup_name(scope, tokens[index].source);
 				std::visit(overload(if_var_found, if_fn_found, if_nothing_found), lookup);

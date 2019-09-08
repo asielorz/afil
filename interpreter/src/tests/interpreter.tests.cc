@@ -133,18 +133,14 @@ let add_seven = fn (int a, int b, int c, int d, int e, int f, int g) -> int
 	REQUIRE(eval_expression("add_seven(1, 2, 3, 4, 5, 6, 7)", context, program, program.global_scope) == 1 + 2 + 3 + 4 + 5 + 6 + 7);
 }
 
-TEST_CASE("stress test: fibonacci")
+TEST_CASE("Nested calls")
 {
 	Program program;
 	interpreter::ExecutionContext context;
 	alloc_stack(context, 2048);
 
-	auto const source = R"(
-let fib = fn (int i) -> int 
-{
-	return a + b + c + d + e + f + g; 
-};
-)";
-	parser::parse_statement(lex::tokenize(source), program, program.global_scope);
-	REQUIRE(eval_expression("add_seven(1, 2, 3, 4, 5, 6, 7)", context, program, program.global_scope) == 1 + 2 + 3 + 4 + 5 + 6 + 7);
+	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope);
+	parser::parse_statement(lex::tokenize("let subtract = fn (int x, int y) -> int { return add(x, 0 - y); };"), program, program.global_scope);
+	
+	REQUIRE(eval_expression("subtract(add(2, 3), subtract(4, 1))", context, program, program.global_scope) == (2 + 3) - (4 - 1));
 }
