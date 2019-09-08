@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\program.cc" />
     <ClCompile Include="src\interpreter.cc" />
     <ClCompile Include="src\parser.cc" />
     <ClCompile Include="src\tests\interpreter.tests.cc" />
@@ -28,6 +29,7 @@
     <ClCompile Include="src\unreachable.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\program.hh" />
     <ClInclude Include="src\interpreter.hh" />
     <ClInclude Include="src\overload.hh" />
     <ClInclude Include="src\parser.hh" />

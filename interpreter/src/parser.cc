@@ -1,8 +1,10 @@
 #include "parser.hh"
 #include "lexer.hh"
+#include "program.hh"
 #include "out.hh"
 #include "span.hh"
 #include "unreachable.hh"
+#include "overload.hh"
 #include <vector>
 #include <cassert>
 #include <charconv>
@@ -85,10 +87,116 @@ namespace parser
 		return root;
 	}
 
-	auto parse_subexpression(span<lex::Token const> tokens, size_t & index) noexcept -> ExpressionTree
+	auto next_statement_tokens(span<lex::Token const> tokens, size_t & index) noexcept -> span<lex::Token const>
+	{
+		size_t length = 0;
+		while (tokens[index + length].type != TokenType::semicolon)
+			length++;
+		length++; // Include the semicolon.
+
+		auto const result_tokens = tokens.subspan(index, length);
+		index += length;
+		return result_tokens;
+	}
+
+	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> FunctionNode
+	{
+		// Skip fn token.
+		index++;
+
+		// Arguments must be between parenthesis
+		assert(tokens[index].type == TokenType::open_parenthesis);
+		index++;
+
+		Function function;
+
+		// Parse arguments.
+		while (tokens[index].type == TokenType::identifier)
+		{
+			// TODO: Types
+			assert(tokens[index].source == "int");
+			index++;
+
+			Variable argument;
+			argument.name = tokens[index].source;
+			argument.offset = function.stack_frame_size;
+			function.stack_frame_size += sizeof(int);
+			function.variables.push_back(argument);
+			function.parameter_count++;
+			index++;
+
+			assert(tokens[index].type == TokenType::comma || tokens[index].type == TokenType::close_parenthesis);
+			index++;
+		}
+
+		// Return type is introduced with an arrow
+		assert(tokens[index].type == TokenType::arrow);
+		index++;
+
+		// Return type. By now only int supported.
+		assert(tokens[index].source == "int");
+		index++;
+
+		// Body of the function is enclosed by braces.
+		assert(tokens[index].type == TokenType::open_brace);
+		index++;
+
+		// Parse all statements in the function.
+		while (tokens[index].type != TokenType::close_brace)
+		{
+			auto statement_tree = parse_statement(next_statement_tokens(tokens, index), program, function);
+			if (statement_tree)
+				function.statements.push_back(std::move(*statement_tree));
+		}
+
+		// Skip closing brace.
+		index++;
+
+		// Add the function to the program.
+		program.functions.push_back(std::move(function));
+		return FunctionNode{static_cast<int>(program.functions.size() - 1)};
+	}
+
+	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree;
+
+	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, int function_id) noexcept -> FunctionCallNode
+	{
+		// Parameter list starts with (
+		assert(tokens[index].type == TokenType::open_parenthesis);
+		index++;
+
+		// Parse parameters
+		int const param_count = program.functions[function_id].parameter_count;
+
+		FunctionCallNode node;
+		node.function_id = function_id;
+		node.parameters.reserve(param_count);
+
+		for (int i = 0; i < param_count; ++i)
+		{
+			node.parameters.push_back(parse_subexpression(tokens, index, program, scope));
+
+			if (i < param_count - 1)
+			{
+				assert(tokens[index].type == TokenType::comma);
+				index++;
+			}
+		}
+
+		return node;
+	}
+
+	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree
 	{
 		std::vector<ExpressionTree> operands;
 		std::vector<Operator> operators;
+
+		if (tokens[index].source == "fn")
+		{
+			return parse_function_expression(tokens, index, program);
+			//auto const func_node = parse_function_expression(tokens, index, program);
+			//return parse_function_call_expression(tokens, index, program, scope, func_node.function_id);
+		}
 
 		// Parse the expression.
 		while (index < tokens.size())
@@ -100,15 +208,31 @@ namespace parser
 			}
 			else if (tokens[index].type == TokenType::identifier)
 			{
-				VariableNode var_node;
-				var_node.variable_name = tokens[index].source;
-				operands.push_back(var_node);
-				index++;
+				auto const if_var_found = [&](lookup_result::VariableFound result)
+				{
+					VariableNode var_node;
+					var_node.variable_offset = result.variable_offset;
+					operands.push_back(var_node);
+					index++;
+				};
+				auto const if_fn_found = [&](lookup_result::FunctionFound result)
+				{
+					FunctionNode func_node;
+					func_node.function_id = result.function_id;
+					index++;
+					operands.push_back(parse_function_call_expression(tokens, index, program, scope, result.function_id));
+				};
+				auto const if_nothing_found = [&](lookup_result::NothingFound)
+				{
+					declare_unreachable();
+				};
+				auto const lookup = lookup_name(scope, tokens[index].source);
+				std::visit(overload(if_var_found, if_fn_found, if_nothing_found), lookup);
 			}
 			else if (tokens[index].type == TokenType::open_parenthesis)
 			{
 				index++;
-				operands.push_back(parse_subexpression(tokens, index));
+				operands.push_back(parse_subexpression(tokens, index, program, scope));
 			}
 			else declare_unreachable(); // TODO: Actual error handling.
 
@@ -118,6 +242,12 @@ namespace parser
 				if (tokens[index].type == TokenType::close_parenthesis)
 				{
 					index++;
+					return resolve_operator_precedence(operands, operators);
+				}
+				// If we encounter a comma, end subexpression but don't consume the comma.
+				// TODO: Think of a consistent way of doing this.
+				if (tokens[index].type == TokenType::comma)
+				{
 					return resolve_operator_precedence(operands, operators);
 				}
 				else if (tokens[index].type == TokenType::operator_)
@@ -132,35 +262,80 @@ namespace parser
 		return resolve_operator_precedence(operands, operators);
 	}
 
-	auto parse_expression(span<lex::Token const> tokens) noexcept -> ExpressionTree
+	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope) noexcept -> ExpressionTree
 	{
 		size_t index = 0;
-		return parse_subexpression(tokens, index);
+		return parse_subexpression(tokens, index, program, scope);
 	}
 
-	auto parse_statement(span<lex::Token const> tokens) noexcept -> StatementTree
+	auto parse_variable_declaration_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> VariableDeclarationStatementNode
 	{
-		// A statement has the following form:
+		// A variable declaration statement has the following form:
 		// int [var_name] = [expr];
+
+		VariableDeclarationStatementNode node;
 
 		// A statement begins with the type of the declared variable.
 		assert(tokens[0].source == "int");
 
-		// The second tokeb of the statement is the variable name.
+		// The second token of the statement is the variable name.
 		assert(tokens[1].type == TokenType::identifier);
-		StatementTree tree;
-		tree.variable_name = tokens[1].source;
+		Variable local;
+		local.name = tokens[1].source;
+		local.offset = scope.stack_frame_size;
+		scope.stack_frame_size += sizeof(int);
+		node.variable_offset = local.offset;
+		scope.variables.push_back(local);
 
 		// The third token is a '='.
 		assert(tokens[2].type == TokenType::assignment);
 
+		// The rest is the expression assigned to the variable.
+		node.assigned_expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope);
+
+		return node;
+	}
+
+	auto parse_return_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> ReturnStatementNode
+	{
+		// A return statement has the following form:
+		// return [expr];
+
+		ReturnStatementNode node;
+		node.returned_expression = parse_expression(tokens.subspan(1, tokens.size() - 2), program, scope);
+		return node;
+	}
+
+	auto parse_function_declaration_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::nullopt_t
+	{
+		// A function declaration statement has the following form:
+		// let [name] = [function expr];
+
+		assert(tokens[1].type == TokenType::identifier);
+		assert(tokens[2].type == TokenType::assignment);
+
+		size_t index = 3;
+		FunctionNode const func_node = parse_function_expression(tokens.subspan(0, tokens.size() - 1), index, program);
+		FunctionName func_name;
+		func_name.name = tokens[1].source;
+		func_name.id = func_node.function_id;
+		scope.functions.push_back(func_name);
+
+		return std::nullopt;
+	}
+
+	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<StatementTree>
+	{
 		// A statement ends with a semicolon.
 		assert(tokens.back().type == TokenType::semicolon);
 
-		// The rest is the expression assigned to the variable.
-		tree.assigned_expression = parse_expression(tokens.subspan(3, tokens.size() - 4));
-
-		return tree;
+		if (tokens[0].source == "return")
+			return parse_return_statement(tokens, program, scope);
+		// This will change when let is also used to declare constants, but that's a problem of future Asier.
+		else if (tokens[0].source == "let")
+			return parse_function_declaration_statement(tokens, program, scope);
+		else
+			return parse_variable_declaration_statement(tokens, program, scope);
 	}
 
 } //namespace parser

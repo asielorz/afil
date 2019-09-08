@@ -3,7 +3,10 @@
 #include "span.hh"
 #include <string_view>
 #include <variant>
+#include <optional>
 
+struct Program;
+struct Scope;
 namespace lex {	struct Token; }
 
 namespace parser
@@ -29,12 +32,23 @@ namespace parser
 
 	struct VariableNode
 	{
-		std::string_view variable_name;
+		int variable_offset;
 	};
 
-	struct ExpressionTree : public std::variant<int, OperatorNode, VariableNode> 
+	struct FunctionNode
 	{
-		using Base = std::variant<int, OperatorNode, VariableNode>;
+		int function_id;
+	};
+
+	struct FunctionCallNode
+	{
+		int function_id;
+		std::vector<ExpressionTree> parameters;
+	};
+
+	struct ExpressionTree : public std::variant<int, OperatorNode, VariableNode, FunctionNode, FunctionCallNode> 
+	{
+		using Base = std::variant<int, OperatorNode, VariableNode, FunctionNode, FunctionCallNode>;
 		using Base::Base;
 		constexpr auto as_variant() noexcept -> Base & { return *this; }
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
@@ -42,14 +56,27 @@ namespace parser
 
 	auto is_operator_node(ExpressionTree const & tree) noexcept -> bool;
 
-	struct StatementTree
+	struct VariableDeclarationStatementNode
 	{
-		std::string_view variable_name;
+		int variable_offset;
 		ExpressionTree assigned_expression;
 	};
 
-	auto parse_expression(span<lex::Token const> tokens) noexcept -> ExpressionTree;
-	auto parse_statement(span<lex::Token const> tokens) noexcept -> StatementTree;
+	struct ReturnStatementNode
+	{
+		ExpressionTree returned_expression;
+	};
+
+	struct StatementTree : public std::variant<VariableDeclarationStatementNode, ReturnStatementNode>
+	{
+		using Base = std::variant<VariableDeclarationStatementNode, ReturnStatementNode>;
+		using Base::Base;
+		constexpr auto as_variant() noexcept -> Base & { return *this; }
+		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
+	};
+
+	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope) noexcept -> ExpressionTree;
+	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<StatementTree>;
 
 } // namespace parser
 
