@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  
+  <Type Name="::span&lt;*&gt;">
+      <DisplayString>{{ size={data_size} }}</DisplayString>
+      <Expand>
+          <ArrayItems>
+              <Size>data_size</Size>
+              <ValuePointer>data_array</ValuePointer>
+          </ArrayItems>
+      </Expand>
+  </Type>
+
+</AutoVisualizer>
