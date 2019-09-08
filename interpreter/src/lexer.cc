@@ -15,9 +15,9 @@ namespace lex
 		return (c == '+') || (c == '-') || (c == '*') || (c == '/');
 	}
 
-	auto is_delimiter(char c) noexcept -> bool
+	auto is_reserved_for_the_language(char c) noexcept -> bool
 	{
-		return (c == '(') || (c == ')');
+		return (c == '(') || (c == ')') || (c == ';') || (c == '=');
 	}
 
 	auto is_whitespace(char c) noexcept -> bool
@@ -27,7 +27,7 @@ namespace lex
 
 	auto is_valid_identifier_char(char c) noexcept -> bool
 	{
-		return !(is_operator(c) || is_delimiter(c) || is_whitespace(c));
+		return !(is_operator(c) || is_reserved_for_the_language(c) || is_whitespace(c));
 	}
 
 	auto is_valid_after_literal(char c) noexcept -> bool
@@ -51,16 +51,13 @@ namespace lex
 
 	auto next_token_type(std::string_view src, int index) noexcept -> Token::Type
 	{
-		if (is_number(src[index]))
-			return Token::Type::literal_int;
-		else if (is_operator(src[index]))
-			return Token::Type::operator_;
-		else if (src[index] == '(')
-			return Token::Type::open_parenthesis;
-		else if (src[index] == ')')
-			return Token::Type::close_parenthesis;
-		else
-			return Token::Type::identifier;
+		if (is_number(src[index]))		return Token::Type::literal_int;
+		if (is_operator(src[index]))	return Token::Type::operator_;
+		if (src[index] == '(')			return Token::Type::open_parenthesis;
+		if (src[index] == ')')			return Token::Type::close_parenthesis;
+		if (src[index] == ';')			return Token::Type::semicolon;
+		if (src[index] == '=')			return Token::Type::assignment;
+		else							return Token::Type::identifier;
 	}
 
 	auto token_length_literal_int(std::string_view src, int index) noexcept -> int
@@ -88,6 +85,8 @@ namespace lex
 			case Token::Type::operator_:			return 1;
 			case Token::Type::open_parenthesis:		return 1;
 			case Token::Type::close_parenthesis:	return 1;
+			case Token::Type::semicolon:			return 1;
+			case Token::Type::assignment:			return 1;
 		}
 		declare_unreachable();
 	}

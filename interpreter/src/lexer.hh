@@ -10,7 +10,7 @@ namespace lex
 	{
 		enum struct Type
 		{
-			identifier, literal_int, operator_, open_parenthesis, close_parenthesis
+			identifier, literal_int, operator_, open_parenthesis, close_parenthesis, semicolon, assignment
 		};
 
 		std::string_view source;

@@ -3,6 +3,9 @@
 #include <vector>
 #include <array>
 
+template <typename T>
+struct span;
+
 namespace detail
 {
 	template <typename T>
@@ -22,6 +25,7 @@ namespace detail
 		constexpr auto end() const noexcept -> T * { return data() + size(); }
 		constexpr auto front() const noexcept -> T & { return data()[0]; }
 		constexpr auto back() const noexcept -> T & { return data()[size() - 1]; }
+		constexpr auto subspan(size_t offset, size_t count) const noexcept -> span<T> { return span<T>(data() + offset, std::min(count, size() - offset)); }
 
 	protected:
 		T * data_array;
