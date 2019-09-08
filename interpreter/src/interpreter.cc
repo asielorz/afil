@@ -51,6 +51,27 @@ struct ExpressionTree
 	std::unique_ptr<ExpressionTree> right;
 };
 
+auto is_operator_node(ExpressionTree const & tree) noexcept -> bool
+{
+	return static_cast<bool>(tree.left);
+}
+
+auto insert_expression(ExpressionTree & tree, ExpressionTree & new_node) noexcept -> void
+{
+	if (precedence(new_node.op) <= precedence(tree.op))
+	{
+		new_node.left = std::make_unique<ExpressionTree>(std::move(tree));
+		tree = std::move(new_node);
+	}
+	else if (!is_operator_node(*tree.right))
+	{
+		new_node.left = std::move(tree.right);
+		tree.right = std::make_unique<ExpressionTree>(std::move(new_node));
+	}
+	else
+		insert_expression(*tree.right, new_node);
+}
+
 auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator const> operators) noexcept -> ExpressionTree
 {
 	if (operators.empty())
@@ -59,7 +80,6 @@ auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator co
 		return std::move(operands[0]);
 	}
 
-	// TODO. Currently just resolves in order with no regard for precedence.
 	ExpressionTree root(operators[0]);
 	root.left = std::make_unique<ExpressionTree>(std::move(operands[0]));
 	root.right = std::make_unique<ExpressionTree>(std::move(operands[1]));
@@ -67,9 +87,8 @@ auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator co
 	for (size_t i = 1; i < operators.size(); ++i)
 	{
 		auto new_node = ExpressionTree(operators[i]);
-		new_node.left = std::make_unique<ExpressionTree>(std::move(root));
 		new_node.right = std::make_unique<ExpressionTree>(std::move(operands[i + 1]));
-		root = std::move(new_node);
+		insert_expression(root, new_node);
 	}
 	return root;
 }

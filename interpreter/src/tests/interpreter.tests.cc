@@ -28,3 +28,9 @@ TEST_CASE("Nested parenthesis")
 	REQUIRE(interpreter::eval_expression("2 * (3 + (4 - 1 - ((2 * 2) - 3)))") == 10);
 }
 
+TEST_CASE("Multiplication has more precedence than addition")
+{
+	REQUIRE(interpreter::eval_expression("2 * 3 + 4") == 10);
+	REQUIRE(interpreter::eval_expression("6 - 4 / 2") == 4);
+	REQUIRE(interpreter::eval_expression("2 * 3 * 2 - 4 * 5 + 6 / 3 * 2 + 1 + 1 + 1 * 3") == 1);
+}
