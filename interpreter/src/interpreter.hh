@@ -13,17 +13,17 @@ struct Program;
 namespace interpreter
 {
 
-	struct ExecutionContext
+	struct ProgramStack
 	{
-		std::vector<char> stack;
-		int stack_base_pointer = 0;
-		int stack_pointer = 0;
+		std::vector<char> memory;
+		int base_pointer = 0;
+		int top_pointer = 0;
 	};
-	auto read_word(ExecutionContext const & context, int address) noexcept -> int;
-	auto write_word(ExecutionContext & context, int address, int value) noexcept -> void;
-	auto alloc_stack(ExecutionContext & context, int stack_size_in_bytes) noexcept -> void;
+	auto read_word(ProgramStack const & stack, int address) noexcept -> int;
+	auto write_word(ProgramStack & stack, int address, int value) noexcept -> void;
+	auto alloc_stack(ProgramStack & stack, int stack_size_in_bytes) noexcept -> void;
 
-	auto eval_expression_tree(parser::ExpressionTree const & tree, ExecutionContext & context, Program const & program) noexcept -> int;
-	auto run_statement_tree(parser::StatementTree const & tree, ExecutionContext & context, Program const & program) noexcept -> bool;
+	auto eval_expression_tree(parser::ExpressionTree const & tree, ProgramStack & stack, Program const & program) noexcept -> int;
+	auto run_statement_tree(parser::StatementTree const & tree, ProgramStack & stack, Program const & program) noexcept -> bool;
 
 }
