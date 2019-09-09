@@ -177,10 +177,11 @@ namespace parser
 			node.parameters.push_back(parse_subexpression(tokens, index, program, scope));
 
 			if (i < param_count - 1)
-			{
 				assert(tokens[index].type == TokenType::comma);
-				index++;
-			}
+			else
+				assert(tokens[index].type == TokenType::close_parenthesis);
+
+			index++;
 		}
 
 		return node;
@@ -193,9 +194,12 @@ namespace parser
 
 		if (tokens[index].source == "fn")
 		{
-			return parse_function_expression(tokens, index, program);
-			//auto const func_node = parse_function_expression(tokens, index, program);
-			//return parse_function_call_expression(tokens, index, program, scope, func_node.function_id);
+			auto const func_node = parse_function_expression(tokens, index, program);
+			// Opening parenthesis after a function means a function call.
+			if (tokens[index].type == TokenType::open_parenthesis)
+				return parse_function_call_expression(tokens, index, program, scope, func_node.function_id);
+			else
+				return func_node;
 		}
 
 		// Parse the expression.
@@ -217,10 +221,11 @@ namespace parser
 				};
 				auto const if_fn_found = [&](lookup_result::FunctionFound result)
 				{
-					FunctionNode func_node;
-					func_node.function_id = result.function_id;
 					index++;
-					operands.push_back(parse_function_call_expression(tokens, index, program, scope, result.function_id));
+					if (tokens[index].type == TokenType::open_parenthesis)
+						operands.push_back(parse_function_call_expression(tokens, index, program, scope, result.function_id));
+					else
+						operands.push_back(FunctionNode{result.function_id});
 				};
 				auto const if_nothing_found = [&](lookup_result::NothingFound)
 				{
@@ -236,30 +241,20 @@ namespace parser
 			{
 				index++;
 				operands.push_back(parse_subexpression(tokens, index, program, scope));
+
+				// Next token must be close parenthesis.
+				assert(tokens[index].type == TokenType::close_parenthesis);
+				index++;
 			}
 			else declare_unreachable(); // TODO: Actual error handling.
 
-			if (index < tokens.size())
+			// If the next token is an operator, parse the operator and repeat. Otherwise end the loop and return the expression.
+			if (index < tokens.size() && tokens[index].type == TokenType::operator_)
 			{
-				// If we encounter a close parenthesis, end subexpression.
-				if (tokens[index].type == TokenType::close_parenthesis)
-				{
-					index++;
-					return resolve_operator_precedence(operands, operators);
-				}
-				// If we encounter a comma, end subexpression but don't consume the comma.
-				// TODO: Think of a consistent way of doing this.
-				if (tokens[index].type == TokenType::comma)
-				{
-					return resolve_operator_precedence(operands, operators);
-				}
-				else if (tokens[index].type == TokenType::operator_)
-				{
-					operators.push_back(parse_operator(tokens[index].source));
-					index++;
-				}
-				else declare_unreachable(); // TODO: Actual error handling.
+				operators.push_back(parse_operator(tokens[index].source));
+				index++;
 			}
+			else break;
 		}
 
 		return resolve_operator_precedence(operands, operators);

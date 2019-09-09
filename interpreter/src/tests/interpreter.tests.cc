@@ -119,7 +119,7 @@ TEST_CASE("Call  function with multiple parameters")
 {
 	Program program;
 	interpreter::ExecutionContext context;
-	alloc_stack(context, 2048);
+	alloc_stack(context, 128);
 	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope);
 	REQUIRE(eval_expression("add(5, 6)", context, program, program.global_scope) == 11);
 
@@ -137,10 +137,20 @@ TEST_CASE("Nested calls")
 {
 	Program program;
 	interpreter::ExecutionContext context;
-	alloc_stack(context, 2048);
+	alloc_stack(context, 128);
 
 	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope);
 	parser::parse_statement(lex::tokenize("let subtract = fn (int x, int y) -> int { return add(x, 0 - y); };"), program, program.global_scope);
 	
 	REQUIRE(eval_expression("subtract(add(2, 3), subtract(4, 1))", context, program, program.global_scope) == (2 + 3) - (4 - 1));
+}
+
+TEST_CASE("Naming a function is a valid expression (that does nothing)")
+{
+	Program program;
+	interpreter::ExecutionContext context;
+	alloc_stack(context, 128);
+
+	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope);
+	parser::parse_expression(lex::tokenize("add"), program, program.global_scope);
 }

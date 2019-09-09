@@ -17,6 +17,7 @@ namespace interpreter
 	{
 		std::vector<char> stack;
 		int stack_base_pointer = 0;
+		int stack_pointer = 0;
 	};
 	auto read_word(ExecutionContext const & context, int address) noexcept -> int;
 	auto write_word(ExecutionContext & context, int address, int value) noexcept -> void;
