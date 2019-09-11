@@ -10,6 +10,7 @@ auto eval_expression(std::string_view src)
 {
 	Program program;
 	interpreter::ProgramStack stack;
+	alloc_stack(stack, 32);
 	return interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, program.global_scope), stack, program);
 }
 
@@ -153,4 +154,15 @@ TEST_CASE("Naming a function is a valid expression (that does nothing)")
 
 	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope);
 	parser::parse_expression(lex::tokenize("add"), program, program.global_scope);
+}
+
+TEST_CASE("Immediately invoked function expression")
+{
+	REQUIRE(eval_expression("fn (int i, int j) -> int { return i + j; }(3, 4)") == 3 + 4);
+}
+
+TEST_CASE("Immediately invoked function expression and operator")
+{
+	REQUIRE(eval_expression("fn (int i, int j) -> int { return i + j; }(3, 4) - 5") == 3 + 4 - 5);
+	REQUIRE(eval_expression("2 * fn (int i, int j) -> int { return i + j; }(3, 4)") == 2 * (3 + 4));
 }

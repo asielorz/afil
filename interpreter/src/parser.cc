@@ -187,11 +187,8 @@ namespace parser
 		return node;
 	}
 
-	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree
+	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree
 	{
-		std::vector<ExpressionTree> operands;
-		std::vector<Operator> operators;
-
 		if (tokens[index].source == "fn")
 		{
 			auto const func_node = parse_function_expression(tokens, index, program);
@@ -201,52 +198,60 @@ namespace parser
 			else
 				return func_node;
 		}
+		else if (tokens[index].type == TokenType::literal_int)
+		{
+			return ExpressionTree(parse_int(tokens[index++].source));
+		}
+		else if (tokens[index].type == TokenType::identifier)
+		{
+			auto const if_var_found = [&](lookup_result::VariableFound result) -> ExpressionTree
+			{
+				VariableNode var_node;
+				var_node.variable_offset = result.variable_offset;
+				index++;
+				return var_node;
+			};
+			auto const if_fn_found = [&](lookup_result::FunctionFound result) -> ExpressionTree
+			{
+				index++;
+				if (tokens[index].type == TokenType::open_parenthesis)
+					return parse_function_call_expression(tokens, index, program, scope, result.function_id);
+				else
+					return FunctionNode{result.function_id};
+			};
+			auto const if_nothing_found = [&](lookup_result::NothingFound)
+			{
+				// Try the global scope.
+				return std::visit(
+					overload(if_var_found, if_fn_found, [](lookup_result::NothingFound) -> ExpressionTree { declare_unreachable(); }),
+					lookup_name(program.global_scope, tokens[index].source));
+			};
+			auto const lookup = lookup_name(scope, tokens[index].source);
+			return std::visit(overload(if_var_found, if_fn_found, if_nothing_found), lookup);
+		}
+		else if (tokens[index].type == TokenType::open_parenthesis)
+		{
+			index++;
+			auto expr = parse_subexpression(tokens, index, program, scope);
+
+			// Next token must be close parenthesis.
+			assert(tokens[index].type == TokenType::close_parenthesis);
+			index++;
+
+			return expr;
+		}
+		else declare_unreachable(); // TODO: Actual error handling.
+	}
+
+	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree
+	{
+		std::vector<ExpressionTree> operands;
+		std::vector<Operator> operators;
 
 		// Parse the expression.
 		while (index < tokens.size())
 		{
-			if (tokens[index].type == TokenType::literal_int)
-			{
-				operands.push_back(ExpressionTree(parse_int(tokens[index].source)));
-				index++;
-			}
-			else if (tokens[index].type == TokenType::identifier)
-			{
-				auto const if_var_found = [&](lookup_result::VariableFound result)
-				{
-					VariableNode var_node;
-					var_node.variable_offset = result.variable_offset;
-					operands.push_back(var_node);
-					index++;
-				};
-				auto const if_fn_found = [&](lookup_result::FunctionFound result)
-				{
-					index++;
-					if (tokens[index].type == TokenType::open_parenthesis)
-						operands.push_back(parse_function_call_expression(tokens, index, program, scope, result.function_id));
-					else
-						operands.push_back(FunctionNode{result.function_id});
-				};
-				auto const if_nothing_found = [&](lookup_result::NothingFound)
-				{
-					// Try the global scope.
-					std::visit(
-						overload(if_var_found, if_fn_found, [](lookup_result::NothingFound) { declare_unreachable(); }), 
-						lookup_name(program.global_scope, tokens[index].source));
-				};
-				auto const lookup = lookup_name(scope, tokens[index].source);
-				std::visit(overload(if_var_found, if_fn_found, if_nothing_found), lookup);
-			}
-			else if (tokens[index].type == TokenType::open_parenthesis)
-			{
-				index++;
-				operands.push_back(parse_subexpression(tokens, index, program, scope));
-
-				// Next token must be close parenthesis.
-				assert(tokens[index].type == TokenType::close_parenthesis);
-				index++;
-			}
-			else declare_unreachable(); // TODO: Actual error handling.
+			operands.push_back(parse_single_expression(tokens, index, program, scope));
 
 			// If the next token is an operator, parse the operator and repeat. Otherwise end the loop and return the expression.
 			if (index < tokens.size() && tokens[index].type == TokenType::operator_)
