@@ -1,6 +1,14 @@
 #include "program.hh"
 #include <algorithm>
 
+auto built_in_types() noexcept -> std::vector<Type>
+{
+	return {
+		{"int", 4, 4},
+		{"float", 4, 4},
+	};
+}
+
 struct name_equal
 {
 	constexpr name_equal(std::string_view name_) noexcept : name(name_) {}

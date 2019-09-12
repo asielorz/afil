@@ -46,9 +46,9 @@ namespace parser
 		std::vector<ExpressionTree> parameters;
 	};
 
-	struct ExpressionTree : public std::variant<int, OperatorNode, VariableNode, FunctionNode, FunctionCallNode> 
+	struct ExpressionTree : public std::variant<int, float, OperatorNode, VariableNode, FunctionNode, FunctionCallNode> 
 	{
-		using Base = std::variant<int, OperatorNode, VariableNode, FunctionNode, FunctionCallNode>;
+		using Base = std::variant<int, float, OperatorNode, VariableNode, FunctionNode, FunctionCallNode>;
 		using Base::Base;
 		constexpr auto as_variant() noexcept -> Base & { return *this; }
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }

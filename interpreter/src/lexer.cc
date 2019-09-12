@@ -1,5 +1,6 @@
 #include "lexer.hh"
 #include "unreachable.hh"
+#include "multicomparison.hh"
 #include <cassert>
 
 namespace lex
@@ -7,7 +8,7 @@ namespace lex
 
 	auto is_number(char c) noexcept -> bool
 	{
-		return (c >= '0') && (c < '9');
+		return (c >= '0') && (c <= '9');
 	}
 
 	auto is_operator(char c) noexcept -> bool
@@ -57,27 +58,45 @@ namespace lex
 		return chars_skipped;
 	}
 
-	auto next_token_type(std::string_view src, int index) noexcept -> Token::Type
-	{
-		if (is_number(src[index]))		return Token::Type::literal_int;
-		if (is_arrow(src, index))		return Token::Type::arrow;
-		if (is_operator(src[index]))	return Token::Type::operator_;
-		if (src[index] == '(')			return Token::Type::open_parenthesis;
-		if (src[index] == ')')			return Token::Type::close_parenthesis;
-		if (src[index] == '{')			return Token::Type::open_brace;
-		if (src[index] == '}')			return Token::Type::close_brace;
-		if (src[index] == ';')			return Token::Type::semicolon;
-		if (src[index] == ',')			return Token::Type::comma;
-		if (src[index] == '=')			return Token::Type::assignment;
-		else							return Token::Type::identifier;
-	}
-
 	auto token_length_literal_int(std::string_view src, int index) noexcept -> int
 	{
 		int length = 0;
 		while (!end_reached(src, index + length) && is_number(src[index + length]))
 			++length;
 		return length;
+	}
+
+	auto token_type_and_length_number(std::string_view src, int index) noexcept -> std::pair<Token::Type, int>
+	{
+		bool dot_read = false;
+		bool exp_read = false;
+
+		int end = index + 1;
+		for (;; ++end)
+		{
+			if (end_reached(src, end))
+				break;
+			if (is_number(src[end]))
+				continue;
+			else if (!dot_read && src[end] == '.')
+				dot_read = true;
+			else if (!exp_read && (src[end] == 'e' || src[end] == 'E'))
+			{
+				exp_read = true;
+				// Account for unary plus and minus in the exponent
+				if (src[end + 1] == '+' || src[end + 1] == '-')
+					++end;
+			}
+			else if (is_valid_after_literal(src[end]))
+				break;
+			else
+				declare_unreachable();
+		}
+
+		return { 
+			(dot_read || exp_read) ? Token::Type::literal_float : Token::Type::literal_int,
+			end - index
+		};
 	}
 
 	auto token_length_identifier(std::string_view src, int index) noexcept -> int
@@ -88,23 +107,19 @@ namespace lex
 		return length;
 	}
 
-	auto next_token_length(std::string_view src, int index, Token::Type type) noexcept -> int
+	auto next_token_type_and_length(std::string_view src, int index) noexcept -> std::pair<Token::Type, int>
 	{
-		switch (type)
-		{
-			case Token::Type::identifier:			return token_length_identifier(src, index);
-			case Token::Type::literal_int:			return token_length_literal_int(src, index);
-			case Token::Type::operator_:			return 1;
-			case Token::Type::open_parenthesis:		return 1;
-			case Token::Type::close_parenthesis:	return 1;
-			case Token::Type::open_brace:			return 1;
-			case Token::Type::close_brace:			return 1;
-			case Token::Type::semicolon:			return 1;
-			case Token::Type::comma:				return 1;
-			case Token::Type::assignment:			return 1;
-			case Token::Type::arrow:				return 2;
-		}
-		declare_unreachable();
+		if (is_number(src[index]))		return token_type_and_length_number(src, index);
+		if (is_arrow(src, index))		return {Token::Type::arrow,				2};
+		if (is_operator(src[index]))	return {Token::Type::operator_,			1};
+		if (src[index] == '(')			return {Token::Type::open_parenthesis,	1};
+		if (src[index] == ')')			return {Token::Type::close_parenthesis,	1};
+		if (src[index] == '{')			return {Token::Type::open_brace,		1};
+		if (src[index] == '}')			return {Token::Type::close_brace,		1};
+		if (src[index] == ';')			return {Token::Type::semicolon,			1};
+		if (src[index] == ',')			return {Token::Type::comma,				1};
+		if (src[index] == '=')			return {Token::Type::assignment,		1};
+		else							return {Token::Type::identifier,		token_length_identifier(src, index)};
 	}
 
 	std::vector<Token> tokenize(std::string_view src)
@@ -114,14 +129,14 @@ namespace lex
 
 		while (!end_reached(src, index))
 		{
+			auto const [token_type, token_length] = next_token_type_and_length(src, index);
 			Token token;
-			token.type = next_token_type(src, index);
-			int const token_length = next_token_length(src, index, token.type);
+			token.type = token_type;
 			token.source = src.substr(index, token_length);
 			index += token_length;
 
 			// After a literal we must find whitespace, an operator, a delimiter or the end of the source.
-			if (token.type == Token::Type::literal_int)
+			if (token.type == any_of(Token::Type::literal_int, Token::Type::literal_float))
 			{
 				assert(end_reached(src, index) || is_valid_after_literal(src[index]));
 			}

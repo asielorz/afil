@@ -166,3 +166,9 @@ TEST_CASE("Immediately invoked function expression and operator")
 	REQUIRE(eval_expression("fn (int i, int j) -> int { return i + j; }(3, 4) - 5") == 3 + 4 - 5);
 	REQUIRE(eval_expression("2 * fn (int i, int j) -> int { return i + j; }(3, 4)") == 2 * (3 + 4));
 }
+
+TEST_CASE("Floating point literal")
+{
+	Program program;
+	parser::parse_expression(lex::tokenize("3.141592"), program, program.global_scope);
+}

@@ -6,6 +6,13 @@
 
 namespace parser { struct StatementTree; }
 
+struct Type
+{
+	std::string_view name;
+	int size;
+	int alignment;
+};
+
 struct Variable
 {
 	std::string_view name;
@@ -31,8 +38,11 @@ struct Function : Scope
 	std::vector<parser::StatementTree> statements;
 };
 
+auto built_in_types() noexcept -> std::vector<Type>;
+
 struct Program
 {
+	std::vector<Type> types = built_in_types();
 	std::vector<Function> functions;
 	Scope global_scope;
 };

@@ -11,7 +11,8 @@ namespace lex
 		enum struct Type
 		{
 			identifier,
-			literal_int, 
+			literal_int,
+			literal_float,
 			operator_,								// + - / *
 			open_parenthesis, close_parenthesis,	// ( )
 			open_brace, close_brace,				// { }

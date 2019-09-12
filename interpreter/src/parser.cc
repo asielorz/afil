@@ -20,9 +20,10 @@ namespace parser
 		return precedences[static_cast<int>(op)];
 	}
 
-	auto parse_int(std::string_view token_source) noexcept -> int
+	template <typename T>
+	auto parse_number_literal(std::string_view token_source) noexcept -> T
 	{
-		int value;
+		T value;
 		std::from_chars(token_source.data(), token_source.data() + token_source.size(), value);
 		return value;
 	}
@@ -200,7 +201,11 @@ namespace parser
 		}
 		else if (tokens[index].type == TokenType::literal_int)
 		{
-			return ExpressionTree(parse_int(tokens[index++].source));
+			return ExpressionTree(parse_number_literal<int>(tokens[index++].source));
+		}
+		else if (tokens[index].type == TokenType::literal_float)
+		{
+			return ExpressionTree(parse_number_literal<float>(tokens[index++].source));
 		}
 		else if (tokens[index].type == TokenType::identifier)
 		{

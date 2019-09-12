@@ -27,6 +27,7 @@ namespace interpreter
 	{
 		auto const visitor = overload(
 			[](int literal_value) { return literal_value; },
+			[](float literal_value) { return (int)literal_value; }, // TODO
 			[&](parser::OperatorNode const & op_node) 
 			{
 				int const lval = eval_expression_tree(*op_node.left, stack, program);
