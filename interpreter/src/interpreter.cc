@@ -10,12 +10,12 @@ namespace interpreter
 
 	auto read_word(ProgramStack const & stack, int address) noexcept -> int
 	{
-		return reinterpret_cast<int const &>(stack.memory[address]);
+		return read<int>(stack, address);
 	}
 
 	auto write_word(ProgramStack & stack, int address, int value) noexcept -> void
 	{
-		reinterpret_cast<int &>(stack.memory[address]) = value;
+		write(stack, address, value);
 	}
 
 	auto alloc_stack(ProgramStack & stack, int stack_size_in_bytes) noexcept -> void

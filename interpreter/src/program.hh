@@ -12,10 +12,12 @@ struct Type
 	int size;
 	int alignment;
 };
+enum struct TypeId { function = -2, none = -1, int_, float_ };
 
 struct Variable
 {
 	std::string_view name;
+	TypeId type;
 	int offset;
 };
 
@@ -35,6 +37,7 @@ struct Scope
 struct Function : Scope
 {
 	int parameter_count = 0; // From the variables, how many are arguments. The rest are locals.
+	TypeId return_type;
 	std::vector<parser::StatementTree> statements;
 };
 
@@ -47,7 +50,6 @@ struct Program
 	Scope global_scope;
 };
 
-// Returns offset of the requested variable, or -1 if not found.
 namespace lookup_result
 {
 	struct NothingFound {};
@@ -60,3 +62,6 @@ auto lookup_name(Scope const & scope, std::string_view name) noexcept
 		lookup_result::VariableFound, 
 		lookup_result::FunctionFound
 	>;
+
+auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId;
+auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;

@@ -45,6 +45,19 @@ namespace parser
 		return tree.index() == 1;
 	}
 
+	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> TypeId
+	{
+		auto const visitor = overload(
+			[](int) { return TypeId::int_; },
+			[](float) { return TypeId::float_; },
+			[&](parser::OperatorNode const & op_node) { return expression_type(*op_node.left, program); },
+			[](parser::VariableNode const & var_node) { return var_node.variable_type; },
+			[](parser::FunctionNode const &) { return TypeId::function; },
+			[&](parser::FunctionCallNode const & func_call_node) { return program.functions[func_call_node.function_id].return_type; }
+		);
+		return std::visit(visitor, tree.as_variant());
+	}
+
 	auto insert_expression(ExpressionTree & tree, ExpressionTree & new_node) noexcept -> void
 	{
 		OperatorNode & tree_op = std::get<OperatorNode>(tree);
@@ -100,6 +113,27 @@ namespace parser
 		return result_tokens;
 	}
 
+	auto align(int address, int alignment) noexcept -> int
+	{
+		int const excedent = address % alignment;
+		if (excedent > 0)
+			address += alignment - excedent;
+		return address;
+	}
+
+	auto add_variable_to_scope(Scope & scope, std::string_view name, TypeId type_id, Program const & program) -> int
+	{
+		Type const & type = type_with_id(program, type_id);
+
+		Variable var;
+		var.name = name;
+		var.type = type_id;
+		var.offset = align(scope.stack_frame_size, type.alignment);
+		scope.stack_frame_size = var.offset + type.size;
+		scope.variables.push_back(var);
+		return var.offset;
+	}
+
 	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> FunctionNode
 	{
 		// Skip fn token.
@@ -115,14 +149,11 @@ namespace parser
 		while (tokens[index].type == TokenType::identifier)
 		{
 			// TODO: Types
-			assert(tokens[index].source == "int");
+			TypeId const type_found = lookup_type_name(program, tokens[index].source);
+			assert(type_found != TypeId::none);
 			index++;
 
-			Variable argument;
-			argument.name = tokens[index].source;
-			argument.offset = function.stack_frame_size;
-			function.stack_frame_size += sizeof(int);
-			function.variables.push_back(argument);
+			add_variable_to_scope(function, tokens[index].source, type_found, program);
 			function.parameter_count++;
 			index++;
 
@@ -279,27 +310,25 @@ namespace parser
 	auto parse_variable_declaration_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> VariableDeclarationStatementNode
 	{
 		// A variable declaration statement has the following form:
-		// int [var_name] = [expr];
+		// [type] [var_name] = [expr];
 
 		VariableDeclarationStatementNode node;
 
 		// A statement begins with the type of the declared variable.
-		assert(tokens[0].source == "int");
+		TypeId const type_found = lookup_type_name(program, tokens[0].source);
+		assert(type_found != TypeId::none);
 
 		// The second token of the statement is the variable name.
 		assert(tokens[1].type == TokenType::identifier);
-		Variable local;
-		local.name = tokens[1].source;
-		local.offset = scope.stack_frame_size;
-		scope.stack_frame_size += sizeof(int);
-		node.variable_offset = local.offset;
-		scope.variables.push_back(local);
+		node.variable_offset = add_variable_to_scope(scope, tokens[1].source, type_found, program);
 
 		// The third token is a '='.
 		assert(tokens[2].type == TokenType::assignment);
 
 		// The rest is the expression assigned to the variable.
 		node.assigned_expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope);
+		// Require that the expression assigned to the variable has the same type as the variable.
+		assert(expression_type(node.assigned_expression, program) == type_found);
 
 		return node;
 	}

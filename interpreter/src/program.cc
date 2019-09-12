@@ -40,3 +40,17 @@ auto lookup_name(Scope const & scope, std::string_view name) noexcept
 
 	return lookup_result::NothingFound();
 }
+
+auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId
+{
+	auto const type = std::find_if(program.types.begin(), program.types.end(), name_equal(name));
+	if (type != program.types.end())
+		return static_cast<TypeId>(type - program.types.begin());
+	else
+		return TypeId::none;
+}
+
+auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &
+{
+	return program.types[static_cast<int>(id)];
+}

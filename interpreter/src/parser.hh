@@ -7,6 +7,7 @@
 
 struct Program;
 struct Scope;
+enum struct TypeId;
 namespace lex {	struct Token; }
 
 namespace parser
@@ -32,6 +33,7 @@ namespace parser
 
 	struct VariableNode
 	{
+		TypeId variable_type;
 		int variable_offset;
 	};
 
@@ -55,6 +57,7 @@ namespace parser
 	};
 
 	auto is_operator_node(ExpressionTree const & tree) noexcept -> bool;
+	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> TypeId;
 
 	struct VariableDeclarationStatementNode
 	{

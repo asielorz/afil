@@ -172,3 +172,15 @@ TEST_CASE("Floating point literal")
 	Program program;
 	parser::parse_expression(lex::tokenize("3.141592"), program, program.global_scope);
 }
+
+TEST_CASE("Floating point variable declaration")
+{
+	interpreter::ProgramStack stack;
+	alloc_stack(stack, 32);
+	Function function;
+	run_statement("float f = 5.0;", stack, function);
+
+	REQUIRE(function.variables.size() == 1);
+	REQUIRE(function.variables[0].name == "f");
+	REQUIRE(interpreter::read<float>(stack, stack.base_pointer + function.variables[0].offset) == 5.0f);
+}
