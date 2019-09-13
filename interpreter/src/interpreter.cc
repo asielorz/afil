@@ -3,7 +3,58 @@
 #include "unreachable.hh"
 #include "overload.hh"
 #include "program.hh"
+#include "utils.hh"
 #include <cassert>
+
+//*************************************************************************************************
+// DELETEME
+//*************************************************************************************************
+using helper_func_t = int(*)(void const * params, void const * function);
+
+using param_t = uint32_t;
+
+template <size_t N>
+using MapEverythingToParam = param_t;
+
+template <size_t ... Is>
+int call_c_function_impl_impl(std::index_sequence<Is...>, param_t const * params, void const * function)
+{
+	using c_func_t = int(*)(MapEverythingToParam<Is>...);
+
+	return static_cast<c_func_t>(function)(params[Is]...);
+}
+
+template <size_t N>
+int call_c_function_impl(void const * params, void const * function)
+{
+	return call_c_function_impl_impl(std::make_index_sequence<N>(), static_cast<param_t const *>(params), function);
+}
+
+constexpr helper_func_t call_c_function_impls[] = {
+	&call_c_function_impl<0>, 
+	&call_c_function_impl<1>,
+	&call_c_function_impl<2>,
+	&call_c_function_impl<3>,
+	&call_c_function_impl<4>,
+	&call_c_function_impl<5>,
+	&call_c_function_impl<6>,
+	&call_c_function_impl<7>,
+	&call_c_function_impl<8>,
+	&call_c_function_impl<9>,
+	&call_c_function_impl<10>
+};
+
+// By now we will assume it calls int.
+int call_c_function(void const * params, int param_size, void const * function)
+{
+	int const func_index = align(param_size, sizeof(param_t)) / sizeof(param_t);
+	assert(func_index < std::size(call_c_function_impls));
+	return call_c_function_impls[func_index](params, function);
+}
+//*************************************************************************************************
+// DELETEME
+//*************************************************************************************************
+
 
 namespace interpreter
 {
@@ -123,9 +174,22 @@ namespace interpreter
 				}
 				else
 				{
-					//ExternFunction const & func = program.extern_functions[func_call_node.function_id.index];
-
+					ExternFunction const & func = program.extern_functions[func_call_node.function_id.index];
 					
+					int const parameter_size = static_cast<int>(func.parameters.size()) * sizeof(int); // TODO: Parameter size for different types
+					int const parameters_start = alloc(stack, parameter_size);
+
+					// Evaluate the expressions that yield the parameters of the function.
+					for (int i = 0, next_parameter_address = parameters_start; i < func_call_node.parameters.size(); ++i)
+					{
+						eval_expression_tree(func_call_node.parameters[i], stack, program, next_parameter_address);
+						next_parameter_address += expression_type(func_call_node.parameters[i], program).size;
+					}
+
+					int const result = call_c_function(stack.memory.data() + parameters_start, parameter_size, func.function_pointer);
+
+					free_up_to(stack, parameters_start);
+					write(stack, return_address, result);
 				}
 			}
 		);

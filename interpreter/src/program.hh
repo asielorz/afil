@@ -46,7 +46,7 @@ struct ExternFunction
 {
 	std::vector<Variable> parameters;
 	TypeId return_type;
-	void * function_pointer;
+	void const * function_pointer;
 };
 
 struct Program

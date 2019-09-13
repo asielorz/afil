@@ -27,6 +27,7 @@
     <ClCompile Include="src\tests\span.tests.cc" />
     <ClCompile Include="src\lexer.cc" />
     <ClCompile Include="src\unreachable.cc" />
+    <ClCompile Include="src\utils.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\function_id.hh" />
@@ -39,6 +40,7 @@
     <ClInclude Include="src\span.hh" />
     <ClInclude Include="src\lexer.hh" />
     <ClInclude Include="src\unreachable.hh" />
+    <ClInclude Include="src\utils.hh" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="span.natvis" />

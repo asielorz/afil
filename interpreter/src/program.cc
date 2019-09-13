@@ -78,13 +78,30 @@ auto resolve_function_overloading(span<FunctionId const> overload_set, span<Type
 {
 	for (FunctionId function_id : overload_set)
 	{
-		Function const & function = program.functions[function_id.index];
-		if (std::equal(
-			function.variables.begin(), function.variables.begin() + function.parameter_count, 
-			parameters.begin(), parameters.end(),
-			[](Variable const & var, TypeId type) { return var.type == type; }
-		))
-			return function_id;
+		if (!function_id.is_extern)
+		{
+			Function const & function = program.functions[function_id.index];
+			if (std::equal(
+				function.variables.begin(), function.variables.begin() + function.parameter_count,
+				parameters.begin(), parameters.end(),
+				[](Variable const & var, TypeId type) { return var.type == type; }
+			))
+			{
+				return function_id;
+			}
+		}
+		else
+		{
+			ExternFunction const & function = program.extern_functions[function_id.index];
+			if (std::equal(
+				function.parameters.begin(), function.parameters.end(),
+				parameters.begin(), parameters.end(),
+				[](Variable const & var, TypeId type) { return var.type == type; }
+			))
+			{
+				return function_id;
+			}
+		}
 	}
 
 	return invalid_function_id;

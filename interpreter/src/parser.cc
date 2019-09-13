@@ -6,6 +6,7 @@
 #include "unreachable.hh"
 #include "overload.hh"
 #include "multicomparison.hh"
+#include "utils.hh"
 #include <vector>
 #include <cassert>
 #include <charconv>
@@ -140,14 +141,6 @@ namespace parser
 		auto const result_tokens = tokens.subspan(index, length);
 		index += length;
 		return result_tokens;
-	}
-
-	auto align(int address, int alignment) noexcept -> int
-	{
-		int const excedent = address % alignment;
-		if (excedent > 0)
-			address += alignment - excedent;
-		return address;
 	}
 
 	auto add_variable_to_scope(Scope & scope, std::string_view name, TypeId type_id, Program const & program) -> int

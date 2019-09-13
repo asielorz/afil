@@ -203,3 +203,23 @@ TEST_CASE("Overloading")
 	REQUIRE(eval_expression<float>("id(3.141592)", stack, program) == 3.141592f);
 }
 
+TEST_CASE("Hacking extern functions as a proof of concept")
+{
+	int(*add_fn)(int, int) = [](int a, int b) 
+	{ 
+		return a + b; 
+	};
+
+	Program program;
+	program.extern_functions.push_back(ExternFunction{
+		{ Variable{"a", TypeId::int_, 0}, Variable{"b", TypeId::int_, 0} },
+		TypeId::int_,
+		add_fn
+	});
+	program.global_scope.functions.push_back(FunctionName{"add", FunctionId{1, 0}});
+
+	interpreter::ProgramStack stack;
+	alloc_stack(stack, 32);
+
+	REQUIRE(eval_expression<int>("add(2, 3)", stack, program) == 2 + 3);
+}
