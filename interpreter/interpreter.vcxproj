@@ -19,9 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\callc.cc" />
     <ClCompile Include="src\program.cc" />
     <ClCompile Include="src\interpreter.cc" />
     <ClCompile Include="src\parser.cc" />
+    <ClCompile Include="src\tests\callc.tests.cc" />
     <ClCompile Include="src\tests\interpreter.tests.cc" />
     <ClCompile Include="src\tests\main.cc" />
     <ClCompile Include="src\tests\span.tests.cc" />
@@ -30,6 +32,7 @@
     <ClCompile Include="src\utils.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\callc.hh" />
     <ClInclude Include="src\function_id.hh" />
     <ClInclude Include="src\multicomparison.hh" />
     <ClInclude Include="src\program.hh" />
@@ -126,6 +129,7 @@
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SupportJustMyCode>false</SupportJustMyCode>
       <AdditionalIncludeDirectories>$(ProjectDir)\src\;$(SolutionDir)\extern\</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -139,6 +143,7 @@
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SupportJustMyCode>false</SupportJustMyCode>
       <AdditionalIncludeDirectories>$(ProjectDir)\src\;$(SolutionDir)\extern\</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -154,6 +159,7 @@
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SupportJustMyCode>false</SupportJustMyCode>
       <AdditionalIncludeDirectories>$(ProjectDir)\src\;$(SolutionDir)\extern\</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -173,6 +179,7 @@
       <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SupportJustMyCode>false</SupportJustMyCode>
       <AdditionalIncludeDirectories>$(ProjectDir)\src\;$(SolutionDir)\extern\</AdditionalIncludeDirectories>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
