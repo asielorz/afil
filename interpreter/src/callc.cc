@@ -1,5 +1,6 @@
 #include "callc.hh"
 #include "unreachable.hh"
+#include "utils.hh"
 
 namespace callc
 {
@@ -9,6 +10,12 @@ namespace callc
 
 	namespace callers
 	{
+
+		template <typename T, typename U>
+		auto next_field(U const * p) -> T const *
+		{
+			return reinterpret_cast<T const *>(align(p + 1, alignof(T)));
+		}
 
 		template <typename R>
 		auto caller_0_args(void const * function, void const *, void * return_value) noexcept -> void
@@ -29,7 +36,7 @@ namespace callc
 		{
 			*static_cast<R *>(return_value) = function_ptr<auto(A1, A2) noexcept -> R>(function)(
 				*reinterpret_cast<A1 const *>(arg_data),
-				*reinterpret_cast<A2 const *>(reinterpret_cast<A1 const *>(arg_data) + 1)
+				*next_field<A2>(reinterpret_cast<A1 const *>(arg_data))
 			);
 		}
 
@@ -38,8 +45,8 @@ namespace callc
 		{
 			*static_cast<R *>(return_value) = function_ptr<auto(A1, A2, A3) noexcept -> R>(function)(
 				*reinterpret_cast<A1 const *>(arg_data),
-				*reinterpret_cast<A2 const *>(reinterpret_cast<A1 const *>(arg_data) + 1),
-				*reinterpret_cast<A3 const *>(reinterpret_cast<A2 const *>(reinterpret_cast<A1 const *>(arg_data) + 1) + 1)
+				*next_field<A2>(reinterpret_cast<A1 const *>(arg_data)),
+				*next_field<A3>(next_field<A2>(reinterpret_cast<A1 const *>(arg_data)))
 			);
 		}
 
@@ -48,9 +55,9 @@ namespace callc
 		{
 			*static_cast<R *>(return_value) = function_ptr<auto(A1, A2, A3, A4) noexcept -> R>(function)(
 				*reinterpret_cast<A1 const *>(arg_data),
-				*reinterpret_cast<A2 const *>(reinterpret_cast<A1 const *>(arg_data) + 1),
-				*reinterpret_cast<A3 const *>(reinterpret_cast<A2 const *>(reinterpret_cast<A1 const *>(arg_data) + 1) + 1),
-				*reinterpret_cast<A4 const *>(reinterpret_cast<A3 const *>(reinterpret_cast<A2 const *>(reinterpret_cast<A1 const *>(arg_data) + 1) + 1) + 1)
+				*next_field<A2>(reinterpret_cast<A1 const *>(arg_data)),
+				*next_field<A3>(next_field<A2>(reinterpret_cast<A1 const *>(arg_data))),
+				*next_field<A4>(next_field<A3>(next_field<A2>(reinterpret_cast<A1 const *>(arg_data))))
 			);
 		}
 	} // namespace callers
