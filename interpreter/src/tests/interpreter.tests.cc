@@ -202,3 +202,4 @@ TEST_CASE("Overloading")
 	REQUIRE(eval_expression<int>("id(5)", stack, program) == 5);
 	REQUIRE(eval_expression<float>("id(3.141592)", stack, program) == 3.141592f);
 }
+

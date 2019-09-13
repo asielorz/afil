@@ -29,6 +29,7 @@
     <ClCompile Include="src\unreachable.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\function_id.hh" />
     <ClInclude Include="src\multicomparison.hh" />
     <ClInclude Include="src\program.hh" />
     <ClInclude Include="src\interpreter.hh" />

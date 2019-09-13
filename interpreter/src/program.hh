@@ -1,5 +1,6 @@
 #pragma once
 
+#include "function_id.hh"
 #include "span.hh"
 #include <string_view>
 #include <variant>
@@ -24,7 +25,7 @@ struct Variable
 struct FunctionName
 {
 	std::string_view name;
-	int id;
+	FunctionId id;
 };
 
 struct Scope
@@ -41,12 +42,20 @@ struct Function : Scope
 	std::vector<parser::StatementTree> statements;
 };
 
-auto built_in_types() noexcept -> std::vector<Type>;
+struct ExternFunction
+{
+	std::vector<Variable> parameters;
+	TypeId return_type;
+	void * function_pointer;
+};
 
 struct Program
 {
-	std::vector<Type> types = built_in_types();
+	Program();
+
+	std::vector<Type> types;
 	std::vector<Function> functions;
+	std::vector<ExternFunction> extern_functions;
 	Scope global_scope;
 };
 
@@ -55,7 +64,7 @@ namespace lookup_result
 	struct Nothing {};
 	struct Variable { TypeId variable_type; int variable_offset; };
 	struct GlobalVariable { TypeId variable_type; int variable_offset; };
-	struct OverloadSet { std::vector<int> function_ids; };
+	struct OverloadSet { std::vector<FunctionId> function_ids; };
 }
 auto lookup_name(Scope const & scope, Scope const & global_scope, std::string_view name) noexcept 
 	-> std::variant<
@@ -65,7 +74,7 @@ auto lookup_name(Scope const & scope, Scope const & global_scope, std::string_vi
 		lookup_result::OverloadSet
 	>;
 // Returns id of function found or -1 on failure.
-auto resolve_function_overloading(span<int const> overload_set, span<TypeId> parameters, Program const & program) noexcept -> int;
+auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId> parameters, Program const & program) noexcept ->FunctionId;
 
 auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;

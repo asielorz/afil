@@ -60,7 +60,13 @@ namespace parser
 			[](parser::LocalVariableNode const & var_node) { return var_node.variable_type; },
 			[](parser::GlobalVariableNode const & var_node) { return var_node.variable_type; },
 			[](parser::FunctionNode const &) { return TypeId::function; },
-			[&](parser::FunctionCallNode const & func_call_node) { return program.functions[func_call_node.function_id].return_type; }
+			[&](parser::FunctionCallNode const & func_call_node) 
+			{
+				if (func_call_node.function_id.is_extern)
+					return program.extern_functions[func_call_node.function_id.index].return_type;
+				else
+					return program.functions[func_call_node.function_id.index].return_type;
+			}
 		);
 		return std::visit(visitor, tree.as_variant());
 	}
@@ -209,12 +215,13 @@ namespace parser
 
 		// Add the function to the program.
 		program.functions.push_back(std::move(function));
-		return FunctionNode{static_cast<int>(program.functions.size() - 1)};
+		auto const func_id = FunctionId{0, static_cast<unsigned>(program.functions.size() - 1)};
+		return FunctionNode{func_id};
 	}
 
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree;
 
-	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, span<int const> overload_set) noexcept -> FunctionCallNode
+	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, span<FunctionId const> overload_set) noexcept -> FunctionCallNode
 	{
 		// Parameter list starts with (
 		assert(tokens[index].type == TokenType::open_parenthesis);
@@ -249,6 +256,7 @@ namespace parser
 		}
 
 		node.function_id = resolve_function_overloading(overload_set, parameter_types, program);
+		assert(node.function_id != invalid_function_id);
 
 		return node;
 	}
@@ -260,7 +268,7 @@ namespace parser
 			auto const func_node = parse_function_expression(tokens, index, program);
 			// Opening parenthesis after a function means a function call.
 			if (tokens[index].type == TokenType::open_parenthesis)
-				return parse_function_call_expression(tokens, index, program, scope, span<int const>(&func_node.function_id, 1));
+				return parse_function_call_expression(tokens, index, program, scope, span<FunctionId const>(&func_node.function_id, 1));
 			else
 				return func_node;
 		}

@@ -91,33 +91,42 @@ namespace interpreter
 			},
 			[&](parser::FunctionCallNode const & func_call_node)
 			{
-				Function const & func = program.functions[func_call_node.function_id];
-
-				int const parameter_size = func.parameter_count * sizeof(int); // TODO: Parameter size for different types
-
-				// Write ebp to the stack so that we can return to our stack frame when the function ends.
-				int const ebp_address = alloc(stack, sizeof(int));
-				write_word(stack, ebp_address, stack.base_pointer);
-
-				// Push stack pointer to the end of parameters. This is to avoid that the expressions that compute
-				// the parameters of the function overwrite the memory reserved for the parameters.
-				int const parameters_start = alloc(stack, parameter_size);
-
-				// Evaluate the expressions that yield the parameters of the function.
-				for (int i = 0, next_parameter_address = parameters_start; i < func_call_node.parameters.size(); ++i)
+				if (!func_call_node.function_id.is_extern)
 				{
-					eval_expression_tree(func_call_node.parameters[i], stack, program, next_parameter_address);
-					next_parameter_address += expression_type(func_call_node.parameters[i], program).size;
+					Function const & func = program.functions[func_call_node.function_id.index];
+
+					int const parameter_size = func.parameter_count * sizeof(int); // TODO: Parameter size for different types
+
+					// Write ebp to the stack so that we can return to our stack frame when the function ends.
+					int const ebp_address = alloc(stack, sizeof(int));
+					write_word(stack, ebp_address, stack.base_pointer);
+
+					// Push stack pointer to the end of parameters. This is to avoid that the expressions that compute
+					// the parameters of the function overwrite the memory reserved for the parameters.
+					int const parameters_start = alloc(stack, parameter_size);
+
+					// Evaluate the expressions that yield the parameters of the function.
+					for (int i = 0, next_parameter_address = parameters_start; i < func_call_node.parameters.size(); ++i)
+					{
+						eval_expression_tree(func_call_node.parameters[i], stack, program, next_parameter_address);
+						next_parameter_address += expression_type(func_call_node.parameters[i], program).size;
+					}
+
+					// Move the stack pointers.
+					stack.base_pointer = parameters_start;
+					stack.top_pointer = parameters_start + func.stack_frame_size;
+
+					// Run the function.
+					for (auto const & statement : func.statements)
+						if (run_statement_tree(statement, stack, program, return_address))
+							break;
 				}
+				else
+				{
+					//ExternFunction const & func = program.extern_functions[func_call_node.function_id.index];
 
-				// Move the stack pointers.
-				stack.base_pointer = parameters_start;
-				stack.top_pointer = parameters_start + func.stack_frame_size;
-
-				// Run the function.
-				for (auto const & statement : func.statements)
-					if (run_statement_tree(statement, stack, program, return_address))
-						break;
+					
+				}
 			}
 		);
 		std::visit(visitor, tree.as_variant());

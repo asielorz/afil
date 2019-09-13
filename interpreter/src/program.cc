@@ -1,4 +1,6 @@
 #include "program.hh"
+#include "lexer.hh"
+#include "parser.hh"
 #include <algorithm>
 
 auto built_in_types() noexcept -> std::vector<Type>
@@ -7,6 +9,12 @@ auto built_in_types() noexcept -> std::vector<Type>
 		{"int", 4, 4},
 		{"float", 4, 4},
 	};
+}
+
+Program::Program()
+{
+	types = built_in_types();
+
 }
 
 struct name_equal
@@ -66,11 +74,11 @@ auto lookup_name(Scope const & scope, Scope const & global_scope, std::string_vi
 		return overload_set;
 }
 
-auto resolve_function_overloading(span<int const> overload_set, span<TypeId> parameters, Program const & program) noexcept -> int
+auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId> parameters, Program const & program) noexcept -> FunctionId
 {
-	for (int function_id : overload_set)
+	for (FunctionId function_id : overload_set)
 	{
-		Function const & function = program.functions[function_id];
+		Function const & function = program.functions[function_id.index];
 		if (std::equal(
 			function.variables.begin(), function.variables.begin() + function.parameter_count, 
 			parameters.begin(), parameters.end(),
@@ -79,7 +87,7 @@ auto resolve_function_overloading(span<int const> overload_set, span<TypeId> par
 			return function_id;
 	}
 
-	return -1;
+	return invalid_function_id;
 }
 
 auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId

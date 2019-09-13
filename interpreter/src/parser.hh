@@ -1,5 +1,6 @@
 #pragma once
 
+#include "function_id.hh"
 #include "span.hh"
 #include <string_view>
 #include <variant>
@@ -42,12 +43,12 @@ namespace parser
 
 	struct FunctionNode
 	{
-		int function_id;
+		FunctionId function_id;
 	};
 
 	struct FunctionCallNode
 	{
-		int function_id;
+		FunctionId function_id;
 		std::vector<ExpressionTree> parameters;
 	};
 
