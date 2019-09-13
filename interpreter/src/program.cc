@@ -33,7 +33,7 @@ auto lookup_name(Scope const & scope, std::string_view name) noexcept
 	auto const func = std::find_if(scope.functions.begin(), scope.functions.end(), name_equal(name));
 
 	if (var != scope.variables.end())
-		return lookup_result::VariableFound{var->offset};
+		return lookup_result::VariableFound{var->type, var->offset};
 
 	if (func != scope.functions.end())
 		return lookup_result::FunctionFound{func->id};

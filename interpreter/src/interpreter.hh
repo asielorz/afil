@@ -25,8 +25,11 @@ namespace interpreter
 	template <typename T> auto write(ProgramStack & stack, int address, T const & value) noexcept -> void;
 	auto alloc_stack(ProgramStack & stack, int stack_size_in_bytes) noexcept -> void;
 
+	// Return value is allocated on top of the stack. Returns address of return value.
 	auto eval_expression_tree(parser::ExpressionTree const & tree, ProgramStack & stack, Program const & program) noexcept -> int;
-	auto run_statement_tree(parser::StatementTree const & tree, ProgramStack & stack, Program const & program) noexcept -> bool;
+	// Return value is written at the given address.
+	auto eval_expression_tree(parser::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> void;
+	auto run_statement_tree(parser::StatementTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> bool;
 
 }
 

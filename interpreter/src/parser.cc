@@ -45,12 +45,17 @@ namespace parser
 		return tree.index() == 1;
 	}
 
-	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> TypeId
+	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> Type
+	{
+		return type_with_id(program, expression_type_id(tree, program));
+	}
+
+	auto expression_type_id(ExpressionTree const & tree, Program const & program) noexcept -> TypeId
 	{
 		auto const visitor = overload(
 			[](int) { return TypeId::int_; },
 			[](float) { return TypeId::float_; },
-			[&](parser::OperatorNode const & op_node) { return expression_type(*op_node.left, program); },
+			[&](parser::OperatorNode const & op_node) { return expression_type_id(*op_node.left, program); },
 			[](parser::VariableNode const & var_node) { return var_node.variable_type; },
 			[](parser::FunctionNode const &) { return TypeId::function; },
 			[&](parser::FunctionCallNode const & func_call_node) { return program.functions[func_call_node.function_id].return_type; }
@@ -77,6 +82,11 @@ namespace parser
 			insert_expression(*tree_op.right, new_node);
 	}
 
+	//auto are_expression_tree_types_valid(ExpressionTree const & tree) noexcept -> bool
+	//{
+	//
+	//}
+
 	auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator const> operators) noexcept -> ExpressionTree
 	{
 		if (operators.empty())
@@ -92,12 +102,13 @@ namespace parser
 			);
 		}();
 
-
 		for (size_t i = 1; i < operators.size(); ++i)
 		{
 			auto new_node = ExpressionTree(OperatorNode(operators[i], nullptr, std::make_unique<ExpressionTree>(std::move(operands[i + 1]))));
 			insert_expression(root, new_node);
 		}
+
+		//assert(are_expression_tree_types_valid(root));
 		return root;
 	}
 
@@ -148,7 +159,6 @@ namespace parser
 		// Parse arguments.
 		while (tokens[index].type == TokenType::identifier)
 		{
-			// TODO: Types
 			TypeId const type_found = lookup_type_name(program, tokens[index].source);
 			assert(type_found != TypeId::none);
 			index++;
@@ -166,7 +176,8 @@ namespace parser
 		index++;
 
 		// Return type. By now only int supported.
-		assert(tokens[index].source == "int");
+		function.return_type = lookup_type_name(program, tokens[index].source);
+		assert(function.return_type != TypeId::none);
 		index++;
 
 		// Body of the function is enclosed by braces.
@@ -243,6 +254,7 @@ namespace parser
 			auto const if_var_found = [&](lookup_result::VariableFound result) -> ExpressionTree
 			{
 				VariableNode var_node;
+				var_node.variable_type = result.variable_type;
 				var_node.variable_offset = result.variable_offset;
 				index++;
 				return var_node;
@@ -328,7 +340,7 @@ namespace parser
 		// The rest is the expression assigned to the variable.
 		node.assigned_expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope);
 		// Require that the expression assigned to the variable has the same type as the variable.
-		assert(expression_type(node.assigned_expression, program) == type_found);
+		assert(expression_type_id(node.assigned_expression, program) == type_found);
 
 		return node;
 	}

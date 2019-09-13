@@ -53,7 +53,7 @@ struct Program
 namespace lookup_result
 {
 	struct NothingFound {};
-	struct VariableFound { int variable_offset; };
+	struct VariableFound { TypeId variable_type; int variable_offset; };
 	struct FunctionFound { int function_id; };
 }
 auto lookup_name(Scope const & scope, std::string_view name) noexcept 

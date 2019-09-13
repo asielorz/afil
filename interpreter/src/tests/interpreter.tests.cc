@@ -10,8 +10,9 @@ auto eval_expression(std::string_view src)
 {
 	Program program;
 	interpreter::ProgramStack stack;
-	alloc_stack(stack, 32);
-	return interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, program.global_scope), stack, program);
+	alloc_stack(stack, 128);
+	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, program.global_scope), stack, program);
+	return read_word(stack, return_address);
 }
 
 TEST_CASE("basic arithmetic expressions")
@@ -46,21 +47,26 @@ TEST_CASE("Multiplication has more precedence than addition")
 	REQUIRE(eval_expression("2 * 3 * 2 - 4 * 5 + 6 / 3 * 2 + 1 + 1 + 1 * 3") == 2 * 3 * 2 - 4 * 5 + 6 / 3 * 2 + 1 + 1 + 1 * 3);
 }
 
-auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Function & function) noexcept -> void
+auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Scope & scope) noexcept -> void
 {
 	Program program;
-	interpreter::run_statement_tree(*parser::parse_statement(lex::tokenize(src), program, function), stack, program);
+	interpreter::run_statement_tree(*parser::parse_statement(lex::tokenize(src), program, scope), stack, program, 0);
 }
 
 auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Scope const & scope) noexcept -> int
 {
 	Program program;
-	return interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope), stack, program);
+	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope), stack, program);
+	return read_word(stack, return_address);
 }
 
-auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Program & program, Scope const & scope) noexcept -> int
+template <typename T>
+auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Program & program) noexcept -> T
 {
-	return interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope), stack, program);
+	if (stack.top_pointer == 0)
+		stack.top_pointer = program.global_scope.stack_frame_size;
+	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, program.global_scope), stack, program);
+	return interpreter::read<T>(stack, return_address);
 }
 
 TEST_CASE("A statement declares a variable and assigns it an expression, then ends with a semicolon")
@@ -82,11 +88,11 @@ TEST_CASE("A variable can be accessed from expressions after it is declared")
 {
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 32);
-	Function function;
-	run_statement("int i = 30;", stack, function);
+	Program program;
+	run_statement("int i = 30;", stack, program.global_scope);
 	int const i = 30;
-	REQUIRE(eval_expression("i", stack, function) == i);
-	REQUIRE(eval_expression("i * i - 4 + i / 6 - 3 * i", stack, function) == i * i - 4 + i / 6 - 3 * i);
+	REQUIRE(eval_expression<int>("i", stack, program) == i);
+	REQUIRE(eval_expression<int>("i * i - 4 + i / 6 - 3 * i", stack, program) == i * i - 4 + i / 6 - 3 * i);
 }
 
 TEST_CASE("Identity function expression")
@@ -113,7 +119,7 @@ TEST_CASE("Call a function")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 32);
 	parser::parse_statement(lex::tokenize("let add_one = fn (int x) -> int { return x + 1; };"), program, program.global_scope);
-	REQUIRE(eval_expression("add_one(5)", stack, program, program.global_scope) == 6);
+	REQUIRE(eval_expression<int>("add_one(5)", stack, program) == 6);
 }
 
 TEST_CASE("Call  function with multiple parameters")
@@ -122,7 +128,7 @@ TEST_CASE("Call  function with multiple parameters")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
 	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope);
-	REQUIRE(eval_expression("add(5, 6)", stack, program, program.global_scope) == 11);
+	REQUIRE(eval_expression<int>("add(5, 6)", stack, program) == 11);
 
 	auto const source = R"(
 let add_seven = fn (int a, int b, int c, int d, int e, int f, int g) -> int 
@@ -131,7 +137,7 @@ let add_seven = fn (int a, int b, int c, int d, int e, int f, int g) -> int
 };
 )";
 	parser::parse_statement(lex::tokenize(source), program, program.global_scope);
-	REQUIRE(eval_expression("add_seven(1, 2, 3, 4, 5, 6, 7)", stack, program, program.global_scope) == 1 + 2 + 3 + 4 + 5 + 6 + 7);
+	REQUIRE(eval_expression<int>("add_seven(1, 2, 3, 4, 5, 6, 7)", stack, program) == 1 + 2 + 3 + 4 + 5 + 6 + 7);
 }
 
 TEST_CASE("Nested calls")
@@ -143,7 +149,7 @@ TEST_CASE("Nested calls")
 	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope);
 	parser::parse_statement(lex::tokenize("let subtract = fn (int x, int y) -> int { return add(x, 0 - y); };"), program, program.global_scope);
 	
-	REQUIRE(eval_expression("subtract(add(2, 3), subtract(4, 1))", stack, program, program.global_scope) == (2 + 3) - (4 - 1));
+	REQUIRE(eval_expression<int>("subtract(add(2, 3), subtract(4, 1))", stack, program) == (2 + 3) - (4 - 1));
 }
 
 TEST_CASE("Naming a function is a valid expression (that does nothing)")
@@ -177,10 +183,20 @@ TEST_CASE("Floating point variable declaration")
 {
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 32);
-	Function function;
-	run_statement("float f = 5.0;", stack, function);
+	Program program;
+	run_statement("float f = 5.0;", stack, program.global_scope);
 
-	REQUIRE(function.variables.size() == 1);
-	REQUIRE(function.variables[0].name == "f");
-	REQUIRE(interpreter::read<float>(stack, stack.base_pointer + function.variables[0].offset) == 5.0f);
+	REQUIRE(program.global_scope.variables.size() == 1);
+	REQUIRE(program.global_scope.variables[0].name == "f");
+	REQUIRE(interpreter::read<float>(stack, stack.base_pointer + program.global_scope.variables[0].offset) == 5.0f);
+	REQUIRE(eval_expression<float>("f", stack, program) == 5.0f);
 }
+
+//TEST_CASE("Operators for floats")
+//{
+//	interpreter::ProgramStack stack;
+//	alloc_stack(stack, 32);
+//	Program program;
+//	run_statement("float f = 5.0 + 3.141592;", stack, program.global_scope);
+//	REQUIRE(eval_expression<float>("f", stack, program) == 5.0f + 3.141592f);
+//}

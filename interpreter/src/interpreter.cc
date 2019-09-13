@@ -23,32 +23,66 @@ namespace interpreter
 		stack.memory.resize(stack_size_in_bytes);
 	}
 
+	// TODO: Alignment
+	auto alloc(ProgramStack & stack, int size) noexcept -> int
+	{
+		int const address = stack.top_pointer;
+		stack.top_pointer += size;
+		return address;
+	}
+
+	auto free_up_to(ProgramStack & stack, int address) noexcept -> void
+	{
+		stack.top_pointer = address;
+	}
+
+	template <typename T>
+	auto push_to_stack_top(ProgramStack & stack, T const & value) noexcept -> int
+	{
+		int const address = alloc_in_stack(stack, sizeof(T));
+		write(stack, address, value);
+		return address;
+	}
+
 	auto eval_expression_tree(parser::ExpressionTree const & tree, ProgramStack & stack, Program const & program) noexcept -> int
 	{
+		int const address = alloc(stack, expression_type(tree, program).size);
+		eval_expression_tree(tree, stack, program, address);
+		return address;
+	}
+
+	auto eval_expression_tree(parser::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> void
+	{
 		auto const visitor = overload(
-			[](int literal_value) { return literal_value; },
-			[](float literal_value) { return (int)literal_value; }, // TODO
+			[&](int literal_value) { write(stack, return_address, literal_value); },
+			[&](float literal_value) { write(stack, return_address, literal_value); },
 			[&](parser::OperatorNode const & op_node) 
 			{
-				int const lval = eval_expression_tree(*op_node.left, stack, program);
-				int const rval = eval_expression_tree(*op_node.right, stack, program);
+				// TODO: Operators for non-ints
+				int const stack_top = stack.top_pointer;
+				int const lval = read_word(stack, eval_expression_tree(*op_node.left, stack, program));
+				int const rval = read_word(stack, eval_expression_tree(*op_node.right, stack, program));
+				int result;
 				switch (op_node.op)
 				{
-					case parser::Operator::add:		 return lval + rval;
-					case parser::Operator::subtract: return lval - rval;
-					case parser::Operator::multiply: return lval * rval;
-					case parser::Operator::divide:	 return lval / rval;
+					case parser::Operator::add:		 result = lval + rval; break;
+					case parser::Operator::subtract: result = lval - rval; break;
+					case parser::Operator::multiply: result = lval * rval; break;
+					case parser::Operator::divide:	 result = lval / rval; break;
+					default: declare_unreachable();
 				}
-				declare_unreachable();
+				
+				free_up_to(stack, stack_top);
+				write(stack, return_address, result);
 			},
 			[&](parser::VariableNode const & var_node)
 			{
 				int const address = stack.base_pointer + var_node.variable_offset;
-				return read_word(stack, address);
+				write_word(stack, return_address, read_word(stack, address));
 			},
-			[](parser::FunctionNode const & func_node)
+			[&](parser::FunctionNode const & func_node) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
 			{
-				return func_node.function_id; // TODO
+				write(stack, return_address, func_node.function_id);
 			},
 			[&](parser::FunctionCallNode const & func_call_node)
 			{
@@ -56,18 +90,20 @@ namespace interpreter
 
 				int const parameter_size = func.parameter_count * sizeof(int); // TODO: Parameter size for different types
 
+				// Write ebp to the stack so that we can return to our stack frame when the function ends.
+				int const ebp_address = alloc(stack, sizeof(int));
+				write_word(stack, ebp_address, stack.base_pointer);
+
 				// Push stack pointer to the end of parameters. This is to avoid that the expressions that compute
 				// the parameters of the function overwrite the memory reserved for the parameters.
-				int const ebp_address = stack.top_pointer;
-				int const parameters_start = ebp_address + sizeof(int);
-				stack.top_pointer += parameter_size;
+				int const parameters_start = alloc(stack, parameter_size);
 
 				// Evaluate the expressions that yield the parameters of the function.
-				for (int i = 0; i < func_call_node.parameters.size(); ++i)
-					write_word(stack, parameters_start + i * sizeof(int), eval_expression_tree(func_call_node.parameters[i], stack, program));
-
-				// Write esp to the stack so that we can return to our stack frame when the function ends.
-				write_word(stack, ebp_address, stack.base_pointer);
+				for (int i = 0, next_parameter_address = parameters_start; i < func_call_node.parameters.size(); ++i)
+				{
+					eval_expression_tree(func_call_node.parameters[i], stack, program, next_parameter_address);
+					next_parameter_address += expression_type(func_call_node.parameters[i], program).size;
+				}
 
 				// Move the stack pointers.
 				stack.base_pointer = parameters_start;
@@ -75,24 +111,20 @@ namespace interpreter
 
 				// Run the function.
 				for (auto const & statement : func.statements)
-					if (run_statement_tree(statement, stack, program))
+					if (run_statement_tree(statement, stack, program, return_address))
 						break;
-
-				// Read the return value from the stack.
-				return read_word(stack, stack.top_pointer);
 			}
 		);
-		return std::visit(visitor, tree.as_variant());
+		std::visit(visitor, tree.as_variant());
 	}
 
-	auto run_statement_tree(parser::StatementTree const & tree, ProgramStack & stack, Program const & program) noexcept -> bool
+	auto run_statement_tree(parser::StatementTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> bool
 	{
 		auto const visitor = overload(
 			[&](parser::VariableDeclarationStatementNode const & node) 
 			{
 				int const address = stack.base_pointer + node.variable_offset;
-				int const value = eval_expression_tree(node.assigned_expression, stack, program);
-				write_word(stack, address, value);
+				eval_expression_tree(node.assigned_expression, stack, program, address);
 				return false;
 			},
 			[&](parser::ReturnStatementNode const & var_node)
@@ -100,9 +132,8 @@ namespace interpreter
 				// Read the previous ebp from the stack.
 				int const prev_ebp_address = stack.base_pointer - 4;
 				int const prev_ebp = read_word(stack, prev_ebp_address);
-				int const return_value = eval_expression_tree(var_node.returned_expression, stack, program);
-				write_word(stack, prev_ebp_address, return_value);
-				stack.top_pointer = prev_ebp_address;
+				eval_expression_tree(var_node.returned_expression, stack, program, return_address);
+				stack.top_pointer = prev_ebp_address + expression_type(var_node.returned_expression, program).size;
 				stack.base_pointer = prev_ebp;
 				return true; // Return true to indicate that the function should end.
 			}
