@@ -22,23 +22,64 @@ struct name_equal
 	std::string_view name;
 };
 
-auto lookup_name(Scope const & scope, std::string_view name) noexcept
+auto lookup_name(Scope const & scope, Scope const & global_scope, std::string_view name) noexcept
 	-> std::variant<
-		lookup_result::NothingFound,
-		lookup_result::VariableFound,
-		lookup_result::FunctionFound
+		lookup_result::Nothing,
+		lookup_result::Variable,
+		lookup_result::GlobalVariable,
+		lookup_result::OverloadSet
 	>
 {
-	auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), name_equal(name));
-	auto const func = std::find_if(scope.functions.begin(), scope.functions.end(), name_equal(name));
+	lookup_result::OverloadSet overload_set;
 
-	if (var != scope.variables.end())
-		return lookup_result::VariableFound{var->type, var->offset};
+	// First search the current scope.
+	if (&scope != &global_scope)
+	{
+		// Variables.
+		auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), name_equal(name));
+		if (var != scope.variables.end())
+			return lookup_result::Variable{ var->type, var->offset };
 
-	if (func != scope.functions.end())
-		return lookup_result::FunctionFound{func->id};
+		// Functions.
+		for (FunctionName const & fn : scope.functions)
+			if (fn.name == name)
+				overload_set.function_ids.push_back(fn.id);
+	}
 
-	return lookup_result::NothingFound();
+	// Search global scope.
+	// If we already know the name belongs to a function, avoid looking up variables.
+	if (overload_set.function_ids.empty())
+	{
+		auto const var = std::find_if(global_scope.variables.begin(), global_scope.variables.end(), name_equal(name));
+		if (var != global_scope.variables.end())
+			return lookup_result::GlobalVariable{var->type, var->offset};
+	}
+
+	// Search global scope for functions.
+	for (FunctionName const & fn : global_scope.functions)
+		if (fn.name == name)
+			overload_set.function_ids.push_back(fn.id);
+
+	if (overload_set.function_ids.empty())
+		return lookup_result::Nothing();
+	else
+		return overload_set;
+}
+
+auto resolve_function_overloading(span<int const> overload_set, span<TypeId> parameters, Program const & program) noexcept -> int
+{
+	for (int function_id : overload_set)
+	{
+		Function const & function = program.functions[function_id];
+		if (std::equal(
+			function.variables.begin(), function.variables.begin() + function.parameter_count, 
+			parameters.begin(), parameters.end(),
+			[](Variable const & var, TypeId type) { return var.type == type; }
+		))
+			return function_id;
+	}
+
+	return -1;
 }
 
 auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId

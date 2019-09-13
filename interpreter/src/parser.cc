@@ -5,6 +5,7 @@
 #include "span.hh"
 #include "unreachable.hh"
 #include "overload.hh"
+#include "multicomparison.hh"
 #include <vector>
 #include <cassert>
 #include <charconv>
@@ -42,7 +43,7 @@ namespace parser
 
 	auto is_operator_node(ExpressionTree const & tree) noexcept -> bool
 	{
-		return tree.index() == 1;
+		return tree.index() == 2;
 	}
 
 	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> Type
@@ -56,7 +57,8 @@ namespace parser
 			[](int) { return TypeId::int_; },
 			[](float) { return TypeId::float_; },
 			[&](parser::OperatorNode const & op_node) { return expression_type_id(*op_node.left, program); },
-			[](parser::VariableNode const & var_node) { return var_node.variable_type; },
+			[](parser::LocalVariableNode const & var_node) { return var_node.variable_type; },
+			[](parser::GlobalVariableNode const & var_node) { return var_node.variable_type; },
 			[](parser::FunctionNode const &) { return TypeId::function; },
 			[&](parser::FunctionCallNode const & func_call_node) { return program.functions[func_call_node.function_id].return_type; }
 		);
@@ -82,12 +84,22 @@ namespace parser
 			insert_expression(*tree_op.right, new_node);
 	}
 
-	//auto are_expression_tree_types_valid(ExpressionTree const & tree) noexcept -> bool
-	//{
-	//
-	//}
+	auto are_expression_tree_types_valid(ExpressionTree const & tree, Program const & program) noexcept -> bool
+	{
+		if (is_operator_node(tree))
+		{
+			auto const & node = std::get<OperatorNode>(tree);
+			return
+				are_expression_tree_types_valid(*node.left, program) &&
+				are_expression_tree_types_valid(*node.right, program) &&
+				expression_type_id(*node.left, program) == expression_type_id(*node.right, program) &&
+				expression_type_id(*node.left, program) == any_of(TypeId::int_, TypeId::float_);
+		}
+		else
+			return true;
+	}
 
-	auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator const> operators) noexcept -> ExpressionTree
+	auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator const> operators, Program const & program) noexcept -> ExpressionTree
 	{
 		if (operators.empty())
 		{
@@ -108,7 +120,7 @@ namespace parser
 			insert_expression(root, new_node);
 		}
 
-		//assert(are_expression_tree_types_valid(root));
+		assert(are_expression_tree_types_valid(root, program));
 		return root;
 	}
 
@@ -202,30 +214,41 @@ namespace parser
 
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree;
 
-	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, int function_id) noexcept -> FunctionCallNode
+	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, span<int const> overload_set) noexcept -> FunctionCallNode
 	{
 		// Parameter list starts with (
 		assert(tokens[index].type == TokenType::open_parenthesis);
 		index++;
 
-		// Parse parameters
-		int const param_count = program.functions[function_id].parameter_count;
+		// Parse parameters.
+		int param_count = 0;
 
 		FunctionCallNode node;
-		node.function_id = function_id;
 		node.parameters.reserve(param_count);
 
-		for (int i = 0; i < param_count; ++i)
+		std::vector<TypeId> parameter_types;
+
+		for (;;)
 		{
+			// Parse a parameter.
 			node.parameters.push_back(parse_subexpression(tokens, index, program, scope));
+			parameter_types.push_back(expression_type_id(node.parameters.back(), program));
 
-			if (i < param_count - 1)
-				assert(tokens[index].type == TokenType::comma);
+			// If after a parameter we find a close parenthesis, end parameter list.
+			if (tokens[index].type == TokenType::close_parenthesis)
+			{
+				index++;
+				break;
+			}
+			// If we find a comma, parse next parameter.
+			else if (tokens[index].type == TokenType::comma)
+				index++;
+			// Anything else we find is wrong.
 			else
-				assert(tokens[index].type == TokenType::close_parenthesis);
-
-			index++;
+				declare_unreachable();
 		}
+
+		node.function_id = resolve_function_overloading(overload_set, parameter_types, program);
 
 		return node;
 	}
@@ -237,7 +260,7 @@ namespace parser
 			auto const func_node = parse_function_expression(tokens, index, program);
 			// Opening parenthesis after a function means a function call.
 			if (tokens[index].type == TokenType::open_parenthesis)
-				return parse_function_call_expression(tokens, index, program, scope, func_node.function_id);
+				return parse_function_call_expression(tokens, index, program, scope, span<int const>(&func_node.function_id, 1));
 			else
 				return func_node;
 		}
@@ -251,31 +274,33 @@ namespace parser
 		}
 		else if (tokens[index].type == TokenType::identifier)
 		{
-			auto const if_var_found = [&](lookup_result::VariableFound result) -> ExpressionTree
+			auto const if_var_found = [&](lookup_result::Variable result) -> ExpressionTree
 			{
-				VariableNode var_node;
+				LocalVariableNode var_node;
 				var_node.variable_type = result.variable_type;
 				var_node.variable_offset = result.variable_offset;
 				index++;
 				return var_node;
 			};
-			auto const if_fn_found = [&](lookup_result::FunctionFound result) -> ExpressionTree
+			auto const if_global_var_found = [&](lookup_result::GlobalVariable result) -> ExpressionTree
+			{
+				GlobalVariableNode var_node;
+				var_node.variable_type = result.variable_type;
+				var_node.variable_offset = result.variable_offset;
+				index++;
+				return var_node;
+			};
+			auto const if_fn_found = [&](lookup_result::OverloadSet result) -> ExpressionTree
 			{
 				index++;
 				if (tokens[index].type == TokenType::open_parenthesis)
-					return parse_function_call_expression(tokens, index, program, scope, result.function_id);
+					return parse_function_call_expression(tokens, index, program, scope, result.function_ids);
 				else
-					return FunctionNode{result.function_id};
+					return FunctionNode{result.function_ids[0]}; // TODO: Overload set node?
 			};
-			auto const if_nothing_found = [&](lookup_result::NothingFound)
-			{
-				// Try the global scope.
-				return std::visit(
-					overload(if_var_found, if_fn_found, [](lookup_result::NothingFound) -> ExpressionTree { declare_unreachable(); }),
-					lookup_name(program.global_scope, tokens[index].source));
-			};
-			auto const lookup = lookup_name(scope, tokens[index].source);
-			return std::visit(overload(if_var_found, if_fn_found, if_nothing_found), lookup);
+			auto const if_nothing_found = [](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); };
+			auto const lookup = lookup_name(scope, program.global_scope, tokens[index].source);
+			return std::visit(overload(if_var_found, if_global_var_found, if_fn_found, if_nothing_found), lookup);
 		}
 		else if (tokens[index].type == TokenType::open_parenthesis)
 		{
@@ -310,7 +335,7 @@ namespace parser
 			else break;
 		}
 
-		return resolve_operator_precedence(operands, operators);
+		return resolve_operator_precedence(operands, operators, program);
 	}
 
 	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope) noexcept -> ExpressionTree

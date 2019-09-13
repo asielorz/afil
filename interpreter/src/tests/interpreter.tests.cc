@@ -192,11 +192,13 @@ TEST_CASE("Floating point variable declaration")
 	REQUIRE(eval_expression<float>("f", stack, program) == 5.0f);
 }
 
-//TEST_CASE("Operators for floats")
-//{
-//	interpreter::ProgramStack stack;
-//	alloc_stack(stack, 32);
-//	Program program;
-//	run_statement("float f = 5.0 + 3.141592;", stack, program.global_scope);
-//	REQUIRE(eval_expression<float>("f", stack, program) == 5.0f + 3.141592f);
-//}
+TEST_CASE("Overloading")
+{
+	interpreter::ProgramStack stack;
+	alloc_stack(stack, 32);
+	Program program;
+	parser::parse_statement(lex::tokenize("let id = fn (int x) -> int { return x; };"), program, program.global_scope);
+	parser::parse_statement(lex::tokenize("let id = fn (float x) -> float { return x; };"), program, program.global_scope);
+	REQUIRE(eval_expression<int>("id(5)", stack, program) == 5);
+	REQUIRE(eval_expression<float>("id(3.141592)", stack, program) == 3.141592f);
+}

@@ -75,9 +75,14 @@ namespace interpreter
 				free_up_to(stack, stack_top);
 				write(stack, return_address, result);
 			},
-			[&](parser::VariableNode const & var_node)
+			[&](parser::LocalVariableNode const & var_node)
 			{
 				int const address = stack.base_pointer + var_node.variable_offset;
+				write_word(stack, return_address, read_word(stack, address));
+			},
+			[&](parser::GlobalVariableNode const & var_node)
+			{
+				int const address = var_node.variable_offset;
 				write_word(stack, return_address, read_word(stack, address));
 			},
 			[&](parser::FunctionNode const & func_node) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?

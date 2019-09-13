@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+#include "span.hh"
 #include <string_view>
 #include <variant>
 
@@ -52,16 +52,20 @@ struct Program
 
 namespace lookup_result
 {
-	struct NothingFound {};
-	struct VariableFound { TypeId variable_type; int variable_offset; };
-	struct FunctionFound { int function_id; };
+	struct Nothing {};
+	struct Variable { TypeId variable_type; int variable_offset; };
+	struct GlobalVariable { TypeId variable_type; int variable_offset; };
+	struct OverloadSet { std::vector<int> function_ids; };
 }
-auto lookup_name(Scope const & scope, std::string_view name) noexcept 
+auto lookup_name(Scope const & scope, Scope const & global_scope, std::string_view name) noexcept 
 	-> std::variant<
-		lookup_result::NothingFound, 
-		lookup_result::VariableFound, 
-		lookup_result::FunctionFound
+		lookup_result::Nothing, 
+		lookup_result::Variable,
+		lookup_result::GlobalVariable,
+		lookup_result::OverloadSet
 	>;
+// Returns id of function found or -1 on failure.
+auto resolve_function_overloading(span<int const> overload_set, span<TypeId> parameters, Program const & program) noexcept -> int;
 
 auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
