@@ -1,7 +1,10 @@
 #include "program.hh"
 #include "lexer.hh"
 #include "parser.hh"
+#include "function_ptr.hh"
 #include <algorithm>
+
+using namespace std::literals;
 
 auto built_in_types() noexcept -> std::vector<Type>
 {
@@ -11,10 +14,51 @@ auto built_in_types() noexcept -> std::vector<Type>
 	};
 }
 
+template <typename T> struct id_for_type {};
+template <> struct id_for_type<int> { static constexpr TypeId value = TypeId::int_; };
+template <> struct id_for_type<float> { static constexpr TypeId value = TypeId::float_; };
+template <typename T> constexpr TypeId id_for_type_v = id_for_type<T>::value;
+
+template <typename R, typename ... Args>
+auto extern_function_descriptor(auto (*fn)(Args...) noexcept -> R) noexcept -> ExternFunction
+{
+	return ExternFunction{
+		{id_for_type_v<Args>...},
+		id_for_type_v<R>,
+		callc::c_function_caller(fn), 
+		fn
+	};
+}
+
+auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_view, ExternFunction>>
+{
+	return {
+		{"operator+"sv, extern_function_descriptor(+[](int a, int b) noexcept { return a + b; })},
+		{"operator-"sv, extern_function_descriptor(+[](int a, int b) noexcept { return a - b; })},
+		{"operator*"sv, extern_function_descriptor(+[](int a, int b) noexcept { return a * b; })},
+		{"operator/"sv, extern_function_descriptor(+[](int a, int b) noexcept { return a / b; })},
+
+		{"operator+"sv, extern_function_descriptor(+[](float a, float b) noexcept { return a + b; })},
+		{"operator-"sv, extern_function_descriptor(+[](float a, float b) noexcept { return a - b; })},
+		{"operator*"sv, extern_function_descriptor(+[](float a, float b) noexcept { return a * b; })},
+		{"operator/"sv, extern_function_descriptor(+[](float a, float b) noexcept { return a / b; })},
+	};
+}
+
 Program::Program()
 {
 	types = built_in_types();
 
+	auto const extern_functions_to_add = default_extern_functions();
+
+	extern_functions.reserve(extern_functions_to_add.size());
+	global_scope.functions.reserve(extern_functions_to_add.size());
+
+	for (auto const fn : extern_functions_to_add)
+	{
+		global_scope.functions.push_back({fn.first, {true, static_cast<unsigned>(extern_functions.size())}});
+		extern_functions.push_back(fn.second);
+	}
 }
 
 struct name_equal
@@ -74,7 +118,7 @@ auto lookup_name(Scope const & scope, Scope const & global_scope, std::string_vi
 		return overload_set;
 }
 
-auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId> parameters, Program const & program) noexcept -> FunctionId
+auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId
 {
 	for (FunctionId function_id : overload_set)
 	{
@@ -94,9 +138,8 @@ auto resolve_function_overloading(span<FunctionId const> overload_set, span<Type
 		{
 			ExternFunction const & function = program.extern_functions[function_id.index];
 			if (std::equal(
-				function.parameters.begin(), function.parameters.end(),
-				parameters.begin(), parameters.end(),
-				[](Variable const & var, TypeId type) { return var.type == type; }
+				function.parameter_types.begin(), function.parameter_types.end(),
+				parameters.begin(), parameters.end()
 			))
 			{
 				return function_id;

@@ -34,10 +34,22 @@ namespace parser
 	{
 		switch (token_source[0])
 		{
-		case '+': return Operator::add;
-		case '-': return Operator::subtract;
-		case '*': return Operator::multiply;
-		case '/': return Operator::divide;
+			case '+': return Operator::add;
+			case '-': return Operator::subtract;
+			case '*': return Operator::multiply;
+			case '/': return Operator::divide;
+		}
+		declare_unreachable();
+	}
+
+	auto operator_function_name(Operator op) noexcept -> std::string_view
+	{
+		switch (op)
+		{
+			case Operator::add:			return "operator+";
+			case Operator::subtract:	return "operator-";
+			case Operator::multiply:	return "operator*";
+			case Operator::divide:		return "operator/";
 		}
 		declare_unreachable();
 	}
@@ -91,22 +103,7 @@ namespace parser
 			insert_expression(*tree_op.right, new_node);
 	}
 
-	auto are_expression_tree_types_valid(ExpressionTree const & tree, Program const & program) noexcept -> bool
-	{
-		if (is_operator_node(tree))
-		{
-			auto const & node = std::get<OperatorNode>(tree);
-			return
-				are_expression_tree_types_valid(*node.left, program) &&
-				are_expression_tree_types_valid(*node.right, program) &&
-				expression_type_id(*node.left, program) == expression_type_id(*node.right, program) &&
-				expression_type_id(*node.left, program) == any_of(TypeId::int_, TypeId::float_);
-		}
-		else
-			return true;
-	}
-
-	auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator const> operators, Program const & program) noexcept -> ExpressionTree
+	auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator const> operators) noexcept -> ExpressionTree
 	{
 		if (operators.empty())
 		{
@@ -127,8 +124,43 @@ namespace parser
 			insert_expression(root, new_node);
 		}
 
-		assert(are_expression_tree_types_valid(root, program));
 		return root;
+	}
+
+	auto resolve_operator_overloading(ExpressionTree tree, Program const & program, Scope const & scope) noexcept -> ExpressionTree
+	{
+		if (is_operator_node(tree))
+		{
+			auto & node = std::get<OperatorNode>(tree);
+			ExpressionTree left = resolve_operator_overloading(std::move(*node.left), program, scope);
+			ExpressionTree right = resolve_operator_overloading(std::move(*node.right), program, scope);
+
+			auto const visitor = overload(
+				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); },
+				[](lookup_result::Variable) -> ExpressionTree { declare_unreachable(); },
+				[](lookup_result::GlobalVariable) -> ExpressionTree { declare_unreachable(); },
+				[&](lookup_result::OverloadSet const & overload_set) -> ExpressionTree
+				{
+					TypeId const operand_types[] = {expression_type_id(left, program), expression_type_id(right, program)};
+					auto const function_id = resolve_function_overloading(overload_set.function_ids, operand_types, program);
+					if (function_id != invalid_function_id)
+					{
+						FunctionCallNode func_node;
+						func_node.function_id = function_id;
+						func_node.parameters.reserve(2);
+						func_node.parameters.push_back(std::move(left));
+						func_node.parameters.push_back(std::move(right));
+						return func_node;
+					}
+					else declare_unreachable();
+				}
+			);
+
+			auto const lookup = lookup_name(scope, program.global_scope, operator_function_name(node.op));
+			return std::visit(visitor, lookup);
+		}
+		else
+			return tree;
 	}
 
 	auto next_statement_tokens(span<lex::Token const> tokens, size_t & index) noexcept -> span<lex::Token const>
@@ -336,7 +368,7 @@ namespace parser
 			else break;
 		}
 
-		return resolve_operator_precedence(operands, operators, program);
+		return resolve_operator_overloading(resolve_operator_precedence(operands, operators), program, scope);
 	}
 
 	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope) noexcept -> ExpressionTree

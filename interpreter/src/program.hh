@@ -2,6 +2,7 @@
 
 #include "function_id.hh"
 #include "span.hh"
+#include "callc.hh"
 #include <string_view>
 #include <variant>
 
@@ -44,8 +45,9 @@ struct Function : Scope
 
 struct ExternFunction
 {
-	std::vector<Variable> parameters;
+	std::vector<TypeId> parameter_types;
 	TypeId return_type;
+	callc::CFunctionCaller caller;
 	void const * function_pointer;
 };
 
@@ -74,7 +76,7 @@ auto lookup_name(Scope const & scope, Scope const & global_scope, std::string_vi
 		lookup_result::OverloadSet
 	>;
 // Returns id of function found or -1 on failure.
-auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId> parameters, Program const & program) noexcept ->FunctionId;
+auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept ->FunctionId;
 
 auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;

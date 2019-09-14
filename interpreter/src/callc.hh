@@ -13,6 +13,11 @@ namespace callc
 
 	using CFunctionCaller = auto(*)(void const * function, void const * arg_data, void * return_value) noexcept -> void;
 
-	auto c_function_caller(span<TypeDescriptor const> param_types, TypeDescriptor return_value_type) noexcept -> CFunctionCaller;
+	auto c_function_caller(span<TypeDescriptor const> param_types, TypeDescriptor return_value_type) noexcept->CFunctionCaller;
+
+	template <typename R, typename ... Args>
+	auto c_function_caller(auto(*)(Args...) -> R) noexcept -> CFunctionCaller;
 
 }
+
+#include "callc.inl"

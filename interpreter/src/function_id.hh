@@ -4,6 +4,7 @@ struct FunctionId
 {
 	unsigned is_extern : 1;
 	unsigned index : 31;
+
 };
 constexpr FunctionId invalid_function_id = { 1, (1u << 31u) - 1u };
 

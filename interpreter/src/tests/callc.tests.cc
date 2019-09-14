@@ -1,61 +1,6 @@
 #include "callc.hh"
+#include "function_ptr.hh"
 #include <catch2/catch.hpp>
-
-template <typename T>
-using function_ptr = T*;
-
-namespace detail
-{
-	template <typename T> struct function_pointer_type_base {};
-
-	template <typename ClassType, typename Ret, typename... Args>
-	struct function_pointer_type_base<Ret(ClassType::*)(Args...) const>
-	{
-		using type = function_ptr<auto(Args...)->Ret>;
-	};
-
-	template <typename ClassType, typename Ret, typename... Args>
-	struct function_pointer_type_base<Ret(ClassType::*)(Args...) const noexcept>
-	{
-		using type = function_ptr<auto(Args...) noexcept->Ret>;
-	};
-}
-
-template <typename T>
-struct function_pointer_type
-	: public detail::function_pointer_type_base<decltype(&T::operator())>
-{
-	static_assert(std::is_convertible_v<T, type>);
-};
-
-template <typename Ret, typename... Args>
-struct function_pointer_type<function_ptr<auto(Args...)->Ret>>
-{
-	using type = function_ptr<auto(Args...)->Ret>;
-};
-
-template <typename Ret, typename... Args>
-struct function_pointer_type<function_ptr<auto(Args...) noexcept->Ret>>
-{
-	using type = function_ptr<auto(Args...) noexcept->Ret>;
-};
-
-template <typename F>
-constexpr auto cast_to_function_pointer(F f) noexcept -> typename function_pointer_type<F>::type
-{
-	return f;
-}
-
-// Operator for easily converting lambdas to function pointers. This is only necessary for MSVC compiler.
-// GCC and clang do it by default.
-#ifdef _MSC_VER
-template <typename F>
-constexpr auto operator +(F f) noexcept -> typename function_pointer_type<F>::type
-{
-	return f;
-}
-#endif
-
 
 TEST_CASE("Function that returns an int")
 {

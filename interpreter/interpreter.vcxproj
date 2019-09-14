@@ -34,6 +34,7 @@
   <ItemGroup>
     <ClInclude Include="src\callc.hh" />
     <ClInclude Include="src\function_id.hh" />
+    <ClInclude Include="src\function_ptr.hh" />
     <ClInclude Include="src\multicomparison.hh" />
     <ClInclude Include="src\program.hh" />
     <ClInclude Include="src\interpreter.hh" />
@@ -49,6 +50,7 @@
     <Natvis Include="span.natvis" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="src\callc.inl" />
     <None Include="src\interpreter.inl" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
