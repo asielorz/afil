@@ -14,7 +14,7 @@ struct Type
 	int size;
 	int alignment;
 };
-enum struct TypeId { function = -2, none = -1, int_, float_ };
+enum struct TypeId { function = -2, none = -1, int_, float_, bool_ };
 
 struct Variable
 {
@@ -32,21 +32,25 @@ struct FunctionName
 struct Scope
 {
 	int stack_frame_size = 0;
+	int stack_frame_alignment = 1; // Alignment requirement of the stack frame.
 	std::vector<Variable> variables;
 	std::vector<FunctionName> functions;
 };
 
 struct Function : Scope
 {
-	int parameter_count = 0; // From the variables, how many are arguments. The rest are locals.
+	int parameter_count = 0;     // From the variables, how many are arguments. The rest are locals.
+	int parameter_size = 0;	     // Size in bytes needed for parameters.
 	TypeId return_type;
 	std::vector<parser::StatementTree> statements;
 };
 
 struct ExternFunction
 {
-	std::vector<TypeId> parameter_types;
+	int parameter_size;
+	int parameter_alignment;
 	TypeId return_type;
+	std::vector<TypeId> parameter_types;
 	callc::CFunctionCaller caller;
 	void const * function_pointer;
 };

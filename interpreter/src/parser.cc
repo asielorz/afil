@@ -13,14 +13,14 @@
 
 using TokenType = lex::Token::Type;
 
+using expr::ExpressionTree;
+using expr::OperatorNode;
+using expr::Operator;
+
+using namespace std::literals;
+
 namespace parser
 {
-
-	auto precedence(Operator op) noexcept -> int
-	{
-		constexpr int precedences[] = { 0, 0, 1, 1 };
-		return precedences[static_cast<int>(op)];
-	}
 
 	template <typename T>
 	auto parse_number_literal(std::string_view token_source) noexcept -> T
@@ -32,56 +32,25 @@ namespace parser
 
 	auto parse_operator(std::string_view token_source) noexcept -> Operator
 	{
+		if (token_source == "=="sv) return Operator::equal;
+		if (token_source == "!="sv) return Operator::not_equal;
+		if (token_source == "<="sv) return Operator::less_equal;
+		if (token_source == ">="sv) return Operator::greater_equal;
+		if (token_source == "<=>"sv) return Operator::three_way_compare;
+		if (token_source == "and"sv) return Operator::and_;
+		if (token_source == "or"sv) return Operator::or_;
+		if (token_source == "xor"sv) return Operator::xor_;
+
 		switch (token_source[0])
 		{
 			case '+': return Operator::add;
 			case '-': return Operator::subtract;
 			case '*': return Operator::multiply;
 			case '/': return Operator::divide;
+			case '<': return Operator::less;
+			case '>': return Operator::greater;
 		}
 		declare_unreachable();
-	}
-
-	auto operator_function_name(Operator op) noexcept -> std::string_view
-	{
-		switch (op)
-		{
-			case Operator::add:			return "operator+";
-			case Operator::subtract:	return "operator-";
-			case Operator::multiply:	return "operator*";
-			case Operator::divide:		return "operator/";
-		}
-		declare_unreachable();
-	}
-
-	auto is_operator_node(ExpressionTree const & tree) noexcept -> bool
-	{
-		return tree.index() == 2;
-	}
-
-	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> Type
-	{
-		return type_with_id(program, expression_type_id(tree, program));
-	}
-
-	auto expression_type_id(ExpressionTree const & tree, Program const & program) noexcept -> TypeId
-	{
-		auto const visitor = overload(
-			[](int) { return TypeId::int_; },
-			[](float) { return TypeId::float_; },
-			[&](parser::OperatorNode const & op_node) { return expression_type_id(*op_node.left, program); },
-			[](parser::LocalVariableNode const & var_node) { return var_node.variable_type; },
-			[](parser::GlobalVariableNode const & var_node) { return var_node.variable_type; },
-			[](parser::FunctionNode const &) { return TypeId::function; },
-			[&](parser::FunctionCallNode const & func_call_node) 
-			{
-				if (func_call_node.function_id.is_extern)
-					return program.extern_functions[func_call_node.function_id.index].return_type;
-				else
-					return program.functions[func_call_node.function_id.index].return_type;
-			}
-		);
-		return std::visit(visitor, tree.as_variant());
 	}
 
 	auto insert_expression(ExpressionTree & tree, ExpressionTree & new_node) noexcept -> void
@@ -112,7 +81,7 @@ namespace parser
 		}
 
 		ExpressionTree root = [=]{
-			return OperatorNode(operators[0],
+			return expr::OperatorNode(operators[0],
 				std::make_unique<ExpressionTree>(std::move(operands[0])),
 				std::make_unique<ExpressionTree>(std::move(operands[1]))
 			);
@@ -134,6 +103,7 @@ namespace parser
 			auto & node = std::get<OperatorNode>(tree);
 			ExpressionTree left = resolve_operator_overloading(std::move(*node.left), program, scope);
 			ExpressionTree right = resolve_operator_overloading(std::move(*node.right), program, scope);
+			Operator const op = node.op;
 
 			auto const visitor = overload(
 				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); },
@@ -145,18 +115,32 @@ namespace parser
 					auto const function_id = resolve_function_overloading(overload_set.function_ids, operand_types, program);
 					if (function_id != invalid_function_id)
 					{
-						FunctionCallNode func_node;
-						func_node.function_id = function_id;
-						func_node.parameters.reserve(2);
-						func_node.parameters.push_back(std::move(left));
-						func_node.parameters.push_back(std::move(right));
-						return func_node;
+						if (op == Operator::not_equal || op == Operator::less || op == Operator::greater ||
+							op == Operator::less_equal || op == Operator::greater_equal)
+						{
+							expr::RelationalOperatorCallNode func_node;
+							func_node.function_id = function_id;
+							func_node.op = op;
+							func_node.parameters = std::make_unique<std::array<ExpressionTree, 2>>();
+							(*func_node.parameters)[0] = std::move(left);
+							(*func_node.parameters)[1] = std::move(right);
+							return func_node;
+						}
+						else
+						{
+							expr::FunctionCallNode func_node;
+							func_node.function_id = function_id;
+							func_node.parameters.reserve(2);
+							func_node.parameters.push_back(std::move(left));
+							func_node.parameters.push_back(std::move(right));
+							return func_node;
+						}
 					}
 					else declare_unreachable();
 				}
 			);
 
-			auto const lookup = lookup_name(scope, program.global_scope, operator_function_name(node.op));
+			auto const lookup = lookup_name(scope, program.global_scope, operator_function_name(op));
 			return std::visit(visitor, lookup);
 		}
 		else
@@ -184,11 +168,12 @@ namespace parser
 		var.type = type_id;
 		var.offset = align(scope.stack_frame_size, type.alignment);
 		scope.stack_frame_size = var.offset + type.size;
+		scope.stack_frame_alignment = std::max(scope.stack_frame_alignment, type.alignment);
 		scope.variables.push_back(var);
 		return var.offset;
 	}
 
-	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> FunctionNode
+	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> expr::FunctionNode
 	{
 		// Skip fn token.
 		index++;
@@ -208,6 +193,7 @@ namespace parser
 
 			add_variable_to_scope(function, tokens[index].source, type_found, program);
 			function.parameter_count++;
+			function.parameter_size = function.stack_frame_size;
 			index++;
 
 			assert(tokens[index].type == TokenType::comma || tokens[index].type == TokenType::close_parenthesis);
@@ -241,12 +227,12 @@ namespace parser
 		// Add the function to the program.
 		program.functions.push_back(std::move(function));
 		auto const func_id = FunctionId{0, static_cast<unsigned>(program.functions.size() - 1)};
-		return FunctionNode{func_id};
+		return expr::FunctionNode{func_id};
 	}
 
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree;
 
-	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, span<FunctionId const> overload_set) noexcept -> FunctionCallNode
+	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, span<FunctionId const> overload_set) noexcept -> expr::FunctionCallNode
 	{
 		// Parameter list starts with (
 		assert(tokens[index].type == TokenType::open_parenthesis);
@@ -255,7 +241,7 @@ namespace parser
 		// Parse parameters.
 		int param_count = 0;
 
-		FunctionCallNode node;
+		expr::FunctionCallNode node;
 		node.parameters.reserve(param_count);
 
 		std::vector<TypeId> parameter_types;
@@ -305,35 +291,41 @@ namespace parser
 		{
 			return ExpressionTree(parse_number_literal<float>(tokens[index++].source));
 		}
+		else if (tokens[index].type == TokenType::literal_bool)
+		{
+			return ExpressionTree(tokens[index++].source[0] == 't'); // if it starts with t it must be bool, and otherwise it must be false.
+		}
 		else if (tokens[index].type == TokenType::identifier)
 		{
-			auto const if_var_found = [&](lookup_result::Variable result) -> ExpressionTree
-			{
-				LocalVariableNode var_node;
-				var_node.variable_type = result.variable_type;
-				var_node.variable_offset = result.variable_offset;
-				index++;
-				return var_node;
-			};
-			auto const if_global_var_found = [&](lookup_result::GlobalVariable result) -> ExpressionTree
-			{
-				GlobalVariableNode var_node;
-				var_node.variable_type = result.variable_type;
-				var_node.variable_offset = result.variable_offset;
-				index++;
-				return var_node;
-			};
-			auto const if_fn_found = [&](lookup_result::OverloadSet result) -> ExpressionTree
-			{
-				index++;
-				if (tokens[index].type == TokenType::open_parenthesis)
-					return parse_function_call_expression(tokens, index, program, scope, result.function_ids);
-				else
-					return FunctionNode{result.function_ids[0]}; // TODO: Overload set node?
-			};
-			auto const if_nothing_found = [](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); };
+			auto const visitor = overload(
+				[&](lookup_result::Variable result) -> ExpressionTree
+				{
+					expr::LocalVariableNode var_node;
+					var_node.variable_type = result.variable_type;
+					var_node.variable_offset = result.variable_offset;
+					index++;
+					return var_node;
+				},
+				[&](lookup_result::GlobalVariable result) -> ExpressionTree
+				{
+					expr::GlobalVariableNode var_node;
+					var_node.variable_type = result.variable_type;
+					var_node.variable_offset = result.variable_offset;
+					index++;
+					return var_node;
+				},
+				[&](lookup_result::OverloadSet result) -> ExpressionTree
+				{
+					index++;
+					if (tokens[index].type == TokenType::open_parenthesis)
+						return parse_function_call_expression(tokens, index, program, scope, result.function_ids);
+					else
+						return expr::FunctionNode{ result.function_ids[0] }; // TODO: Overload set node?
+				},
+				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); }
+			);
 			auto const lookup = lookup_name(scope, program.global_scope, tokens[index].source);
-			return std::visit(overload(if_var_found, if_global_var_found, if_fn_found, if_nothing_found), lookup);
+			return std::visit(visitor, lookup);
 		}
 		else if (tokens[index].type == TokenType::open_parenthesis)
 		{
@@ -374,7 +366,9 @@ namespace parser
 	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope) noexcept -> ExpressionTree
 	{
 		size_t index = 0;
-		return parse_subexpression(tokens, index, program, scope);
+		ExpressionTree tree = parse_subexpression(tokens, index, program, scope);
+		assert(index == tokens.size()); // Ensure that all tokens were read.
+		return tree;
 	}
 
 	auto parse_variable_declaration_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> VariableDeclarationStatementNode
@@ -422,7 +416,7 @@ namespace parser
 		assert(tokens[2].type == TokenType::assignment);
 
 		size_t index = 3;
-		FunctionNode const func_node = parse_function_expression(tokens.subspan(0, tokens.size() - 1), index, program);
+		expr::FunctionNode const func_node = parse_function_expression(tokens.subspan(0, tokens.size() - 1), index, program);
 		FunctionName func_name;
 		func_name.name = tokens[1].source;
 		func_name.id = func_node.function_id;

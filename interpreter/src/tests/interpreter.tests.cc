@@ -213,7 +213,8 @@ TEST_CASE("Hacking extern functions as a proof of concept")
 
 	Program program;
 	program.extern_functions.push_back(ExternFunction{
-		{TypeId::int_, TypeId::int_}, TypeId::int_,
+		2 * sizeof(int), alignof(int),
+		TypeId::int_, {TypeId::int_, TypeId::int_},
 		callc::c_function_caller(add_fn),
 		add_fn
 	});
@@ -230,4 +231,97 @@ TEST_CASE("Operators for floats")
 	REQUIRE(eval_expression<float>("3.0 + 4.7") == 3.0f + 4.7f);
 	REQUIRE(eval_expression<float>("1.12 + 5.3 + 6.09 - 3.24 + 2.85") == 1.12f + 5.3f + 6.09f - 3.24f + 2.85f);
 	REQUIRE(eval_expression<float>("3.14 * 4.007 * 5.94 / 6.367") == 3.14f * 4.007f * 5.94f / 6.367f);
+}
+
+TEST_CASE("Boolean literals")
+{
+	Program program;
+	parser::parse_expression(lex::tokenize("true"), program, program.global_scope);
+	parser::parse_expression(lex::tokenize("false"), program, program.global_scope);
+}
+
+TEST_CASE("Declare variable of boolean type")
+{
+	interpreter::ProgramStack stack;
+	alloc_stack(stack, 128);
+	Program program;
+	run_statement("bool t = true;", stack, program.global_scope);
+	run_statement("bool f = false;", stack, program.global_scope);
+
+	REQUIRE(eval_expression<bool>("t", stack, program) == true);
+	REQUIRE(eval_expression<bool>("f", stack, program) == false);
+}
+
+TEST_CASE("Comparisons")
+{
+	REQUIRE(eval_expression<bool>("3 == 3") == true);
+	REQUIRE(eval_expression<bool>("5 != 5") == false);
+	REQUIRE(eval_expression<bool>("1 == 2") == false);
+	REQUIRE(eval_expression<bool>("7 != 2") == true);
+
+	REQUIRE(eval_expression<bool>("3 > 4") == false);
+	REQUIRE(eval_expression<bool>("6 > 2") == true);
+	REQUIRE(eval_expression<bool>("2 > 2") == false);
+
+	REQUIRE(eval_expression<bool>("3 >= 4") == false);
+	REQUIRE(eval_expression<bool>("6 >= 2") == true);
+	REQUIRE(eval_expression<bool>("2 >= 2") == true);
+
+	REQUIRE(eval_expression<bool>("3 < 4") == true);
+	REQUIRE(eval_expression<bool>("6 < 2") == false);
+	REQUIRE(eval_expression<bool>("2 < 2") == false);
+
+	REQUIRE(eval_expression<bool>("3 <= 4") == true);
+	REQUIRE(eval_expression<bool>("6 <= 2") == false);
+	REQUIRE(eval_expression<bool>("2 <= 2") == true);
+
+	REQUIRE(eval_expression<int>("3 <=> 4") < 0);
+	REQUIRE(eval_expression<int>("6 <=> 2") > 0);
+	REQUIRE(eval_expression<int>("2 <=> 2") == 0);
+}
+
+TEST_CASE("Comparisons of floats")
+{
+	REQUIRE(eval_expression<bool>("3.5 == 3.5") == true);
+	REQUIRE(eval_expression<bool>("5.5 != 5.5") == false);
+	REQUIRE(eval_expression<bool>("1.5 == 2.5") == false);
+	REQUIRE(eval_expression<bool>("7.5 != 2.5") == true);
+
+	REQUIRE(eval_expression<bool>("3.5 > 4.5") == false);
+	REQUIRE(eval_expression<bool>("6.5 > 2.5") == true);
+	REQUIRE(eval_expression<bool>("2.5 > 2.5") == false);
+
+	REQUIRE(eval_expression<bool>("3.5 >= 4.5") == false);
+	REQUIRE(eval_expression<bool>("6.5 >= 2.5") == true);
+	REQUIRE(eval_expression<bool>("2.5 >= 2.5") == true);
+
+	REQUIRE(eval_expression<bool>("3.5 < 4.5") == true);
+	REQUIRE(eval_expression<bool>("6.5 < 2.5") == false);
+	REQUIRE(eval_expression<bool>("2.5 < 2.5") == false);
+
+	REQUIRE(eval_expression<bool>("3.5 <= 4.5") == true);
+	REQUIRE(eval_expression<bool>("6.5 <= 2.5") == false);
+	REQUIRE(eval_expression<bool>("2.5 <= 2.5") == true);
+
+	REQUIRE(eval_expression<int>("3.5 <=> 4.5") < 0);
+	REQUIRE(eval_expression<int>("6.5 <=> 2.5") > 0);
+	REQUIRE(eval_expression<int>("2.5 <=> 2.5") == 0);
+}
+
+TEST_CASE("Logical operators")
+{
+	REQUIRE(eval_expression<bool>("true and true") == true);
+	REQUIRE(eval_expression<bool>("true and false") == false);
+	REQUIRE(eval_expression<bool>("false and true") == false);
+	REQUIRE(eval_expression<bool>("false and false") == false);
+
+	REQUIRE(eval_expression<bool>("true or true") == true);
+	REQUIRE(eval_expression<bool>("true or false") == true);
+	REQUIRE(eval_expression<bool>("false or true") == true);
+	REQUIRE(eval_expression<bool>("false or false") == false);
+
+	REQUIRE(eval_expression<bool>("true xor true") == false);
+	REQUIRE(eval_expression<bool>("true xor false") == true);
+	REQUIRE(eval_expression<bool>("false xor true") == true);
+	REQUIRE(eval_expression<bool>("false xor false") == false);
 }

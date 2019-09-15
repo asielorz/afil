@@ -11,20 +11,24 @@ auto built_in_types() noexcept -> std::vector<Type>
 	return {
 		{"int", 4, 4},
 		{"float", 4, 4},
+		{"bool", 1, 1},
 	};
 }
 
 template <typename T> struct id_for_type {};
 template <> struct id_for_type<int> { static constexpr TypeId value = TypeId::int_; };
 template <> struct id_for_type<float> { static constexpr TypeId value = TypeId::float_; };
+template <> struct id_for_type<bool> { static constexpr TypeId value = TypeId::bool_; };
 template <typename T> constexpr TypeId id_for_type_v = id_for_type<T>::value;
 
 template <typename R, typename ... Args>
 auto extern_function_descriptor(auto (*fn)(Args...) noexcept -> R) noexcept -> ExternFunction
 {
 	return ExternFunction{
-		{id_for_type_v<Args>...},
+		static_cast<int>(sizeof(std::tuple<Args...>)),
+		static_cast<int>(std::max({alignof(Args)...})),
 		id_for_type_v<R>,
+		{id_for_type_v<Args>...},
 		callc::c_function_caller(fn), 
 		fn
 	};
@@ -33,15 +37,23 @@ auto extern_function_descriptor(auto (*fn)(Args...) noexcept -> R) noexcept -> E
 auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_view, ExternFunction>>
 {
 	return {
-		{"operator+"sv, extern_function_descriptor(+[](int a, int b) noexcept { return a + b; })},
-		{"operator-"sv, extern_function_descriptor(+[](int a, int b) noexcept { return a - b; })},
-		{"operator*"sv, extern_function_descriptor(+[](int a, int b) noexcept { return a * b; })},
-		{"operator/"sv, extern_function_descriptor(+[](int a, int b) noexcept { return a / b; })},
+		{"operator+"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a + b; })},
+		{"operator-"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
+		{"operator*"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a * b; })},
+		{"operator/"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a / b; })},
+		{"operator=="sv,	extern_function_descriptor(+[](int a, int b) noexcept -> bool { return a == b; })},
+		{"operator<=>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
 
-		{"operator+"sv, extern_function_descriptor(+[](float a, float b) noexcept { return a + b; })},
-		{"operator-"sv, extern_function_descriptor(+[](float a, float b) noexcept { return a - b; })},
-		{"operator*"sv, extern_function_descriptor(+[](float a, float b) noexcept { return a * b; })},
-		{"operator/"sv, extern_function_descriptor(+[](float a, float b) noexcept { return a / b; })},
+		{"operator+"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a + b; })},
+		{"operator-"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
+		{"operator*"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a * b; })},
+		{"operator/"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a / b; })},
+		{"operator=="sv,	extern_function_descriptor(+[](float a, float b) noexcept -> bool { return a == b; })},
+		{"operator<=>"sv,	extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
+
+		{"operator and"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a && b; })},
+		{"operator or"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a || b; })},
+		{"operator xor"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return (a && !b) || (!a && b); })},
 	};
 }
 
