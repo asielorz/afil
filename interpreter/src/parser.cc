@@ -14,6 +14,7 @@
 using TokenType = lex::Token::Type;
 
 using expr::ExpressionTree;
+using expr::OperatorTree;
 using expr::OperatorNode;
 using expr::Operator;
 
@@ -53,26 +54,26 @@ namespace parser
 		declare_unreachable();
 	}
 
-	auto insert_expression(ExpressionTree & tree, ExpressionTree & new_node) noexcept -> void
+	auto insert_expression(OperatorTree & tree, OperatorTree & new_node) noexcept -> void
 	{
 		OperatorNode & tree_op = std::get<OperatorNode>(tree);
 		OperatorNode & new_op = std::get<OperatorNode>(new_node);
 
 		if (precedence(new_op.op) <= precedence(tree_op.op))
 		{
-			new_op.left = std::make_unique<ExpressionTree>(std::move(tree));
+			new_op.left = std::make_unique<OperatorTree>(std::move(tree));
 			tree = std::move(new_node);
 		}
 		else if (!is_operator_node(*tree_op.right))
 		{
 			new_op.left = std::move(tree_op.right);
-			tree_op.right = std::make_unique<ExpressionTree>(std::move(new_node));
+			tree_op.right = std::make_unique<OperatorTree>(std::move(new_node));
 		}
 		else
 			insert_expression(*tree_op.right, new_node);
 	}
 
-	auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator const> operators) noexcept -> ExpressionTree
+	auto resolve_operator_precedence(span<ExpressionTree> operands, span<Operator const> operators) noexcept -> OperatorTree
 	{
 		if (operators.empty())
 		{
@@ -80,23 +81,23 @@ namespace parser
 			return std::move(operands[0]);
 		}
 
-		ExpressionTree root = [=]{
+		OperatorTree root = [=]{
 			return expr::OperatorNode(operators[0],
-				std::make_unique<ExpressionTree>(std::move(operands[0])),
-				std::make_unique<ExpressionTree>(std::move(operands[1]))
+				std::make_unique<OperatorTree>(std::move(operands[0])),
+				std::make_unique<OperatorTree>(std::move(operands[1]))
 			);
 		}();
 
 		for (size_t i = 1; i < operators.size(); ++i)
 		{
-			auto new_node = ExpressionTree(OperatorNode(operators[i], nullptr, std::make_unique<ExpressionTree>(std::move(operands[i + 1]))));
+			auto new_node = OperatorTree(OperatorNode(operators[i], nullptr, std::make_unique<OperatorTree>(std::move(operands[i + 1]))));
 			insert_expression(root, new_node);
 		}
 
 		return root;
 	}
 
-	auto resolve_operator_overloading(ExpressionTree tree, Program const & program, Scope const & scope) noexcept -> ExpressionTree
+	auto resolve_operator_overloading(OperatorTree tree, Program const & program, Scope const & scope) noexcept -> ExpressionTree
 	{
 		if (is_operator_node(tree))
 		{
@@ -144,7 +145,7 @@ namespace parser
 			return std::visit(visitor, lookup);
 		}
 		else
-			return tree;
+			return std::move(std::get<ExpressionTree>(tree));
 	}
 
 	auto next_statement_tokens(span<lex::Token const> tokens, size_t & index) noexcept -> span<lex::Token const>

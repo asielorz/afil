@@ -24,17 +24,6 @@ namespace expr
 
 	struct ExpressionTree;
 
-	struct OperatorNode
-	{
-		explicit OperatorNode(Operator o) noexcept : op(o) {}
-		OperatorNode(Operator o, std::unique_ptr<ExpressionTree> l, std::unique_ptr<ExpressionTree> r) noexcept
-			: op(o), left(std::move(l)), right(std::move(r)) {}
-
-		Operator op;
-		std::unique_ptr<ExpressionTree> left;
-		std::unique_ptr<ExpressionTree> right;
-	};
-
 	struct VariableNode
 	{
 		TypeId variable_type;
@@ -65,7 +54,6 @@ namespace expr
 	{
 		using ExpressionTreeBase = std::variant<
 			int, float, bool, 
-			OperatorNode, 
 			LocalVariableNode, GlobalVariableNode, 
 			FunctionNode, FunctionCallNode, RelationalOperatorCallNode
 		>;
@@ -79,7 +67,28 @@ namespace expr
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
 	};
 
-	auto is_operator_node(ExpressionTree const & tree) noexcept -> bool;
+	struct OperatorTree;
+
+	struct OperatorNode
+	{
+		explicit OperatorNode(Operator o) noexcept : op(o) {}
+		OperatorNode(Operator o, std::unique_ptr<OperatorTree> l, std::unique_ptr<OperatorTree> r) noexcept
+			: op(o), left(std::move(l)), right(std::move(r)) {}
+
+		Operator op;
+		std::unique_ptr<OperatorTree> left;
+		std::unique_ptr<OperatorTree> right;
+	};
+
+	struct OperatorTree : public std::variant<OperatorNode, ExpressionTree>
+	{
+		using Base = std::variant<OperatorNode, ExpressionTree>;
+		using Base::Base;
+		constexpr auto as_variant() noexcept -> Base & { return *this; }
+		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
+	};
+
+	auto is_operator_node(OperatorTree const & tree) noexcept -> bool;
 	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept->Type;
 	auto expression_type_id(ExpressionTree const & tree, Program const & program) noexcept->TypeId;
 

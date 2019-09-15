@@ -110,25 +110,6 @@ namespace interpreter
 			[&](int literal_value) { write(stack, return_address, literal_value); },
 			[&](float literal_value) { write(stack, return_address, literal_value); },
 			[&](bool literal_value) { write(stack, return_address, literal_value); },
-			[&](expr::OperatorNode const & op_node) 
-			{
-				// TODO: Operators for non-ints
-				int const stack_top = stack.top_pointer;
-				int const lval = read_word(stack, eval_expression_tree(*op_node.left, stack, program));
-				int const rval = read_word(stack, eval_expression_tree(*op_node.right, stack, program));
-				int result;
-				switch (op_node.op)
-				{
-					case expr::Operator::add:		 result = lval + rval; break;
-					case expr::Operator::subtract: result = lval - rval; break;
-					case expr::Operator::multiply: result = lval * rval; break;
-					case expr::Operator::divide:	 result = lval / rval; break;
-					default: declare_unreachable();
-				}
-				
-				free_up_to(stack, stack_top);
-				write(stack, return_address, result);
-			},
 			[&](expr::LocalVariableNode const & var_node)
 			{
 				int const address = stack.base_pointer + var_node.variable_offset;

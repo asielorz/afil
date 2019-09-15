@@ -34,9 +34,9 @@ namespace expr
 		declare_unreachable();
 	}
 
-	auto is_operator_node(ExpressionTree const & tree) noexcept -> bool
+	auto is_operator_node(OperatorTree const & tree) noexcept -> bool
 	{
-		return tree.index() == 3;
+		return tree.index() == 0;
 	}
 
 	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> Type
@@ -50,7 +50,6 @@ namespace expr
 			[](int) { return TypeId::int_; },
 			[](float) { return TypeId::float_; },
 			[](bool) { return TypeId::bool_; },
-			[&](OperatorNode const & op_node) { return expression_type_id(*op_node.left, program); },
 			[](LocalVariableNode const & var_node) { return var_node.variable_type; },
 			[](GlobalVariableNode const & var_node) { return var_node.variable_type; },
 			[](FunctionNode const &) { return TypeId::function; },
