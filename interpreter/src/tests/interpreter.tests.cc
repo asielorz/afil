@@ -325,3 +325,15 @@ TEST_CASE("Logical operators")
 	REQUIRE(eval_expression<bool>("false xor true") == true);
 	REQUIRE(eval_expression<bool>("false xor false") == false);
 }
+
+TEST_CASE("Equality for booleans")
+{
+	REQUIRE(eval_expression<bool>("true == true") == true);
+	REQUIRE(eval_expression<bool>("true == false") == false);
+	REQUIRE(eval_expression<bool>("true != true") == false);
+	REQUIRE(eval_expression<bool>("true != false") == true);
+	REQUIRE(eval_expression<bool>("false == false") == true);
+	REQUIRE(eval_expression<bool>("false == true") == false);
+	REQUIRE(eval_expression<bool>("false != false") == false);
+	REQUIRE(eval_expression<bool>("false != true") == true);
+}
