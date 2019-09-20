@@ -11,9 +11,20 @@ auto run_tests() noexcept -> int
 	return result;
 }
 
-#ifdef UNIT_TESTS
-int main()
+auto program_main_(int argc, char const * const argv[]) -> int;
+
+#undef main
+auto main(int argc, char const * const argv[]) -> int
 {
-	return run_tests();
-}
+	int const unit_test_result = run_tests();
+
+#ifdef UNIT_TESTS
+	static_cast<void>(argc, argv);
+	return unit_test_result;
+#else
+	if (unit_test_result != 0)
+		return unit_test_result;
+	else
+		return program_main_(argc, argv);
 #endif
+}
