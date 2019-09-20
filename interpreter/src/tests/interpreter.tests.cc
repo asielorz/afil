@@ -357,7 +357,7 @@ TEST_CASE("Fibonacci just for the fun of it")
 		{
 			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
 		};
-	)";
+	)"sv;
 
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 2048);
@@ -387,6 +387,71 @@ TEST_CASE("Declaring variables with let")
 
 	REQUIRE(eval_expression<int>("i", stack, program) == 7 * 6 / 2 - 50);
 	REQUIRE(eval_expression<float>("f", stack, program) == 3.141592f);
+}
+
+auto parse_and_run(std::string_view src) noexcept -> int
+{
+	Program const program = parser::parse_source(src);
+	return interpreter::run(program);
+}
+
+TEST_CASE("main function")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			return 0;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+
+auto fib(int i) -> int
+{
+	if (i <= 1)
+		return i;
+	else
+		return fib(i - 1) + fib(i - 2);
+};
+
+TEST_CASE("Main function that calls another function.")
+{
+	auto const src = R"(
+		let fib = fn (int i) -> int
+		{
+			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
+		};		
+
+		let main = fn () -> int
+		{
+			let i = fib(5);
+			let j = fib(8);
+
+			let difference = fn (int i, int j) -> int
+			{
+				return 
+					if (i > j)
+						i - j
+					else
+						j - i;
+			};
+
+			return difference(i, j);
+		};
+	)"sv;
+
+	auto const difference = [](int i, int j)
+	{
+		if (i > j)
+			return i - j;
+		else
+			return j - i;
+	};
+
+	int const i = fib(5);
+	int const j = fib(8);
+	REQUIRE(parse_and_run(src) == difference(i, j));
 }
 
 //TEST_CASE("Block expression")

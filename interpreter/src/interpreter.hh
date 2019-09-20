@@ -28,6 +28,9 @@ namespace interpreter
 	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> void;
 	auto run_statement_tree(parser::StatementTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> bool;
 
+	// TODO: argc, argv. Decide a good stack size.
+	auto run(Program const & program, int stack_size = 2048) noexcept -> int;
+
 }
 
 #include "interpreter.inl"

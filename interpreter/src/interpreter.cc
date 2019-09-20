@@ -200,4 +200,16 @@ namespace interpreter
 		return std::visit(visitor, tree.as_variant());
 	}
 
+	auto run(Program const & program, int stack_size) noexcept -> int
+	{
+		assert(program.main_function != invalid_function_id);
+
+		ProgramStack stack;
+		alloc_stack(stack, stack_size);
+		// TODO: Stack frame and initialization of globals.
+		int const return_address = alloc(stack, sizeof(int), alignof(int));
+		call_function(program.main_function, {}, stack, program, return_address);
+		return read<int>(stack, return_address);
+	}
+
 }

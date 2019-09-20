@@ -151,9 +151,18 @@ namespace parser
 	auto next_statement_tokens(span<lex::Token const> tokens, size_t & index) noexcept -> span<lex::Token const>
 	{
 		size_t length = 0;
-		while (tokens[index + length].type != TokenType::semicolon)
-			length++;
-		length++; // Include the semicolon.
+		for (int scope_depth = 0; length < tokens.size(); length++)
+		{
+			if (tokens[index + length].type == TokenType::semicolon && scope_depth == 0)
+			{
+				length++; // Include the semicolon.
+				break;
+			}
+			else if (tokens[index + length].type == TokenType::open_brace)
+				scope_depth++;
+			else if (tokens[index + length].type == TokenType::close_brace)
+				scope_depth--;
+		}
 
 		auto const result_tokens = tokens.subspan(index, length);
 		index += length;
@@ -176,7 +185,7 @@ namespace parser
 
 	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, Program & program, Function & function) noexcept -> void
 	{
-		// Arguments must be between parenthesis
+		// Parameters must be between parenthesis.
 		assert(tokens[index].type == TokenType::open_parenthesis);
 		index++;
 
@@ -192,11 +201,18 @@ namespace parser
 			function.parameter_size = function.stack_frame_size;
 			index++;
 
-			assert(tokens[index].type == TokenType::comma || tokens[index].type == TokenType::close_parenthesis);
+			if (tokens[index].type == TokenType::close_parenthesis)
+				break;
+
+			assert(tokens[index].type == TokenType::comma);
 			index++;
 		}
 
-		// Return type is introduced with an arrow
+		// After parameters close parenthesis.
+		assert(tokens[index].type == TokenType::close_parenthesis);
+		index++;
+
+		// Return type is introduced with an arrow.
 		assert(tokens[index].type == TokenType::arrow);
 		index++;
 
@@ -456,6 +472,36 @@ namespace parser
 		return node;
 	}
 
+	auto bind_function_name(std::string_view function_name, FunctionId function_id, Program & program, Scope & scope) noexcept -> void
+	{
+		// Special rules for the main function.
+		if (function_name == "main")
+		{
+			// Main function must be in the global scope.
+			assert(&scope == &program.global_scope);
+
+			// Main cannot be a extern function.
+			assert(!function_id.is_extern);
+
+			// Main must not take parameters and return int.
+			Function const & main_function = program.functions[function_id.index];
+			assert(main_function.return_type == TypeId::int_);
+			assert(main_function.parameter_count == 0);
+
+			// There can only be one main function.
+			assert(program.main_function == invalid_function_id);
+
+			// Bind the function as the program's main function.
+			program.main_function = function_id;
+
+			// Main function does not go to the list of function names. You cannot lookup main.
+		}
+		else
+		{
+			scope.functions.push_back({function_name, function_id});
+		}
+	}
+
 	auto parse_function_declaration_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::nullopt_t
 	{
 		// A function declaration statement has the following form:
@@ -465,14 +511,25 @@ namespace parser
 		assert(tokens[2].type == TokenType::assignment);
 
 		// Adding the function to the program before parsing the body allows the body of the function to find itself and be recursive.
+
 		// Add a new function to the program.
 		Function & function = program.functions.emplace_back();
 		// Add the function name to the scope.
-		auto const func_id = FunctionId{0, static_cast<unsigned>(program.functions.size() - 1)};
-		scope.functions.push_back({tokens[1].source, func_id});
+		auto const function_id = FunctionId{0, static_cast<unsigned>(program.functions.size() - 1)};
 		size_t index = 4;
 		parse_function_prototype(tokens, index, program, function);
-		parse_function_body(tokens, index, program, function);
+		bind_function_name(tokens[1].source, function_id, program, scope);
+
+		// Operate on a local temporary to avoid invalidation of the reference on reallocation.
+		Function temp;
+		temp.parameter_count = function.parameter_count;
+		temp.parameter_size = function.parameter_size;
+		temp.stack_frame_size = function.stack_frame_size;
+		temp.stack_frame_alignment = function.stack_frame_alignment;
+		temp.return_type = function.return_type;
+		temp.variables = function.variables;
+		parse_function_body(tokens, index, program, temp);
+		program.functions[function_id.index] = std::move(temp);
 
 		return std::nullopt;
 	}
@@ -494,7 +551,7 @@ namespace parser
 			if (var_type == TypeId::function)
 			{
 				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
-				scope.functions.push_back({tokens[1].source, function_id});
+				bind_function_name(tokens[1].source, function_id, program, scope);
 				return std::nullopt;
 			}
 			else
@@ -528,6 +585,18 @@ namespace parser
 			return parse_variable_declaration_statement(tokens, program, scope);
 		else
 			return parse_expression_statement(tokens, program, scope);
+	}
+
+	auto parse_source(std::string_view src) noexcept -> Program
+	{
+		auto const tokens = lex::tokenize(src);
+		Program program;
+
+		size_t index = 0;
+		while (index < tokens.size())
+			parse_statement(next_statement_tokens(tokens, index), program, program.global_scope);
+
+		return program;
 	}
 
 } //namespace parser

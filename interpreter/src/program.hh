@@ -63,6 +63,7 @@ struct Program
 	std::vector<Function> functions;
 	std::vector<ExternFunction> extern_functions;
 	Scope global_scope;
+	FunctionId main_function = invalid_function_id;
 };
 
 namespace lookup_result

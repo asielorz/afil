@@ -39,5 +39,8 @@ namespace parser
 	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope) noexcept -> expr::ExpressionTree;
 	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<StatementTree>;
 
+	// Tokenize and parse a source file and return the resulting program.
+	auto parse_source(std::string_view src) noexcept -> Program;
+
 } // namespace parser
 
