@@ -50,12 +50,20 @@ namespace expr
 		std::unique_ptr<std::array<ExpressionTree, 2>> parameters;
 	};
 
+	struct IfNode
+	{
+		std::unique_ptr<ExpressionTree> condition;
+		std::unique_ptr<ExpressionTree> then_case;
+		std::unique_ptr<ExpressionTree> else_case;
+	};
+
 	namespace detail
 	{
 		using ExpressionTreeBase = std::variant<
 			int, float, bool, 
 			LocalVariableNode, GlobalVariableNode, 
-			FunctionNode, FunctionCallNode, RelationalOperatorCallNode
+			FunctionNode, FunctionCallNode, RelationalOperatorCallNode,
+			IfNode
 		>;
 	}
 

@@ -337,3 +337,15 @@ TEST_CASE("Equality for booleans")
 	REQUIRE(eval_expression<bool>("false != false") == false);
 	REQUIRE(eval_expression<bool>("false != true") == true);
 }
+
+TEST_CASE("if expression")
+{
+	REQUIRE(eval_expression<int>("if (true) 1 else 2") == 1);
+	REQUIRE(eval_expression<int>("if (false) 1 else 2") == 2);
+}
+
+TEST_CASE("slightly more complex if expressions")
+{
+	REQUIRE(eval_expression<int>("if (1 < 5) 1 + 3 * 2 else 2 - 1") == 1 + 3 * 2);
+	REQUIRE(eval_expression<float>("if (2 != 2) 1.3 + 3.1 * 2.9 else 2.3 - 1.123") == 2.3f - 1.123f);
+}

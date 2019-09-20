@@ -273,6 +273,35 @@ namespace parser
 		return node;
 	}
 
+	auto parse_if_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> expr::IfNode
+	{
+		// Skip if token
+		index++;
+
+		// Condition goes between parenthesis.
+		assert(tokens[index].type == TokenType::open_parenthesis);
+		index++;
+
+		expr::IfNode if_node;
+		if_node.condition = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope));
+		assert(expression_type_id(*if_node.condition, program) == TypeId::bool_);
+
+		assert(tokens[index].type == TokenType::close_parenthesis);
+		index++;
+
+		if_node.then_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope));
+
+		// Expect keyword else to separate then and else cases.
+		assert(tokens[index].source == "else");
+		index++;
+
+		if_node.else_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope));
+
+		assert(expression_type_id(*if_node.then_case, program) == expression_type_id(*if_node.else_case, program));
+
+		return if_node;
+	}
+
 	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree
 	{
 		if (tokens[index].source == "fn")
@@ -283,6 +312,10 @@ namespace parser
 				return parse_function_call_expression(tokens, index, program, scope, span<FunctionId const>(&func_node.function_id, 1));
 			else
 				return func_node;
+		}
+		else if (tokens[index].source == "if")
+		{
+			return parse_if_expression(tokens, index, program, scope);
 		}
 		else if (tokens[index].type == TokenType::literal_int)
 		{

@@ -158,6 +158,15 @@ namespace interpreter
 					write(stack, return_address, boolean_result);
 					free_up_to(stack, prev_stack_top);
 				}
+			},
+			[&](expr::IfNode const & if_node)
+			{
+				int const result_addr = eval_expression_tree(*if_node.condition, stack, program);
+				bool const condition = read<bool>(stack, result_addr);
+				free_up_to(stack, result_addr);
+
+				expr::ExpressionTree const & expr = condition ? *if_node.then_case : *if_node.else_case;
+				eval_expression_tree(expr, stack, program, return_address);
 			}
 		);
 		std::visit(visitor, tree.as_variant());

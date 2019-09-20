@@ -60,7 +60,8 @@ namespace expr
 				else
 					return program.functions[func_call_node.function_id.index].return_type;
 			},
-			[](RelationalOperatorCallNode const &) { return TypeId::bool_; }
+			[](RelationalOperatorCallNode const &) { return TypeId::bool_; },
+			[&](IfNode const & if_node) { return expression_type_id(*if_node.then_case, program); }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}
