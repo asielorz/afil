@@ -86,6 +86,41 @@ namespace lex
 		return chars_skipped;
 	}
 
+	auto skip_comments(std::string_view src, int index) noexcept -> int
+	{
+		if (starts_with(src, index, "//"sv))
+		{
+			size_t const newline = src.find('\n', index);
+			if (newline == std::string_view::npos)
+				return static_cast<int>(src.size()) - index;
+			else
+				return static_cast<int>(newline + 1) - index;
+		}
+		else if (starts_with(src, index, "/*"sv))
+		{
+			size_t const comment_end = src.find("*/"sv, index);
+			assert(comment_end != std::string_view::npos); // A C comment must be closed.
+			return static_cast<int>(comment_end + 2) - index;
+		}
+		else
+			return 0;
+	}
+
+	auto skip_whitespace_and_comments(std::string_view src, int index) noexcept -> int
+	{
+		int original_index = index;
+		for (;;)
+		{
+			int const whitespace_chars = skip_whitespace(src, index);
+			int const comment_chars = skip_comments(src, index + whitespace_chars);
+			if (whitespace_chars + comment_chars == 0)
+				break;
+			else
+				index += whitespace_chars + comment_chars;
+		}
+		return index - original_index;
+	}
+
 	auto token_length_literal_int(std::string_view src, int index) noexcept -> int
 	{
 		int length = 0;
@@ -169,7 +204,7 @@ namespace lex
 	std::vector<Token> tokenize(std::string_view src)
 	{
 		std::vector<Token> result;
-		int index = skip_whitespace(src, 0);
+		int index = skip_whitespace_and_comments(src, 0);
 
 		while (!end_reached(src, index))
 		{
@@ -186,7 +221,7 @@ namespace lex
 				assert(end_reached(src, index) || is_valid_after_literal(src[index]));
 			}
 
-			index += skip_whitespace(src, index);
+			index += skip_whitespace_and_comments(src, index);
 			result.push_back(token);
 		}
 
