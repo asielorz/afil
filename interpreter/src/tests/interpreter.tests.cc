@@ -344,8 +344,59 @@ TEST_CASE("if expression")
 	REQUIRE(eval_expression<int>("if (false) 1 else 2") == 2);
 }
 
-TEST_CASE("slightly more complex if expressions")
+TEST_CASE("Slightly more complex if expressions")
 {
 	REQUIRE(eval_expression<int>("if (1 < 5) 1 + 3 * 2 else 2 - 1") == 1 + 3 * 2);
 	REQUIRE(eval_expression<float>("if (2 != 2) 1.3 + 3.1 * 2.9 else 2.3 - 1.123") == 2.3f - 1.123f);
 }
+
+TEST_CASE("Fibonacci just for the fun of it")
+{
+	auto const src = R"(
+		let fib = fn (int i) -> int
+		{
+			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
+		};
+	)";
+
+	interpreter::ProgramStack stack;
+	alloc_stack(stack, 2048);
+	Program program;
+	parser::parse_statement(lex::tokenize(src), program, program.global_scope);
+
+	REQUIRE(eval_expression<int>("fib(0)", stack, program) == 0);
+	REQUIRE(eval_expression<int>("fib(1)", stack, program) == 1);
+	REQUIRE(eval_expression<int>("fib(2)", stack, program) == 1);
+	REQUIRE(eval_expression<int>("fib(3)", stack, program) == 2);
+	REQUIRE(eval_expression<int>("fib(4)", stack, program) == 3);
+	REQUIRE(eval_expression<int>("fib(5)", stack, program) == 5);
+	REQUIRE(eval_expression<int>("fib(6)", stack, program) == 8);
+	REQUIRE(eval_expression<int>("fib(7)", stack, program) == 13);
+	REQUIRE(eval_expression<int>("fib(8)", stack, program) == 21);
+	REQUIRE(eval_expression<int>("fib(9)", stack, program) == 34);
+	REQUIRE(eval_expression<int>("fib(10)", stack, program) == 55);
+}
+
+TEST_CASE("Declaring variables with let")
+{
+	interpreter::ProgramStack stack;
+	alloc_stack(stack, 128);
+	Program program;
+	run_statement("let i = 7 * 6 / 2 - 50;", stack, program.global_scope);
+	run_statement("let f = 3.141592;", stack, program.global_scope);
+
+	REQUIRE(eval_expression<int>("i", stack, program) == 7 * 6 / 2 - 50);
+	REQUIRE(eval_expression<float>("f", stack, program) == 3.141592f);
+}
+
+//TEST_CASE("Block expression")
+//{
+//	auto const src =
+//		"{"
+//		"    int i = 3;"
+//		"    int j = 4;"
+//		"    => i * i + j * j;"
+//		"}";
+//
+//	REQUIRE(eval_expression<int>(src) == 3 * 3 + 4 * 4);
+//}

@@ -174,16 +174,11 @@ namespace parser
 		return var.offset;
 	}
 
-	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> expr::FunctionNode
+	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, Program & program, Function & function) noexcept -> void
 	{
-		// Skip fn token.
-		index++;
-
 		// Arguments must be between parenthesis
 		assert(tokens[index].type == TokenType::open_parenthesis);
 		index++;
-
-		Function function;
 
 		// Parse arguments.
 		while (tokens[index].type == TokenType::identifier)
@@ -209,7 +204,10 @@ namespace parser
 		function.return_type = lookup_type_name(program, tokens[index].source);
 		assert(function.return_type != TypeId::none);
 		index++;
+	}
 
+	auto parse_function_body(span<lex::Token const> tokens, size_t & index, Program & program, Function & function) noexcept -> void
+	{
 		// Body of the function is enclosed by braces.
 		assert(tokens[index].type == TokenType::open_brace);
 		index++;
@@ -224,10 +222,22 @@ namespace parser
 
 		// Skip closing brace.
 		index++;
+	}
+
+	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> expr::FunctionNode
+	{
+		// Skip fn token.
+		index++;
+
+		Function function;
+
+		parse_function_prototype(tokens, index, program, function);
+		parse_function_body(tokens, index, program, function);
 
 		// Add the function to the program.
 		program.functions.push_back(std::move(function));
 		auto const func_id = FunctionId{0, static_cast<unsigned>(program.functions.size() - 1)};
+
 		return expr::FunctionNode{func_id};
 	}
 
@@ -405,6 +415,11 @@ namespace parser
 		return tree;
 	}
 
+	auto register_declared_variable()
+	{
+
+	}
+
 	auto parse_variable_declaration_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> VariableDeclarationStatementNode
 	{
 		// A variable declaration statement has the following form:
@@ -449,14 +464,54 @@ namespace parser
 		assert(tokens[1].type == TokenType::identifier);
 		assert(tokens[2].type == TokenType::assignment);
 
-		size_t index = 3;
-		expr::FunctionNode const func_node = parse_function_expression(tokens.subspan(0, tokens.size() - 1), index, program);
-		FunctionName func_name;
-		func_name.name = tokens[1].source;
-		func_name.id = func_node.function_id;
-		scope.functions.push_back(func_name);
+		// Adding the function to the program before parsing the body allows the body of the function to find itself and be recursive.
+		// Add a new function to the program.
+		Function & function = program.functions.emplace_back();
+		// Add the function name to the scope.
+		auto const func_id = FunctionId{0, static_cast<unsigned>(program.functions.size() - 1)};
+		scope.functions.push_back({tokens[1].source, func_id});
+		size_t index = 4;
+		parse_function_prototype(tokens, index, program, function);
+		parse_function_body(tokens, index, program, function);
 
 		return std::nullopt;
+	}
+
+	auto parse_let_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<StatementTree>
+	{
+		// If we have directly a function expression, parse it in a special way to handle recursion. TODO: Think of generalizing
+		// binding names to function expressions somehow.
+		if (tokens[3].source == "fn")
+			return parse_function_declaration_statement(tokens, program, scope);
+		else
+		{
+			assert(tokens[1].type == TokenType::identifier);
+			assert(tokens[2].type == TokenType::assignment);
+
+			// If the expression returns a function, bind it to its name and return a noop.
+			expr::ExpressionTree expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope);
+			TypeId const var_type = expression_type_id(expression, program);
+			if (var_type == TypeId::function)
+			{
+				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
+				scope.functions.push_back({tokens[1].source, function_id});
+				return std::nullopt;
+			}
+			else
+			{
+				VariableDeclarationStatementNode node;
+				node.variable_offset = add_variable_to_scope(scope, tokens[1].source, var_type, program);
+				node.assigned_expression = std::move(expression);
+				return node;
+			}
+		}
+	}
+
+	auto parse_expression_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> ExpressionStatementNode
+	{
+		ExpressionStatementNode node;
+		node.expression = parse_expression(tokens.subspan(0, tokens.size() - 1), program, scope);
+		return node;
 	}
 
 	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<StatementTree>
@@ -468,9 +523,11 @@ namespace parser
 			return parse_return_statement(tokens, program, scope);
 		// This will change when let is also used to declare constants, but that's a problem of future Asier.
 		else if (tokens[0].source == "let")
-			return parse_function_declaration_statement(tokens, program, scope);
-		else
+			return parse_let_statement(tokens, program, scope);
+		else if (lookup_type_name(program, tokens[0].source) != TypeId::none)
 			return parse_variable_declaration_statement(tokens, program, scope);
+		else
+			return parse_expression_statement(tokens, program, scope);
 	}
 
 } //namespace parser

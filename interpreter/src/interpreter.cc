@@ -190,6 +190,11 @@ namespace interpreter
 				stack.top_pointer = prev_ebp_address + expression_type(var_node.returned_expression, program).size;
 				stack.base_pointer = prev_ebp;
 				return true; // Return true to indicate that the function should end.
+			},
+			[&](parser::ExpressionStatementNode const & expr_node)
+			{
+				eval_expression_tree(expr_node.expression, stack, program, stack.top_pointer);
+				return false;
 			}
 		);
 		return std::visit(visitor, tree.as_variant());

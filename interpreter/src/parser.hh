@@ -23,9 +23,14 @@ namespace parser
 		expr::ExpressionTree returned_expression;
 	};
 
-	struct StatementTree : public std::variant<VariableDeclarationStatementNode, ReturnStatementNode>
+	struct ExpressionStatementNode
 	{
-		using Base = std::variant<VariableDeclarationStatementNode, ReturnStatementNode>;
+		expr::ExpressionTree expression;
+	};
+
+	struct StatementTree : public std::variant<VariableDeclarationStatementNode, ReturnStatementNode, ExpressionStatementNode>
+	{
+		using Base = std::variant<VariableDeclarationStatementNode, ReturnStatementNode, ExpressionStatementNode>;
 		using Base::Base;
 		constexpr auto as_variant() noexcept -> Base & { return *this; }
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
