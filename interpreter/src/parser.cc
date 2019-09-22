@@ -17,6 +17,7 @@ using expr::ExpressionTree;
 using expr::OperatorTree;
 using expr::OperatorNode;
 using expr::Operator;
+using expr::Literal;
 
 using namespace std::literals;
 
@@ -328,6 +329,20 @@ namespace parser
 		return if_node;
 	}
 
+	auto parse_return_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> expr::ReturnNode
+	{
+		// Skip return token
+		index++;
+
+		expr::ReturnNode node;
+		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope));
+
+		// Cannot return special types that do not represent data types.
+		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
+
+		return node;
+	}
+
 	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope) noexcept -> ExpressionTree
 	{
 		if (tokens[index].source == "fn")
@@ -343,17 +358,21 @@ namespace parser
 		{
 			return parse_if_expression(tokens, index, program, scope);
 		}
+		else if (tokens[index].source == "return")
+		{
+			return parse_return_expression(tokens, index, program, scope);
+		}
 		else if (tokens[index].type == TokenType::literal_int)
 		{
-			return ExpressionTree(parse_number_literal<int>(tokens[index++].source));
+			return ExpressionTree(Literal<int>{parse_number_literal<int>(tokens[index++].source)});
 		}
 		else if (tokens[index].type == TokenType::literal_float)
 		{
-			return ExpressionTree(parse_number_literal<float>(tokens[index++].source));
+			return ExpressionTree(Literal<float>{parse_number_literal<float>(tokens[index++].source)});
 		}
 		else if (tokens[index].type == TokenType::literal_bool)
 		{
-			return ExpressionTree(tokens[index++].source[0] == 't'); // if it starts with t it must be bool, and otherwise it must be false.
+			return ExpressionTree(Literal<bool>{tokens[index++].source[0] == 't'}); // if it starts with t it must be bool, and otherwise it must be false.
 		}
 		else if (tokens[index].type == TokenType::identifier)
 		{
@@ -462,16 +481,6 @@ namespace parser
 		return node;
 	}
 
-	auto parse_return_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> ReturnStatementNode
-	{
-		// A return statement has the following form:
-		// return [expr];
-
-		ReturnStatementNode node;
-		node.returned_expression = parse_expression(tokens.subspan(1, tokens.size() - 2), program, scope);
-		return node;
-	}
-
 	auto bind_function_name(std::string_view function_name, FunctionId function_id, Program & program, Scope & scope) noexcept -> void
 	{
 		// Special rules for the main function.
@@ -534,7 +543,7 @@ namespace parser
 		return std::nullopt;
 	}
 
-	auto parse_let_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<StatementTree>
+	auto parse_let_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<Statement>
 	{
 		// If we have directly a function expression, parse it in a special way to handle recursion. TODO: Think of generalizing
 		// binding names to function expressions somehow.
@@ -571,15 +580,12 @@ namespace parser
 		return node;
 	}
 
-	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<StatementTree>
+	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<Statement>
 	{
 		// A statement ends with a semicolon.
 		assert(tokens.back().type == TokenType::semicolon);
 
-		if (tokens[0].source == "return")
-			return parse_return_statement(tokens, program, scope);
-		// This will change when let is also used to declare constants, but that's a problem of future Asier.
-		else if (tokens[0].source == "let")
+		if (tokens[0].source == "let")
 			return parse_let_statement(tokens, program, scope);
 		else if (lookup_type_name(program, tokens[0].source) != TypeId::none)
 			return parse_variable_declaration_statement(tokens, program, scope);

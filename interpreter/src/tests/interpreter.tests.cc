@@ -51,7 +51,7 @@ TEST_CASE("Multiplication has more precedence than addition")
 auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Scope & scope) noexcept -> void
 {
 	Program program;
-	interpreter::run_statement_tree(*parser::parse_statement(lex::tokenize(src), program, scope), stack, program, 0);
+	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), program, scope), stack, program);
 }
 
 auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Scope const & scope) noexcept -> int

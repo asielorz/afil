@@ -176,3 +176,8 @@ auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &
 {
 	return program.types[static_cast<int>(id)];
 }
+
+auto is_data_type(TypeId id) noexcept -> bool
+{
+	return id >= TypeId::int_;
+}

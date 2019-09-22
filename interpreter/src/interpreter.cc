@@ -4,6 +4,7 @@
 #include "overload.hh"
 #include "program.hh"
 #include "utils.hh"
+#include "variant.hh"
 #include <cassert>
 
 namespace interpreter
@@ -81,8 +82,20 @@ namespace interpreter
 
 			// Run the function.
 			for (auto const & statement : func.statements)
-				if (run_statement_tree(statement, stack, program, return_address))
+			{
+				auto const cf = run_statement(statement, stack, program);
+				if (auto const ret = try_get<control_flow::Return>(cf))
+				{
+					// Read the previous ebp from the stack.
+					int const prev_ebp_address = stack.base_pointer - sizeof(int);
+					int const prev_ebp = read_word(stack, prev_ebp_address);
+					eval_expression_tree(*ret->returned_expression, stack, program, return_address);
+					stack.top_pointer = prev_ebp_address + expression_type(*ret->returned_expression, program).size;
+					stack.base_pointer = prev_ebp;
+
 					break;
+				}
+			}
 		}
 		else
 		{
@@ -104,12 +117,13 @@ namespace interpreter
 		}
 	}
 
-	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> void
+	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept 
+		-> control_flow::Variant
 	{
-		auto const visitor = overload(
-			[&](int literal_value) { write(stack, return_address, literal_value); },
-			[&](float literal_value) { write(stack, return_address, literal_value); },
-			[&](bool literal_value) { write(stack, return_address, literal_value); },
+		auto const visitor = overload_default_ret(control_flow::Variant(),
+			[&](expr::Literal<int> literal) { write(stack, return_address, literal.value); },
+			[&](expr::Literal<float> literal) { write(stack, return_address, literal.value); },
+			[&](expr::Literal<bool> literal) { write(stack, return_address, literal.value); },
 			[&](expr::LocalVariableNode const & var_node)
 			{
 				int const address = stack.base_pointer + var_node.variable_offset;
@@ -167,34 +181,27 @@ namespace interpreter
 
 				expr::ExpressionTree const & expr = condition ? *if_node.then_case : *if_node.else_case;
 				eval_expression_tree(expr, stack, program, return_address);
+			},
+			[](expr::ReturnNode const & ret_node)
+			{
+				return control_flow::Return{ret_node.returned_expression.get()};
 			}
 		);
-		std::visit(visitor, tree.as_variant());
+		return std::visit(visitor, tree.as_variant());
 	}
 
-	auto run_statement_tree(parser::StatementTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> bool
+	auto run_statement(parser::Statement const & tree, ProgramStack & stack, Program const & program) noexcept 
+		-> control_flow::Variant
 	{
 		auto const visitor = overload(
-			[&](parser::VariableDeclarationStatementNode const & node) 
+			[&](parser::VariableDeclarationStatementNode const & node) -> control_flow::Variant
 			{
 				int const address = stack.base_pointer + node.variable_offset;
-				eval_expression_tree(node.assigned_expression, stack, program, address);
-				return false;
+				return eval_expression_tree(node.assigned_expression, stack, program, address);
 			},
-			[&](parser::ReturnStatementNode const & var_node)
+			[&](parser::ExpressionStatementNode const & expr_node) -> control_flow::Variant
 			{
-				// Read the previous ebp from the stack.
-				int const prev_ebp_address = stack.base_pointer - sizeof(int);
-				int const prev_ebp = read_word(stack, prev_ebp_address);
-				eval_expression_tree(var_node.returned_expression, stack, program, return_address);
-				stack.top_pointer = prev_ebp_address + expression_type(var_node.returned_expression, program).size;
-				stack.base_pointer = prev_ebp;
-				return true; // Return true to indicate that the function should end.
-			},
-			[&](parser::ExpressionStatementNode const & expr_node)
-			{
-				eval_expression_tree(expr_node.expression, stack, program, stack.top_pointer);
-				return false;
+				return eval_expression_tree(expr_node.expression, stack, program, stack.top_pointer);
 			}
 		);
 		return std::visit(visitor, tree.as_variant());
@@ -210,7 +217,7 @@ namespace interpreter
 		// Initialization of globals.
 		alloc(stack, program.global_scope.stack_frame_size);
 		for (auto const & statement : program.global_initialization_statements)
-			run_statement_tree(statement, stack, program, 0);
+			run_statement(statement, stack, program);
 
 		// Run main.
 		int const return_address = alloc(stack, sizeof(int), alignof(int));

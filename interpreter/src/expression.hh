@@ -24,6 +24,12 @@ namespace expr
 
 	struct ExpressionTree;
 
+	template <typename T>
+	struct Literal
+	{
+		T value;
+	};
+
 	struct VariableNode
 	{
 		TypeId variable_type;
@@ -57,13 +63,18 @@ namespace expr
 		std::unique_ptr<ExpressionTree> else_case;
 	};
 
+	struct ReturnNode
+	{
+		std::unique_ptr<ExpressionTree> returned_expression;
+	};
+
 	namespace detail
 	{
 		using ExpressionTreeBase = std::variant<
-			int, float, bool, 
+			Literal<int>, Literal<float>, Literal<bool>, 
 			LocalVariableNode, GlobalVariableNode, 
 			FunctionNode, FunctionCallNode, RelationalOperatorCallNode,
-			IfNode
+			IfNode, ReturnNode
 		>;
 	}
 

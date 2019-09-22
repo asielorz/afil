@@ -1,10 +1,11 @@
 #pragma once
 
+#include <variant>
 #include <vector>
 #include <string_view>
 
 namespace expr { struct ExpressionTree; }
-namespace parser { struct StatementTree; }
+namespace parser { struct Statement; }
 struct Program;
 
 namespace interpreter
@@ -22,11 +23,21 @@ namespace interpreter
 	template <typename T> auto write(ProgramStack & stack, int address, T const & value) noexcept -> void;
 	auto alloc_stack(ProgramStack & stack, int stack_size_in_bytes) noexcept -> void;
 
+	namespace control_flow
+	{
+		struct Nothing {};
+		struct Return { expr::ExpressionTree const * returned_expression; };
+		using Variant = std::variant<control_flow::Nothing, control_flow::Return>;
+	}
+
 	// Return value is allocated on top of the stack. Returns address of return value.
 	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program) noexcept -> int;
 	// Return value is written at the given address.
-	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> void;
-	auto run_statement_tree(parser::StatementTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> bool;
+	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept 
+		-> control_flow::Variant;
+
+	auto run_statement(parser::Statement const & tree, ProgramStack & stack, Program const & program) noexcept
+		->control_flow::Variant;
 
 	// TODO: argc, argv. Decide a good stack size.
 	auto run(Program const & program, int stack_size = 2048) noexcept -> int;

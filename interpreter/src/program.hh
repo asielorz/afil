@@ -6,7 +6,7 @@
 #include <string_view>
 #include <variant>
 
-namespace parser { struct StatementTree; }
+namespace parser { struct Statement; }
 
 struct Type
 {
@@ -14,7 +14,7 @@ struct Type
 	int size;
 	int alignment;
 };
-enum struct TypeId { function = -2, none = -1, int_, float_, bool_ };
+enum struct TypeId { noreturn = -3, function = -2, none = -1, int_, float_, bool_ };
 
 struct Variable
 {
@@ -42,7 +42,7 @@ struct Function : Scope
 	int parameter_count = 0;     // From the variables, how many are arguments. The rest are locals.
 	int parameter_size = 0;	     // Size in bytes needed for parameters.
 	TypeId return_type;
-	std::vector<parser::StatementTree> statements;
+	std::vector<parser::Statement> statements;
 };
 
 struct ExternFunction
@@ -62,7 +62,7 @@ struct Program
 	std::vector<Type> types;
 	std::vector<Function> functions;
 	std::vector<ExternFunction> extern_functions;
-	std::vector<parser::StatementTree> global_initialization_statements;
+	std::vector<parser::Statement> global_initialization_statements;
 	Scope global_scope;
 	FunctionId main_function = invalid_function_id;
 };
@@ -86,3 +86,4 @@ auto resolve_function_overloading(span<FunctionId const> overload_set, span<Type
 
 auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
+auto is_data_type(TypeId id) noexcept -> bool;

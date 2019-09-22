@@ -18,26 +18,21 @@ namespace parser
 		expr::ExpressionTree assigned_expression;
 	};
 
-	struct ReturnStatementNode
-	{
-		expr::ExpressionTree returned_expression;
-	};
-
 	struct ExpressionStatementNode
 	{
 		expr::ExpressionTree expression;
 	};
 
-	struct StatementTree : public std::variant<VariableDeclarationStatementNode, ReturnStatementNode, ExpressionStatementNode>
+	struct Statement : public std::variant<VariableDeclarationStatementNode, ExpressionStatementNode>
 	{
-		using Base = std::variant<VariableDeclarationStatementNode, ReturnStatementNode, ExpressionStatementNode>;
+		using Base = std::variant<VariableDeclarationStatementNode, ExpressionStatementNode>;
 		using Base::Base;
 		constexpr auto as_variant() noexcept -> Base & { return *this; }
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
 	};
 
 	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope) noexcept -> expr::ExpressionTree;
-	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<StatementTree>;
+	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::optional<Statement>;
 
 	// Tokenize and parse a source file and return the resulting program.
 	auto parse_source(std::string_view src) noexcept -> Program;

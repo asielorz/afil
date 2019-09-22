@@ -47,9 +47,9 @@ namespace expr
 	auto expression_type_id(ExpressionTree const & tree, Program const & program) noexcept -> TypeId
 	{
 		auto const visitor = overload(
-			[](int) { return TypeId::int_; },
-			[](float) { return TypeId::float_; },
-			[](bool) { return TypeId::bool_; },
+			[](Literal<int>) { return TypeId::int_; },
+			[](Literal<float>) { return TypeId::float_; },
+			[](Literal<bool>) { return TypeId::bool_; },
 			[](LocalVariableNode const & var_node) { return var_node.variable_type; },
 			[](GlobalVariableNode const & var_node) { return var_node.variable_type; },
 			[](FunctionNode const &) { return TypeId::function; },
@@ -61,7 +61,8 @@ namespace expr
 					return program.functions[func_call_node.function_id.index].return_type;
 			},
 			[](RelationalOperatorCallNode const &) { return TypeId::bool_; },
-			[&](IfNode const & if_node) { return expression_type_id(*if_node.then_case, program); }
+			[&](IfNode const & if_node) { return expression_type_id(*if_node.then_case, program); },
+			[](ReturnNode const &) { return TypeId::noreturn; }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}
