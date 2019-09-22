@@ -62,6 +62,7 @@ struct Program
 	std::vector<Type> types;
 	std::vector<Function> functions;
 	std::vector<ExternFunction> extern_functions;
+	std::vector<parser::StatementTree> global_initialization_statements;
 	Scope global_scope;
 	FunctionId main_function = invalid_function_id;
 };

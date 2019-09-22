@@ -206,7 +206,13 @@ namespace interpreter
 
 		ProgramStack stack;
 		alloc_stack(stack, stack_size);
-		// TODO: Stack frame and initialization of globals.
+
+		// Initialization of globals.
+		alloc(stack, program.global_scope.stack_frame_size);
+		for (auto const & statement : program.global_initialization_statements)
+			run_statement_tree(statement, stack, program, 0);
+
+		// Run main.
 		int const return_address = alloc(stack, sizeof(int), alignof(int));
 		call_function(program.main_function, {}, stack, program, return_address);
 		return read<int>(stack, return_address);

@@ -542,6 +542,19 @@ TEST_CASE("C comments")
 	REQUIRE(parse_and_run(src) == difference(i, j));
 }
 
+TEST_CASE("Accessing global variables from main function")
+{
+	auto const src = R"(
+		let i = 5;		
+		
+		let main = fn () -> int
+		{
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
 
 //TEST_CASE("Block expression")
 //{

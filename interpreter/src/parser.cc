@@ -594,7 +594,14 @@ namespace parser
 
 		size_t index = 0;
 		while (index < tokens.size())
-			parse_statement(next_statement_tokens(tokens, index), program, program.global_scope);
+		{
+			auto statement = parse_statement(next_statement_tokens(tokens, index), program, program.global_scope);
+			if (statement)
+			{
+				assert(statement->index() != 2); // An expression statement is not allowed at the global scope.
+				program.global_initialization_statements.push_back(std::move(*statement));
+			}
+		}
 
 		return program;
 	}
