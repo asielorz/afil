@@ -12,20 +12,20 @@ namespace lex {	struct Token; }
 namespace parser
 {
 
-	struct VariableDeclarationStatementNode
+	struct VariableDeclarationStatement
 	{
 		int variable_offset;
 		expr::ExpressionTree assigned_expression;
 	};
 
-	struct ExpressionStatementNode
+	struct ExpressionStatement
 	{
 		expr::ExpressionTree expression;
 	};
 
-	struct Statement : public std::variant<VariableDeclarationStatementNode, ExpressionStatementNode>
+	struct Statement : public std::variant<VariableDeclarationStatement, ExpressionStatement>
 	{
-		using Base = std::variant<VariableDeclarationStatementNode, ExpressionStatementNode>;
+		using Base = std::variant<VariableDeclarationStatement, ExpressionStatement>;
 		using Base::Base;
 		constexpr auto as_variant() noexcept -> Base & { return *this; }
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }

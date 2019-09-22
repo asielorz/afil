@@ -556,14 +556,14 @@ TEST_CASE("Accessing global variables from main function")
 	REQUIRE(parse_and_run(src) == 5);
 }
 
-//TEST_CASE("Block expression")
-//{
-//	auto const src =
-//		"{"
-//		"    int i = 3;"
-//		"    int j = 4;"
-//		"    => i * i + j * j;"
-//		"}";
-//
-//	REQUIRE(eval_expression<int>(src) == 3 * 3 + 4 * 4);
-//}
+TEST_CASE("Block expression")
+{
+	auto const src =
+		"{"
+		"    int i = 3;"
+		"    int j = 4;"
+		"    => i * i + j * j;"
+		"}";
+
+	REQUIRE(eval_expression<int>(src) == 3 * 3 + 4 * 4);
+}

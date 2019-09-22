@@ -194,12 +194,12 @@ namespace interpreter
 		-> control_flow::Variant
 	{
 		auto const visitor = overload(
-			[&](parser::VariableDeclarationStatementNode const & node) -> control_flow::Variant
+			[&](parser::VariableDeclarationStatement const & node) -> control_flow::Variant
 			{
 				int const address = stack.base_pointer + node.variable_offset;
 				return eval_expression_tree(node.assigned_expression, stack, program, address);
 			},
-			[&](parser::ExpressionStatementNode const & expr_node) -> control_flow::Variant
+			[&](parser::ExpressionStatement const & expr_node) -> control_flow::Variant
 			{
 				return eval_expression_tree(expr_node.expression, stack, program, stack.top_pointer);
 			}

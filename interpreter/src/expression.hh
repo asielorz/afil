@@ -68,13 +68,25 @@ namespace expr
 		std::unique_ptr<ExpressionTree> returned_expression;
 	};
 
+	struct StatementBlockNode
+	{
+		Scope scope;
+		std::vector<parser::Statement> statements;
+		TypeId return_type;
+	};
+
+	struct BlockReturnNode // =>
+	{
+		std::unique_ptr<ExpressionTree> returned_expression;
+	};
+
 	namespace detail
 	{
 		using ExpressionTreeBase = std::variant<
 			Literal<int>, Literal<float>, Literal<bool>, 
 			LocalVariableNode, GlobalVariableNode, 
 			FunctionNode, FunctionCallNode, RelationalOperatorCallNode,
-			IfNode, ReturnNode
+			IfNode, StatementBlockNode, BlockReturnNode, ReturnNode
 		>;
 	}
 
