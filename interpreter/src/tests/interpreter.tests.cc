@@ -12,7 +12,9 @@ auto eval_expression(std::string_view src)
 	Program program;
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
-	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, program.global_scope, ScopeType::global), stack, program);
+	ScopeStack scope_stack;
+	scope_stack.push_back({&program.global_scope, ScopeType::global});
+	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope_stack), stack, program);
 	return interpreter::read<T>(stack, return_address);
 }
 
@@ -51,13 +53,18 @@ TEST_CASE("Multiplication has more precedence than addition")
 auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Scope & scope) noexcept -> void
 {
 	Program program;
-	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), program, scope, ScopeType::function), stack, program);
+	ScopeStack scope_stack;
+	scope_stack.push_back({&program.global_scope, ScopeType::global});
+	scope_stack.push_back({&scope, ScopeType::function});
+	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), program, scope_stack), stack, program);
 }
 
-auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Scope const & scope) noexcept -> int
+auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Scope & scope) noexcept -> int
 {
 	Program program;
-	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope, ScopeType::function), stack, program);
+	ScopeStack scope_stack;
+	scope_stack.push_back({&scope, ScopeType::function});
+	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope_stack), stack, program);
 	return read_word(stack, return_address);
 }
 
@@ -66,7 +73,11 @@ auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Pr
 {
 	if (stack.top_pointer == 0)
 		stack.top_pointer = program.global_scope.stack_frame_size;
-	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, program.global_scope, ScopeType::global), stack, program);
+	
+	ScopeStack scope_stack;
+	scope_stack.push_back({&program.global_scope, ScopeType::global});
+
+	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope_stack), stack, program);
 	return interpreter::read<T>(stack, return_address);
 }
 
@@ -99,16 +110,34 @@ TEST_CASE("A variable can be accessed from expressions after it is declared")
 TEST_CASE("Identity function expression")
 {
 	Program program;
-	parser::parse_expression(lex::tokenize("fn (int x) -> int { return x; }"), program, program.global_scope, ScopeType::global);
+	ScopeStack scope_stack;
+	scope_stack.push_back({&program.global_scope, ScopeType::global});
+	parser::parse_expression(lex::tokenize("fn (int x) -> int { return x; }"), program, scope_stack);
+}
+
+auto parse_statement(std::string_view source, Program & program) noexcept -> void
+{
+	ScopeStack scope_stack;
+	scope_stack.push_back({&program.global_scope, ScopeType::global});
+	parser::parse_statement(lex::tokenize(source), program, scope_stack);
+}
+
+auto parse_expression(std::string_view source, Program & program) noexcept -> void
+{
+	ScopeStack scope_stack;
+	scope_stack.push_back({ &program.global_scope, ScopeType::global });
+	parser::parse_expression(lex::tokenize(source), program, scope_stack);
 }
 
 TEST_CASE("Use let to name a function")
 {
 	Program program;
-	parser::parse_statement(lex::tokenize("let id = fn (int x) -> int { return x; };"), program, program.global_scope, ScopeType::global);
+	parse_statement("let id = fn (int x) -> int { return x; };", program);
 
 	REQUIRE(program.functions.size() == 1);
-	REQUIRE(std::get<lookup_result::OverloadSet>(lookup_name(program.global_scope, program.global_scope, "id")).function_ids.size() == 1);
+	ScopeStack scope_stack;
+	scope_stack.push_back({&program.global_scope, ScopeType::global});
+	REQUIRE(std::get<lookup_result::OverloadSet>(lookup_name(scope_stack, "id")).function_ids.size() == 1);
 	REQUIRE(program.functions[0].variables.size() == 1);
 	REQUIRE(program.functions[0].parameter_count == 1);
 	REQUIRE(program.functions[0].variables[0].name == "x");
@@ -119,7 +148,7 @@ TEST_CASE("Call a function")
 	Program program;
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
-	parser::parse_statement(lex::tokenize("let add_one = fn (int x) -> int { return x + 1; };"), program, program.global_scope, ScopeType::global);
+	parse_statement("let add_one = fn (int x) -> int { return x + 1; };", program);
 	REQUIRE(eval_expression<int>("add_one(5)", stack, program) == 6);
 }
 
@@ -128,7 +157,7 @@ TEST_CASE("Call  function with multiple parameters")
 	Program program;
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
-	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope, ScopeType::global);
+	parse_statement("let add = fn (int x, int y) -> int { return x + y; };", program);
 	REQUIRE(eval_expression<int>("add(5, 6)", stack, program) == 11);
 
 	auto const source = R"(
@@ -137,7 +166,7 @@ let add_seven = fn (int a, int b, int c, int d, int e, int f, int g) -> int
 	return a + b + c + d + e + f + g; 
 };
 )";
-	parser::parse_statement(lex::tokenize(source), program, program.global_scope, ScopeType::global);
+	parse_statement(source, program);
 	REQUIRE(eval_expression<int>("add_seven(1, 2, 3, 4, 5, 6, 7)", stack, program) == 1 + 2 + 3 + 4 + 5 + 6 + 7);
 }
 
@@ -147,8 +176,10 @@ TEST_CASE("Nested calls")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
 
-	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope, ScopeType::global);
-	parser::parse_statement(lex::tokenize("let subtract = fn (int x, int y) -> int { return add(x, 0 - y); };"), program, program.global_scope, ScopeType::global);
+	ScopeStack scope_stack;
+	scope_stack.push_back({&program.global_scope, ScopeType::global});
+	parse_statement("let add = fn (int x, int y) -> int { return x + y; };", program);
+	parse_statement("let subtract = fn (int x, int y) -> int { return add(x, 0 - y); };", program);
 	
 	REQUIRE(eval_expression<int>("subtract(add(2, 3), subtract(4, 1))", stack, program) == (2 + 3) - (4 - 1));
 }
@@ -159,8 +190,8 @@ TEST_CASE("Naming a function is a valid expression (that does nothing)")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
 
-	parser::parse_statement(lex::tokenize("let add = fn (int x, int y) -> int { return x + y; };"), program, program.global_scope, ScopeType::global);
-	parser::parse_expression(lex::tokenize("add"), program, program.global_scope, ScopeType::global);
+	parse_statement("let add = fn (int x, int y) -> int { return x + y; };", program);
+	parse_expression("add", program);
 }
 
 TEST_CASE("Immediately invoked function expression")
@@ -177,7 +208,7 @@ TEST_CASE("Immediately invoked function expression and operator")
 TEST_CASE("Floating point literal")
 {
 	Program program;
-	parser::parse_expression(lex::tokenize("3.141592"), program, program.global_scope, ScopeType::global);
+	parse_expression("3.141592", program);
 }
 
 TEST_CASE("Floating point variable declaration")
@@ -198,8 +229,8 @@ TEST_CASE("Overloading")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
 	Program program;
-	parser::parse_statement(lex::tokenize("let id = fn (int x) -> int { return x; };"), program, program.global_scope, ScopeType::global);
-	parser::parse_statement(lex::tokenize("let id = fn (float x) -> float { return x; };"), program, program.global_scope, ScopeType::global);
+	parse_statement("let id = fn (int x) -> int { return x; };", program);
+	parse_statement("let id = fn (float x) -> float { return x; };", program);
 	REQUIRE(eval_expression<int>("id(5)", stack, program) == 5);
 	REQUIRE(eval_expression<float>("id(3.141592)", stack, program) == 3.141592f);
 }
@@ -236,8 +267,8 @@ TEST_CASE("Operators for floats")
 TEST_CASE("Boolean literals")
 {
 	Program program;
-	parser::parse_expression(lex::tokenize("true"), program, program.global_scope, ScopeType::global);
-	parser::parse_expression(lex::tokenize("false"), program, program.global_scope, ScopeType::global);
+	parse_expression("true", program);
+	parse_expression("false", program);
 }
 
 TEST_CASE("Declare variable of boolean type")
@@ -362,7 +393,7 @@ TEST_CASE("Fibonacci just for the fun of it")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 2048);
 	Program program;
-	parser::parse_statement(lex::tokenize(src), program, program.global_scope, ScopeType::global);
+	parse_statement(src, program);
 
 	REQUIRE(eval_expression<int>("fib(0)", stack, program) == 0);
 	REQUIRE(eval_expression<int>("fib(1)", stack, program) == 1);
@@ -598,7 +629,7 @@ TEST_CASE("A more imperative fibonacci")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 2048);
 	Program program;
-	parser::parse_statement(lex::tokenize(src), program, program.global_scope, ScopeType::global);
+	parse_statement(src, program);
 
 	REQUIRE(eval_expression<int>("fib(0)", stack, program) == 0);
 	REQUIRE(eval_expression<int>("fib(1)", stack, program) == 1);
@@ -611,4 +642,31 @@ TEST_CASE("A more imperative fibonacci")
 	REQUIRE(eval_expression<int>("fib(8)", stack, program) == 21);
 	REQUIRE(eval_expression<int>("fib(9)", stack, program) == 34);
 	REQUIRE(eval_expression<int>("fib(10)", stack, program) == 55);
+}
+
+TEST_CASE("Accessing a variable from outside the block")
+{
+	auto const src = R"(
+		let foo = fn (int i, int j) -> int
+		{
+			if (i > j)
+			{
+				int difference = i - j;
+				return difference;
+			}
+			else
+			{
+				int difference = j - i;
+				return difference;
+			};
+		};		
+
+		let main = fn () -> int
+		{
+			
+			return foo(6, 10);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 10 - 6);
 }

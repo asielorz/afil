@@ -13,8 +13,8 @@ namespace lex {	struct Token; }
 namespace parser
 {
 
-	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope, ScopeType scope_type) noexcept -> expr::ExpressionTree;
-	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope, ScopeType scope_type) noexcept -> std::optional<stmt::Statement>;
+	auto parse_expression(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> expr::ExpressionTree;
+	auto parse_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>;
 
 	// Tokenize and parse a source file and return the resulting program.
 	auto parse_source(std::string_view src) noexcept -> Program;

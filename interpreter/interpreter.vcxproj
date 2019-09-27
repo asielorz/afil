@@ -33,6 +33,7 @@
     <ClCompile Include="src\program.cc" />
     <ClCompile Include="src\interpreter.cc" />
     <ClCompile Include="src\parser.cc" />
+    <ClCompile Include="src\scope.cc" />
     <ClCompile Include="src\tests\callc.tests.cc" />
     <ClCompile Include="src\tests\interpreter.tests.cc" />
     <ClCompile Include="src\tests\main.tests.cc" />

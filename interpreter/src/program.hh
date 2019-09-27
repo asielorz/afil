@@ -44,20 +44,6 @@ struct Program
 	FunctionId main_function = invalid_function_id;
 };
 
-namespace lookup_result
-{
-	struct Nothing {};
-	struct Variable { TypeId variable_type; int variable_offset; };
-	struct GlobalVariable { TypeId variable_type; int variable_offset; };
-	struct OverloadSet { std::vector<FunctionId> function_ids; };
-}
-auto lookup_name(Scope const & scope, Scope const & global_scope, std::string_view name) noexcept 
-	-> std::variant<
-		lookup_result::Nothing, 
-		lookup_result::Variable,
-		lookup_result::GlobalVariable,
-		lookup_result::OverloadSet
-	>;
 // Returns id of function found or -1 on failure.
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept ->FunctionId;
 

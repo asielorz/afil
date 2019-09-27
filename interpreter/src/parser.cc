@@ -54,6 +54,7 @@ namespace parser
 		}
 		declare_unreachable();
 	}
+	auto top(ScopeStack & stack) noexcept -> Scope & { return *stack.back().scope; }
 
 	auto insert_expression(OperatorTree & tree, OperatorTree & new_node) noexcept -> void
 	{
@@ -98,13 +99,13 @@ namespace parser
 		return root;
 	}
 
-	auto resolve_operator_overloading(OperatorTree tree, Program const & program, Scope const & scope) noexcept -> ExpressionTree
+	auto resolve_operator_overloading(OperatorTree tree, Program const & program, ScopeStack const & scope_stack) noexcept -> ExpressionTree
 	{
 		if (is_operator_node(tree))
 		{
 			auto & node = std::get<OperatorNode>(tree);
-			ExpressionTree left = resolve_operator_overloading(std::move(*node.left), program, scope);
-			ExpressionTree right = resolve_operator_overloading(std::move(*node.right), program, scope);
+			ExpressionTree left = resolve_operator_overloading(std::move(*node.left), program, scope_stack);
+			ExpressionTree right = resolve_operator_overloading(std::move(*node.right), program, scope_stack);
 			Operator const op = node.op;
 
 			auto const visitor = overload(
@@ -142,7 +143,7 @@ namespace parser
 				}
 			);
 
-			auto const lookup = lookup_name(scope, program.global_scope, operator_function_name(op));
+			auto const lookup = lookup_name(scope_stack, operator_function_name(op));
 			return std::visit(visitor, lookup);
 		}
 		else
@@ -223,25 +224,29 @@ namespace parser
 		index++;
 	}
 
-	auto parse_function_body(span<lex::Token const> tokens, size_t & index, Program & program, Function & function) noexcept -> void
+	auto parse_function_body(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack, Function & function) noexcept -> void
 	{
 		// Body of the function is enclosed by braces.
 		assert(tokens[index].type == TokenType::open_brace);
 		index++;
 
+		scope_stack.push_back({&function, ScopeType::function });
+
 		// Parse all statements in the function.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			auto statement = parse_statement(next_statement_tokens(tokens, index), program, function, ScopeType::function);
+			auto statement = parse_statement(next_statement_tokens(tokens, index), program, scope_stack);
 			if (statement)
 				function.statements.push_back(std::move(*statement));
 		}
+
+		scope_stack.pop_back();
 
 		// Skip closing brace.
 		index++;
 	}
 
-	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> expr::FunctionNode
+	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> expr::FunctionNode
 	{
 		// Skip fn token.
 		index++;
@@ -249,7 +254,7 @@ namespace parser
 		Function function;
 
 		parse_function_prototype(tokens, index, program, function);
-		parse_function_body(tokens, index, program, function);
+		parse_function_body(tokens, index, program, scope_stack, function);
 
 		// Add the function to the program.
 		program.functions.push_back(std::move(function));
@@ -258,9 +263,9 @@ namespace parser
 		return expr::FunctionNode{func_id};
 	}
 
-	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, ScopeType scope_type) noexcept -> ExpressionTree;
+	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> ExpressionTree;
 
-	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, ScopeType scope_type, span<FunctionId const> overload_set) noexcept -> expr::FunctionCallNode
+	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack, span<FunctionId const> overload_set) noexcept -> expr::FunctionCallNode
 	{
 		// Parameter list starts with (
 		assert(tokens[index].type == TokenType::open_parenthesis);
@@ -277,7 +282,7 @@ namespace parser
 		for (;;)
 		{
 			// Parse a parameter.
-			node.parameters.push_back(parse_subexpression(tokens, index, program, scope, scope_type));
+			node.parameters.push_back(parse_subexpression(tokens, index, program, scope_stack));
 			parameter_types.push_back(expression_type_id(node.parameters.back(), program));
 
 			// If after a parameter we find a close parenthesis, end parameter list.
@@ -300,7 +305,7 @@ namespace parser
 		return node;
 	}
 
-	auto parse_if_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, ScopeType scope_type) noexcept -> expr::IfNode
+	auto parse_if_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> expr::IfNode
 	{
 		// Skip if token
 		index++;
@@ -310,32 +315,32 @@ namespace parser
 		index++;
 
 		expr::IfNode if_node;
-		if_node.condition = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope, scope_type));
+		if_node.condition = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
 		assert(expression_type_id(*if_node.condition, program) == TypeId::bool_);
 
 		assert(tokens[index].type == TokenType::close_parenthesis);
 		index++;
 
-		if_node.then_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope, scope_type));
+		if_node.then_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
 
 		// Expect keyword else to separate then and else cases.
 		assert(tokens[index].source == "else");
 		index++;
 
-		if_node.else_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope, scope_type));
+		if_node.else_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
 
 		assert(expression_type_id(*if_node.then_case, program) == expression_type_id(*if_node.else_case, program));
 
 		return if_node;
 	}
 
-	auto parse_return_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, ScopeType scope_type) noexcept -> expr::ReturnNode
+	auto parse_return_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> expr::ReturnNode
 	{
 		// Skip return token
 		index++;
 
 		expr::ReturnNode node;
-		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope, scope_type));
+		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
 
 		// Cannot return special types that do not represent data types.
 		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
@@ -343,16 +348,16 @@ namespace parser
 		return node;
 	}
 
-	auto parse_block_return_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, ScopeType scope_type) noexcept -> expr::BlockReturnNode
+	auto parse_block_return_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> expr::BlockReturnNode
 	{
 		// A block return must appear in a statement block scope. Any other is wrong.
-		assert(scope_type == ScopeType::block);
+		assert(scope_stack.back().type == ScopeType::block);
 
 		// Skip => token
 		index++;
 
 		expr::BlockReturnNode node;
-		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope, scope_type));
+		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
 		
 		// Cannot return special types that do not represent data types.
 		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
@@ -398,7 +403,7 @@ namespace parser
 		return deduce_return_type(try_get<stmt::ExpressionStatement>(statement)->expression, program);
 	}
 
-	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & /*scope*/) noexcept -> expr::StatementBlockNode
+	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> expr::StatementBlockNode
 	{
 		// Skip opening brace.
 		index++;
@@ -408,7 +413,9 @@ namespace parser
 		// Parse all statements in the function.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			auto statement = parse_statement(next_statement_tokens(tokens, index), program, node.scope, ScopeType::block);
+			scope_stack.push_back({&node.scope, ScopeType::block});
+			auto statement = parse_statement(next_statement_tokens(tokens, index), program, scope_stack);
+			scope_stack.pop_back();
 			if (statement)
 				node.statements.push_back(std::move(*statement));
 		}
@@ -424,32 +431,32 @@ namespace parser
 		return node;
 	}
 
-	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, ScopeType scope_type) noexcept -> ExpressionTree
+	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> ExpressionTree
 	{
 		if (tokens[index].source == "fn")
 		{
-			auto const func_node = parse_function_expression(tokens, index, program);
+			auto const func_node = parse_function_expression(tokens, index, program, scope_stack);
 			// Opening parenthesis after a function means a function call.
 			if (tokens[index].type == TokenType::open_parenthesis)
-				return parse_function_call_expression(tokens, index, program, scope, scope_type, span<FunctionId const>(&func_node.function_id, 1));
+				return parse_function_call_expression(tokens, index, program, scope_stack, span<FunctionId const>(&func_node.function_id, 1));
 			else
 				return func_node;
 		}
 		else if (tokens[index].source == "if")
 		{
-			return parse_if_expression(tokens, index, program, scope, scope_type);
+			return parse_if_expression(tokens, index, program, scope_stack);
 		}
 		else if (tokens[index].source == "return")
 		{
-			return parse_return_expression(tokens, index, program, scope, scope_type);
+			return parse_return_expression(tokens, index, program, scope_stack);
 		}
 		else if (tokens[index].type == TokenType::block_return)
 		{
-			return parse_block_return_expression(tokens, index, program, scope, scope_type);
+			return parse_block_return_expression(tokens, index, program, scope_stack);
 		}
 		else if (tokens[index].type == TokenType::open_brace)
 		{
-			return parse_statement_block_expression(tokens, index, program, scope);
+			return parse_statement_block_expression(tokens, index, program, scope_stack);
 		}
 		else if (tokens[index].type == TokenType::literal_int)
 		{
@@ -486,19 +493,19 @@ namespace parser
 				{
 					index++;
 					if (tokens[index].type == TokenType::open_parenthesis)
-						return parse_function_call_expression(tokens, index, program, scope, scope_type, result.function_ids);
+						return parse_function_call_expression(tokens, index, program, scope_stack, result.function_ids);
 					else
 						return expr::FunctionNode{result.function_ids[0]}; // TODO: Overload set node?
 				},
 				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); }
 			);
-			auto const lookup = lookup_name(scope, program.global_scope, tokens[index].source);
+			auto const lookup = lookup_name(scope_stack, tokens[index].source);
 			return std::visit(visitor, lookup);
 		}
 		else if (tokens[index].type == TokenType::open_parenthesis)
 		{
 			index++;
-			auto expr = parse_subexpression(tokens, index, program, scope, scope_type);
+			auto expr = parse_subexpression(tokens, index, program, scope_stack);
 
 			// Next token must be close parenthesis.
 			assert(tokens[index].type == TokenType::close_parenthesis);
@@ -509,7 +516,7 @@ namespace parser
 		else declare_unreachable(); // TODO: Actual error handling.
 	}
 
-	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, Scope const & scope, ScopeType scope_type) noexcept -> ExpressionTree
+	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> ExpressionTree
 	{
 		std::vector<ExpressionTree> operands;
 		std::vector<Operator> operators;
@@ -517,7 +524,7 @@ namespace parser
 		// Parse the expression.
 		while (index < tokens.size())
 		{
-			operands.push_back(parse_single_expression(tokens, index, program, scope, scope_type));
+			operands.push_back(parse_single_expression(tokens, index, program, scope_stack));
 
 			// If the next token is an operator, parse the operator and repeat. Otherwise end the loop and return the expression.
 			if (index < tokens.size() && tokens[index].type == TokenType::operator_)
@@ -528,18 +535,18 @@ namespace parser
 			else break;
 		}
 
-		return resolve_operator_overloading(resolve_operator_precedence(operands, operators), program, scope);
+		return resolve_operator_overloading(resolve_operator_precedence(operands, operators), program, scope_stack);
 	}
 
-	auto parse_expression(span<lex::Token const> tokens, Program & program, Scope const & scope, ScopeType scope_type) noexcept -> ExpressionTree
+	auto parse_expression(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> ExpressionTree
 	{
 		size_t index = 0;
-		ExpressionTree tree = parse_subexpression(tokens, index, program, scope, scope_type);
+		ExpressionTree tree = parse_subexpression(tokens, index, program, scope_stack);
 		assert(index == tokens.size()); // Ensure that all tokens were read.
 		return tree;
 	}
 
-	auto parse_variable_declaration_statement(span<lex::Token const> tokens, Program & program, Scope & scope, ScopeType scope_type) noexcept -> stmt::VariableDeclarationStatement
+	auto parse_variable_declaration_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> stmt::VariableDeclarationStatement
 	{
 		// A variable declaration statement has the following form:
 		// [type] [var_name] = [expr];
@@ -552,13 +559,13 @@ namespace parser
 
 		// The second token of the statement is the variable name.
 		assert(tokens[1].type == TokenType::identifier);
-		node.variable_offset = add_variable_to_scope(scope, tokens[1].source, type_found, program);
+		node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[1].source, type_found, program);
 
 		// The third token is a '='.
 		assert(tokens[2].type == TokenType::assignment);
 
 		// The rest is the expression assigned to the variable.
-		node.assigned_expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope, scope_type);
+		node.assigned_expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope_stack);
 		// Require that the expression assigned to the variable has the same type as the variable.
 		assert(expression_type_id(node.assigned_expression, program) == type_found);
 
@@ -595,7 +602,7 @@ namespace parser
 		}
 	}
 
-	auto parse_function_declaration_statement(span<lex::Token const> tokens, Program & program, Scope & scope) noexcept -> std::nullopt_t
+	auto parse_function_declaration_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> std::nullopt_t
 	{
 		// A function declaration statement has the following form:
 		// let [name] = [function expr];
@@ -611,7 +618,7 @@ namespace parser
 		auto const function_id = FunctionId{0, static_cast<unsigned>(program.functions.size() - 1)};
 		size_t index = 4;
 		parse_function_prototype(tokens, index, program, function);
-		bind_function_name(tokens[1].source, function_id, program, scope);
+		bind_function_name(tokens[1].source, function_id, program, top(scope_stack));
 
 		// Operate on a local temporary to avoid invalidation of the reference on reallocation.
 		Function temp;
@@ -621,60 +628,60 @@ namespace parser
 		temp.stack_frame_alignment = function.stack_frame_alignment;
 		temp.return_type = function.return_type;
 		temp.variables = function.variables;
-		parse_function_body(tokens, index, program, temp);
+		parse_function_body(tokens, index, program, scope_stack, temp);
 		program.functions[function_id.index] = std::move(temp);
 
 		return std::nullopt;
 	}
 
-	auto parse_let_statement(span<lex::Token const> tokens, Program & program, Scope & scope, ScopeType scope_type) noexcept -> std::optional<stmt::Statement>
+	auto parse_let_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>
 	{
 		// If we have directly a function expression, parse it in a special way to handle recursion. TODO: Think of generalizing
 		// binding names to function expressions somehow.
 		if (tokens[3].source == "fn")
-			return parse_function_declaration_statement(tokens, program, scope);
+			return parse_function_declaration_statement(tokens, program, scope_stack);
 		else
 		{
 			assert(tokens[1].type == TokenType::identifier);
 			assert(tokens[2].type == TokenType::assignment);
 
 			// If the expression returns a function, bind it to its name and return a noop.
-			expr::ExpressionTree expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope, scope_type);
+			expr::ExpressionTree expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope_stack);
 			TypeId const var_type = expression_type_id(expression, program);
 			if (var_type == TypeId::function)
 			{
 				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
-				bind_function_name(tokens[1].source, function_id, program, scope);
+				bind_function_name(tokens[1].source, function_id, program, top(scope_stack));
 				return std::nullopt;
 			}
 			else
 			{
 				stmt::VariableDeclarationStatement node;
-				node.variable_offset = add_variable_to_scope(scope, tokens[1].source, var_type, program);
+				node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[1].source, var_type, program);
 				node.assigned_expression = std::move(expression);
 				return node;
 			}
 		}
 	}
 
-	auto parse_expression_statement(span<lex::Token const> tokens, Program & program, Scope & scope, ScopeType scope_type) noexcept -> stmt::ExpressionStatement
+	auto parse_expression_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> stmt::ExpressionStatement
 	{
 		stmt::ExpressionStatement node;
-		node.expression = parse_expression(tokens.subspan(0, tokens.size() - 1), program, scope, scope_type);
+		node.expression = parse_expression(tokens.subspan(0, tokens.size() - 1), program, scope_stack);
 		return node;
 	}
 
-	auto parse_statement(span<lex::Token const> tokens, Program & program, Scope & scope, ScopeType scope_type) noexcept -> std::optional<stmt::Statement>
+	auto parse_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>
 	{
 		// A statement ends with a semicolon.
 		assert(tokens.back().type == TokenType::semicolon);
 
 		if (tokens[0].source == "let")
-			return parse_let_statement(tokens, program, scope, scope_type);
+			return parse_let_statement(tokens, program, scope_stack);
 		else if (lookup_type_name(program, tokens[0].source) != TypeId::none)
-			return parse_variable_declaration_statement(tokens, program, scope, scope_type);
+			return parse_variable_declaration_statement(tokens, program, scope_stack);
 		else
-			return parse_expression_statement(tokens, program, scope, scope_type);
+			return parse_expression_statement(tokens, program, scope_stack);
 	}
 
 	auto parse_source(std::string_view src) noexcept -> Program
@@ -682,10 +689,13 @@ namespace parser
 		auto const tokens = lex::tokenize(src);
 		Program program;
 
+		ScopeStack scope_stack;
+		scope_stack.push_back({&program.global_scope, ScopeType::global});
+
 		size_t index = 0;
 		while (index < tokens.size())
 		{
-			auto statement = parse_statement(next_statement_tokens(tokens, index), program, program.global_scope, ScopeType::global);
+			auto statement = parse_statement(next_statement_tokens(tokens, index), program, scope_stack);
 			if (statement)
 			{
 				assert(!has_type<stmt::ExpressionStatement>(*statement)); // An expression statement is not allowed at the global scope.
