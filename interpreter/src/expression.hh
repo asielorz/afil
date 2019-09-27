@@ -68,21 +68,11 @@ namespace expr
 		std::unique_ptr<ExpressionTree> else_case;
 	};
 
-	struct ReturnNode
-	{
-		std::unique_ptr<ExpressionTree> returned_expression;
-	};
-
 	struct StatementBlockNode
 	{
 		Scope scope;
 		std::vector<stmt::Statement> statements;
 		TypeId return_type;
-	};
-
-	struct BlockReturnNode // =>
-	{
-		std::unique_ptr<ExpressionTree> returned_expression;
 	};
 
 	namespace detail
@@ -91,7 +81,7 @@ namespace expr
 			Literal<int>, Literal<float>, Literal<bool>, 
 			LocalVariableNode, GlobalVariableNode, 
 			FunctionNode, FunctionCallNode, RelationalOperatorCallNode,
-			IfNode, StatementBlockNode, BlockReturnNode, ReturnNode
+			IfNode, StatementBlockNode
 		>;
 	}
 

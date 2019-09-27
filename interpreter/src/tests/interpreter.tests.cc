@@ -606,7 +606,7 @@ TEST_CASE("Block expressions with multiple return paths")
 		"    int i = 3;"
 		"    int j = 4;"
 		"    if (i > j)"
-		"		 => i * i - j * j"
+		"		 => i * i - j * j;"
 		"	 else"
 		"		 => j * j - i * i;"
 		"}";
@@ -620,7 +620,7 @@ TEST_CASE("A more imperative fibonacci")
 		let fib = fn (int i) -> int
 		{
 			if (i <= 1) 
-				return i 
+				return i; 
 			else 
 				return fib(i - 1) + fib(i - 2);
 		};
@@ -658,12 +658,11 @@ TEST_CASE("Accessing a variable from outside the block")
 			{
 				int difference = j - i;
 				return difference;
-			};
+			}
 		};		
 
 		let main = fn () -> int
 		{
-			
 			return foo(6, 10);
 		};
 	)"sv;
@@ -685,12 +684,11 @@ TEST_CASE("Ensure that variables inside the block do not share an address with t
 			{
 				int difference = j - i;
 				return difference + i + j;
-			};
+			}
 		};		
 
 		let main = fn () -> int
 		{
-			
 			return foo(6, 10);
 		};
 	)"sv;

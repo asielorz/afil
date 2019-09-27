@@ -137,10 +137,9 @@ namespace interpreter
 		}
 	}
 
-	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept 
-		-> control_flow::Variant
+	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> void
 	{
-		auto const visitor = overload_default_ret(control_flow::Variant(),
+		auto const visitor = overload(
 			[&](expr::Literal<int> literal) { write(stack, return_address, literal.value); },
 			[&](expr::Literal<float> literal) { write(stack, return_address, literal.value); },
 			[&](expr::Literal<bool> literal) { write(stack, return_address, literal.value); },
@@ -200,15 +199,7 @@ namespace interpreter
 				free_up_to(stack, result_addr);
 
 				expr::ExpressionTree const & expr = condition ? *if_node.then_case : *if_node.else_case;
-				return eval_expression_tree(expr, stack, program, return_address);
-			},
-			[](expr::ReturnNode const & ret_node)
-			{
-				return control_flow::Return{ret_node.returned_expression.get()};
-			},
-			[](expr::BlockReturnNode const & ret_node)
-			{
-				return control_flow::BlockReturn{ret_node.returned_expression.get()};
+				eval_expression_tree(expr, stack, program, return_address);
 			},
 			[&](expr::StatementBlockNode const & block_node)
 			{
@@ -224,30 +215,59 @@ namespace interpreter
 						eval_expression_tree(*ret->returned_expression, stack, program, return_address);
 						break;
 					}
-					if (auto const ret = try_get<control_flow::Return>(cf))
-					{
-						return cf;
-					}
 				}
-
-				return control_flow::Variant();
 			}
 		);
-		return std::visit(visitor, tree.as_variant());
+		std::visit(visitor, tree.as_variant());
 	}
 
 	auto run_statement(stmt::Statement const & tree, ProgramStack & stack, Program const & program) noexcept 
 		-> control_flow::Variant
 	{
-		auto const visitor = overload(
-			[&](stmt::VariableDeclarationStatement const & node) -> control_flow::Variant
+		auto const visitor = overload_default_ret(control_flow::Variant(),
+			[&](stmt::VariableDeclarationStatement const & node)
 			{
 				int const address = stack.base_pointer + node.variable_offset;
-				return eval_expression_tree(node.assigned_expression, stack, program, address);
+				eval_expression_tree(node.assigned_expression, stack, program, address);
 			},
-			[&](stmt::ExpressionStatement const & expr_node) -> control_flow::Variant
+			[&](stmt::ExpressionStatement const & expr_node)
 			{
-				return eval_expression_tree(expr_node.expression, stack, program, stack.top_pointer);
+				eval_expression_tree(expr_node.expression, stack, program, stack.top_pointer);
+			},
+			[](stmt::ReturnStatement const & return_node)
+			{
+				return control_flow::Return{return_node.returned_expression.get()};
+			},
+			[](stmt::BlockReturnStatement const & return_node)
+			{
+				return control_flow::BlockReturn{return_node.returned_expression.get()};
+			},
+			[&](stmt::IfStatement const & if_node) -> control_flow::Variant
+			{
+				int const result_addr = eval_expression_tree(if_node.condition, stack, program);
+				bool const condition = read<bool>(stack, result_addr);
+				free_up_to(stack, result_addr);
+
+				stmt::Statement const * const statement = condition ? if_node.then_case.get() : if_node.else_case.get();
+				if (statement)
+					return run_statement(*statement, stack, program);
+				else
+					return control_flow::Nothing();
+			},
+			[&](stmt::StatementBlock const & block_node) -> control_flow::Variant
+			{
+				StackGuard const stack_guard(stack);
+				stack.top_pointer += block_node.scope.stack_frame_size;
+
+				// Run the function.
+				for (auto const & statement : block_node.statements)
+				{
+					auto const cf = run_statement(statement, stack, program);
+					if (auto const ret = try_get<control_flow::Return>(cf))
+						return cf;
+				}
+
+				return control_flow::Nothing();
 			}
 		);
 		return std::visit(visitor, tree.as_variant());

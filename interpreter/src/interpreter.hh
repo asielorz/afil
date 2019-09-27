@@ -34,11 +34,10 @@ namespace interpreter
 	// Return value is allocated on top of the stack. Returns address of return value.
 	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program) noexcept -> int;
 	// Return value is written at the given address.
-	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept 
-		-> control_flow::Variant;
+	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> void;
 
 	auto run_statement(stmt::Statement const & tree, ProgramStack & stack, Program const & program) noexcept
-		->control_flow::Variant;
+		-> control_flow::Variant;
 
 	// TODO: argc, argv. Decide a good stack size.
 	auto run(Program const & program, int stack_size = 2048) noexcept -> int;

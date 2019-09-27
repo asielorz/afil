@@ -150,27 +150,6 @@ namespace parser
 			return std::move(std::get<ExpressionTree>(tree));
 	}
 
-	auto next_statement_tokens(span<lex::Token const> tokens, size_t & index) noexcept -> span<lex::Token const>
-	{
-		size_t length = 0;
-		for (int scope_depth = 0; length < tokens.size(); length++)
-		{
-			if (tokens[index + length].type == TokenType::semicolon && scope_depth == 0)
-			{
-				length++; // Include the semicolon.
-				break;
-			}
-			else if (tokens[index + length].type == TokenType::open_brace)
-				scope_depth++;
-			else if (tokens[index + length].type == TokenType::close_brace)
-				scope_depth--;
-		}
-
-		auto const result_tokens = tokens.subspan(index, length);
-		index += length;
-		return result_tokens;
-	}
-
 	auto add_variable_to_scope(Scope & scope, std::string_view name, TypeId type_id, int scope_offset, Program const & program) -> int
 	{
 		Type const & type = type_with_id(program, type_id);
@@ -184,6 +163,10 @@ namespace parser
 		scope.variables.push_back(var);
 		return var.offset;
 	}
+
+	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> ExpressionTree;
+	auto parse_substatement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>;
+
 
 	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, Program & program, Function & function) noexcept -> void
 	{
@@ -235,7 +218,7 @@ namespace parser
 		// Parse all statements in the function.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			auto statement = parse_statement(next_statement_tokens(tokens, index), program, scope_stack);
+			auto statement = parse_substatement(tokens, index, program, scope_stack);
 			if (statement)
 				function.statements.push_back(std::move(*statement));
 		}
@@ -262,8 +245,6 @@ namespace parser
 
 		return expr::FunctionNode{func_id};
 	}
-
-	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> ExpressionTree;
 
 	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack, span<FunctionId const> overload_set) noexcept -> expr::FunctionCallNode
 	{
@@ -334,37 +315,6 @@ namespace parser
 		return if_node;
 	}
 
-	auto parse_return_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> expr::ReturnNode
-	{
-		// Skip return token
-		index++;
-
-		expr::ReturnNode node;
-		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
-
-		// Cannot return special types that do not represent data types.
-		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
-
-		return node;
-	}
-
-	auto parse_block_return_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> expr::BlockReturnNode
-	{
-		// A block return must appear in a statement block scope. Any other is wrong.
-		assert(scope_stack.back().type == ScopeType::block);
-
-		// Skip => token
-		index++;
-
-		expr::BlockReturnNode node;
-		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
-		
-		// Cannot return special types that do not represent data types.
-		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
-
-		return node;
-	}
-
 	auto common_type(TypeId a, TypeId b) noexcept -> TypeId
 	{
 		if (a == TypeId::none) return b;
@@ -378,14 +328,20 @@ namespace parser
 		TypeId block_return_type;
 		bool all_branches_return;
 	};
-	auto deduce_return_type(ExpressionTree const & expr, Program const & program) noexcept -> DeducedReturnType
+	auto deduce_return_type(stmt::Statement const & statement, Program const & program) noexcept -> DeducedReturnType
 	{
 		auto const visitor = overload(
 			[](auto const &) { return DeducedReturnType{TypeId::none, TypeId::none, false}; }, // Default case, does not return
-			[&](expr::ReturnNode const & ret_node) { return DeducedReturnType{expression_type_id(*ret_node.returned_expression, program), TypeId::none, true}; },
-			[&](expr::BlockReturnNode const & ret_node) { return DeducedReturnType{TypeId::none, expression_type_id(*ret_node.returned_expression, program), true}; },
-			[&](expr::IfNode const & if_node) 
+			[&](stmt::ReturnStatement const & ret_node) { return DeducedReturnType{expression_type_id(*ret_node.returned_expression, program), TypeId::none, true}; },
+			[&](stmt::BlockReturnStatement const & ret_node) { return DeducedReturnType{TypeId::none, expression_type_id(*ret_node.returned_expression, program), true}; },
+			[&](stmt::IfStatement const & if_node)
 			{
+				if (!if_node.else_case)
+				{
+					auto const left = deduce_return_type(*if_node.then_case, program);
+					return DeducedReturnType{left.return_type, left.block_return_type, false};
+				}
+
 				auto const left = deduce_return_type(*if_node.then_case, program);
 				auto const right = deduce_return_type(*if_node.else_case, program);
 				return DeducedReturnType{
@@ -395,12 +351,7 @@ namespace parser
 				};
 			}
 		);
-		return std::visit(visitor, expr.as_variant());
-	}
-	auto deduce_return_type(stmt::Statement const & statement, Program const & program) noexcept -> DeducedReturnType
-	{
-		assert(has_type<stmt::ExpressionStatement>(statement));
-		return deduce_return_type(try_get<stmt::ExpressionStatement>(statement)->expression, program);
+		return std::visit(visitor, statement.as_variant());
 	}
 
 	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> expr::StatementBlockNode
@@ -414,7 +365,7 @@ namespace parser
 		while (tokens[index].type != TokenType::close_brace)
 		{
 			scope_stack.push_back({&node.scope, ScopeType::block});
-			auto statement = parse_statement(next_statement_tokens(tokens, index), program, scope_stack);
+			auto statement = parse_substatement(tokens, index, program, scope_stack);
 			scope_stack.pop_back();
 			if (statement)
 				node.statements.push_back(std::move(*statement));
@@ -445,14 +396,6 @@ namespace parser
 		else if (tokens[index].source == "if")
 		{
 			return parse_if_expression(tokens, index, program, scope_stack);
-		}
-		else if (tokens[index].source == "return")
-		{
-			return parse_return_expression(tokens, index, program, scope_stack);
-		}
-		else if (tokens[index].type == TokenType::block_return)
-		{
-			return parse_block_return_expression(tokens, index, program, scope_stack);
 		}
 		else if (tokens[index].type == TokenType::open_brace)
 		{
@@ -546,7 +489,7 @@ namespace parser
 		return tree;
 	}
 
-	auto parse_variable_declaration_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> stmt::VariableDeclarationStatement
+	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::VariableDeclarationStatement
 	{
 		// A variable declaration statement has the following form:
 		// [type] [var_name] = [expr];
@@ -554,18 +497,21 @@ namespace parser
 		stmt::VariableDeclarationStatement node;
 
 		// A statement begins with the type of the declared variable.
-		TypeId const type_found = lookup_type_name(program, tokens[0].source);
+		TypeId const type_found = lookup_type_name(program, tokens[index].source);
+		index++;
 		assert(type_found != TypeId::none);
 
 		// The second token of the statement is the variable name.
-		assert(tokens[1].type == TokenType::identifier);
-		node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[1].source, type_found, local_variable_offset(scope_stack), program);
+		assert(tokens[index].type == TokenType::identifier);
+		node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[index].source, type_found, local_variable_offset(scope_stack), program);
+		index++;
 
 		// The third token is a '='.
-		assert(tokens[2].type == TokenType::assignment);
+		assert(tokens[index].type == TokenType::assignment);
+		index++;
 
 		// The rest is the expression assigned to the variable.
-		node.assigned_expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope_stack);
+		node.assigned_expression = parse_subexpression(tokens, index, program, scope_stack);
 		// Require that the expression assigned to the variable has the same type as the variable.
 		assert(expression_type_id(node.assigned_expression, program) == type_found);
 
@@ -602,13 +548,22 @@ namespace parser
 		}
 	}
 
-	auto parse_function_declaration_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> std::nullopt_t
+	auto parse_function_declaration_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> std::nullopt_t
 	{
 		// A function declaration statement has the following form:
 		// let [name] = [function expr];
 
-		assert(tokens[1].type == TokenType::identifier);
-		assert(tokens[2].type == TokenType::assignment);
+		// Skip the let.
+		index++;
+
+		lex::Token const id_token = tokens[index];
+		assert(id_token.type == TokenType::identifier);
+		index++;
+		assert(tokens[index].type == TokenType::assignment);
+		index++;
+
+		// Skip the fn.
+		index++;
 
 		// Adding the function to the program before parsing the body allows the body of the function to find itself and be recursive.
 
@@ -616,9 +571,8 @@ namespace parser
 		Function & function = program.functions.emplace_back();
 		// Add the function name to the scope.
 		auto const function_id = FunctionId{0, static_cast<unsigned>(program.functions.size() - 1)};
-		size_t index = 4;
 		parse_function_prototype(tokens, index, program, function);
-		bind_function_name(tokens[1].source, function_id, program, top(scope_stack));
+		bind_function_name(id_token.source, function_id, program, top(scope_stack));
 
 		// Operate on a local temporary to avoid invalidation of the reference on reallocation.
 		Function temp;
@@ -634,54 +588,161 @@ namespace parser
 		return std::nullopt;
 	}
 
-	auto parse_let_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>
+	auto parse_let_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>
 	{
-		// If we have directly a function expression, parse it in a special way to handle recursion. TODO: Think of generalizing
-		// binding names to function expressions somehow.
-		if (tokens[3].source == "fn")
-			return parse_function_declaration_statement(tokens, program, scope_stack);
+		// If we have directly a function expression, parse it in a special way to handle recursion. 
+		// TODO: Think of generalizing binding names to function expressions somehow.
+		if (tokens[index + 3].source == "fn")
+			return parse_function_declaration_statement(tokens, index, program, scope_stack);
 		else
 		{
-			assert(tokens[1].type == TokenType::identifier);
-			assert(tokens[2].type == TokenType::assignment);
+			lex::Token const id_token = tokens[index + 1];
+
+			assert(id_token.type == TokenType::identifier);
+			assert(tokens[index + 2].type == TokenType::assignment);
+			index += 3;
 
 			// If the expression returns a function, bind it to its name and return a noop.
-			expr::ExpressionTree expression = parse_expression(tokens.subspan(3, tokens.size() - 4), program, scope_stack);
+			expr::ExpressionTree expression = parse_subexpression(tokens, index, program, scope_stack);
 			TypeId const var_type = expression_type_id(expression, program);
 			if (var_type == TypeId::function)
 			{
 				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
-				bind_function_name(tokens[1].source, function_id, program, top(scope_stack));
+				bind_function_name(id_token.source, function_id, program, top(scope_stack));
 				return std::nullopt;
 			}
 			else
 			{
 				stmt::VariableDeclarationStatement node;
-				node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[1].source, var_type, local_variable_offset(scope_stack), program);
+				node.variable_offset = add_variable_to_scope(top(scope_stack), id_token.source, var_type, local_variable_offset(scope_stack), program);
 				node.assigned_expression = std::move(expression);
 				return node;
 			}
 		}
 	}
 
-	auto parse_expression_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> stmt::ExpressionStatement
+	auto parse_expression_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::ExpressionStatement
 	{
 		stmt::ExpressionStatement node;
-		node.expression = parse_expression(tokens.subspan(0, tokens.size() - 1), program, scope_stack);
+		node.expression = parse_subexpression(tokens, index, program, scope_stack);
 		return node;
+	}
+
+	auto parse_return_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::ReturnStatement
+	{
+		// Skip return token.
+		index++;
+
+		stmt::ReturnStatement node;
+		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
+
+		// Cannot return special types that do not represent data types.
+		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
+
+		return node;
+	}
+
+	auto parse_block_return_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::BlockReturnStatement
+	{
+		// A block return must appear in a statement block scope. Any other is wrong.
+		assert(scope_stack.back().type == ScopeType::block);
+
+		// Skip => token
+		index++;
+
+		stmt::BlockReturnStatement node;
+		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
+
+		// Cannot return special types that do not represent data types.
+		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
+
+		return node;
+	}
+
+	auto parse_if_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::IfStatement
+	{
+		// Skip the if
+		index++;
+
+		assert(tokens[index].type == TokenType::open_parenthesis);
+		index++;
+
+		stmt::IfStatement node;
+		node.condition = parse_subexpression(tokens, index, program, scope_stack);
+
+		assert(tokens[index].type == TokenType::close_parenthesis);
+		index++;
+
+		auto then_case = parse_substatement(tokens, index, program, scope_stack);
+		assert(then_case.has_value()); // Do not allow no-ops as cases of ifs.
+		node.then_case = std::make_unique<stmt::Statement>(*std::move(then_case));
+
+		// For if statement else is optional.
+		if (tokens[index].source == "else")
+		{
+			// Skip else token.
+			index++;
+			auto else_case = parse_substatement(tokens, index, program, scope_stack);
+			assert(else_case.has_value());  // Do not allow no-ops as cases of ifs.
+			node.else_case = std::make_unique<stmt::Statement>(*std::move(else_case));
+		}
+
+		return node;
+	}
+
+	auto parse_statement_block(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::StatementBlock
+	{
+		// Skip opening }
+		index++;
+
+		stmt::StatementBlock node;
+
+		// Parse all statements in the function.
+		while (tokens[index].type != TokenType::close_brace)
+		{
+			scope_stack.push_back({ &node.scope, ScopeType::block });
+			auto statement = parse_substatement(tokens, index, program, scope_stack);
+			scope_stack.pop_back();
+			if (statement)
+				node.statements.push_back(std::move(*statement));
+		}
+
+		// Skip closing brace.
+		index++;
+
+		return node;
+	}
+
+	auto parse_substatement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>
+	{
+		std::optional<stmt::Statement> result;
+
+		if (tokens[index].source == "let")
+			result = parse_let_statement(tokens, index, program, scope_stack);
+		else if (tokens[index].source == "return")
+			result = parse_return_statement(tokens, index, program, scope_stack);
+		else if (tokens[index].type == TokenType::block_return)
+			result = parse_block_return_statement(tokens, index, program, scope_stack);
+		else if (tokens[index].source == "if")
+			return parse_if_statement(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
+		else if (tokens[index].type == TokenType::open_brace)
+			return parse_statement_block(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
+		else if (lookup_type_name(program, tokens[index].source) != TypeId::none)
+			result = parse_variable_declaration_statement(tokens, index, program, scope_stack);
+		else
+			result = parse_expression_statement(tokens, index, program, scope_stack);
+
+		// A statement must end with a semicolon.
+		assert(tokens[index].type == TokenType::semicolon);
+		index++;
+
+		return result;
 	}
 
 	auto parse_statement(span<lex::Token const> tokens, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>
 	{
-		// A statement ends with a semicolon.
-		assert(tokens.back().type == TokenType::semicolon);
-
-		if (tokens[0].source == "let")
-			return parse_let_statement(tokens, program, scope_stack);
-		else if (lookup_type_name(program, tokens[0].source) != TypeId::none)
-			return parse_variable_declaration_statement(tokens, program, scope_stack);
-		else
-			return parse_expression_statement(tokens, program, scope_stack);
+		size_t index = 0;
+		return parse_substatement(tokens, index, program, scope_stack);
 	}
 
 	auto parse_source(std::string_view src) noexcept -> Program
@@ -695,7 +756,7 @@ namespace parser
 		size_t index = 0;
 		while (index < tokens.size())
 		{
-			auto statement = parse_statement(next_statement_tokens(tokens, index), program, scope_stack);
+			auto statement = parse_substatement(tokens, index, program, scope_stack);
 			if (statement)
 			{
 				assert(!has_type<stmt::ExpressionStatement>(*statement)); // An expression statement is not allowed at the global scope.
