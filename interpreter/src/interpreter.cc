@@ -10,6 +10,27 @@
 namespace interpreter
 {
 
+	struct StackGuard
+	{
+		int * stack_top_pointer;
+		int old_top_pointer;
+
+		explicit StackGuard(ProgramStack & stack)
+			: stack_top_pointer(&stack.top_pointer)
+			, old_top_pointer(stack.top_pointer)
+		{}
+
+		StackGuard(StackGuard const &) = delete;
+		StackGuard(StackGuard &&) = delete;
+		StackGuard & operator = (StackGuard const &) = delete;
+		StackGuard & operator = (StackGuard &&) = delete;
+
+		~StackGuard()
+		{
+			*stack_top_pointer = old_top_pointer;
+		}
+	};
+
 	auto read_word(ProgramStack const & stack, int address) noexcept -> int
 	{
 		return read<int>(stack, address);
@@ -180,26 +201,52 @@ namespace interpreter
 				free_up_to(stack, result_addr);
 
 				expr::ExpressionTree const & expr = condition ? *if_node.then_case : *if_node.else_case;
-				eval_expression_tree(expr, stack, program, return_address);
+				return eval_expression_tree(expr, stack, program, return_address);
 			},
 			[](expr::ReturnNode const & ret_node)
 			{
 				return control_flow::Return{ret_node.returned_expression.get()};
+			},
+			[](expr::BlockReturnNode const & ret_node)
+			{
+				return control_flow::BlockReturn{ret_node.returned_expression.get()};
+			},
+			[&](expr::StatementBlockNode const & block_node)
+			{
+				StackGuard const stack_guard(stack);
+				stack.top_pointer += block_node.scope.stack_frame_size;
+
+				// Run the function.
+				for (auto const & statement : block_node.statements)
+				{
+					auto const cf = run_statement(statement, stack, program);
+					if (auto const ret = try_get<control_flow::BlockReturn>(cf))
+					{
+						eval_expression_tree(*ret->returned_expression, stack, program, return_address);
+						break;
+					}
+					if (auto const ret = try_get<control_flow::Return>(cf))
+					{
+						return cf;
+					}
+				}
+
+				return control_flow::Variant();
 			}
 		);
 		return std::visit(visitor, tree.as_variant());
 	}
 
-	auto run_statement(parser::Statement const & tree, ProgramStack & stack, Program const & program) noexcept 
+	auto run_statement(stmt::Statement const & tree, ProgramStack & stack, Program const & program) noexcept 
 		-> control_flow::Variant
 	{
 		auto const visitor = overload(
-			[&](parser::VariableDeclarationStatement const & node) -> control_flow::Variant
+			[&](stmt::VariableDeclarationStatement const & node) -> control_flow::Variant
 			{
 				int const address = stack.base_pointer + node.variable_offset;
 				return eval_expression_tree(node.assigned_expression, stack, program, address);
 			},
-			[&](parser::ExpressionStatement const & expr_node) -> control_flow::Variant
+			[&](stmt::ExpressionStatement const & expr_node) -> control_flow::Variant
 			{
 				return eval_expression_tree(expr_node.expression, stack, program, stack.top_pointer);
 			}

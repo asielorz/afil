@@ -1,6 +1,7 @@
 #pragma once
 
 #include "function_id.hh"
+#include "scope.hh"
 #include <memory>
 #include <vector>
 #include <variant>
@@ -8,7 +9,11 @@
 
 struct Program;
 struct Type;
-enum struct TypeId;
+
+namespace stmt
+{
+	struct Statement;
+}
 
 namespace expr
 {
@@ -71,7 +76,7 @@ namespace expr
 	struct StatementBlockNode
 	{
 		Scope scope;
-		std::vector<parser::Statement> statements;
+		std::vector<stmt::Statement> statements;
 		TypeId return_type;
 	};
 

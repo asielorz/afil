@@ -1,12 +1,11 @@
 #pragma once
 
-#include "function_id.hh"
+#include "scope.hh"
 #include "span.hh"
 #include "callc.hh"
-#include <string_view>
 #include <variant>
 
-namespace parser { struct Statement; }
+namespace stmt { struct Statement; }
 
 struct Type
 {
@@ -14,35 +13,13 @@ struct Type
 	int size;
 	int alignment;
 };
-enum struct TypeId { noreturn = -3, function = -2, none = -1, int_, float_, bool_ };
-
-struct Variable
-{
-	std::string_view name;
-	TypeId type;
-	int offset;
-};
-
-struct FunctionName
-{
-	std::string_view name;
-	FunctionId id;
-};
-
-struct Scope
-{
-	int stack_frame_size = 0;
-	int stack_frame_alignment = 1; // Alignment requirement of the stack frame.
-	std::vector<Variable> variables;
-	std::vector<FunctionName> functions;
-};
 
 struct Function : Scope
 {
 	int parameter_count = 0;     // From the variables, how many are arguments. The rest are locals.
 	int parameter_size = 0;	     // Size in bytes needed for parameters.
 	TypeId return_type;
-	std::vector<parser::Statement> statements;
+	std::vector<stmt::Statement> statements;
 };
 
 struct ExternFunction
@@ -62,7 +39,7 @@ struct Program
 	std::vector<Type> types;
 	std::vector<Function> functions;
 	std::vector<ExternFunction> extern_functions;
-	std::vector<parser::Statement> global_initialization_statements;
+	std::vector<stmt::Statement> global_initialization_statements;
 	Scope global_scope;
 	FunctionId main_function = invalid_function_id;
 };

@@ -1,4 +1,5 @@
 #include "expression.hh"
+#include "statement.hh"
 #include "program.hh"
 #include "overload.hh"
 #include "unreachable.hh"
@@ -62,7 +63,9 @@ namespace expr
 			},
 			[](RelationalOperatorCallNode const &) { return TypeId::bool_; },
 			[&](IfNode const & if_node) { return expression_type_id(*if_node.then_case, program); },
-			[](ReturnNode const &) { return TypeId::noreturn; }
+			[](ReturnNode const &) { return TypeId::noreturn; },
+			[](StatementBlockNode const & block_node) { return block_node.return_type; },
+			[](BlockReturnNode const &) { return TypeId::noreturn; }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}

@@ -5,7 +5,7 @@
 #include <string_view>
 
 namespace expr { struct ExpressionTree; }
-namespace parser { struct Statement; }
+namespace stmt { struct Statement; }
 struct Program;
 
 namespace interpreter
@@ -27,7 +27,8 @@ namespace interpreter
 	{
 		struct Nothing {};
 		struct Return { expr::ExpressionTree const * returned_expression; };
-		using Variant = std::variant<control_flow::Nothing, control_flow::Return>;
+		struct BlockReturn { expr::ExpressionTree const * returned_expression; };
+		using Variant = std::variant<Nothing, Return, BlockReturn>;
 	}
 
 	// Return value is allocated on top of the stack. Returns address of return value.
@@ -36,7 +37,7 @@ namespace interpreter
 	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept 
 		-> control_flow::Variant;
 
-	auto run_statement(parser::Statement const & tree, ProgramStack & stack, Program const & program) noexcept
+	auto run_statement(stmt::Statement const & tree, ProgramStack & stack, Program const & program) noexcept
 		->control_flow::Variant;
 
 	// TODO: argc, argv. Decide a good stack size.
