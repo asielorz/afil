@@ -64,3 +64,20 @@ auto lookup_name(ScopeStack const & scope_stack, std::string_view name) noexcept
 	else
 		return overload_set;
 }
+
+auto local_variable_offset(ScopeStack const & scope_stack) noexcept -> int
+{
+	int const start = static_cast<int>(scope_stack.size() - 1);
+	if (scope_stack[start].type == ScopeType::global || scope_stack[start].type == ScopeType::function)
+		return 0;
+
+	int size = 0;
+	for (int i = start - 1; i >= 0; --i)
+	{
+		size += scope_stack[i].scope->stack_frame_size;
+		if (scope_stack[start].type == ScopeType::global || scope_stack[start].type == ScopeType::function)
+			break;
+	}
+
+	return size;
+}

@@ -171,14 +171,14 @@ namespace parser
 		return result_tokens;
 	}
 
-	auto add_variable_to_scope(Scope & scope, std::string_view name, TypeId type_id, Program const & program) -> int
+	auto add_variable_to_scope(Scope & scope, std::string_view name, TypeId type_id, int scope_offset, Program const & program) -> int
 	{
 		Type const & type = type_with_id(program, type_id);
 
 		Variable var;
 		var.name = name;
 		var.type = type_id;
-		var.offset = align(scope.stack_frame_size, type.alignment);
+		var.offset = scope_offset + align(scope.stack_frame_size, type.alignment);
 		scope.stack_frame_size = var.offset + type.size;
 		scope.stack_frame_alignment = std::max(scope.stack_frame_alignment, type.alignment);
 		scope.variables.push_back(var);
@@ -198,7 +198,7 @@ namespace parser
 			assert(type_found != TypeId::none);
 			index++;
 
-			add_variable_to_scope(function, tokens[index].source, type_found, program);
+			add_variable_to_scope(function, tokens[index].source, type_found, 0, program);
 			function.parameter_count++;
 			function.parameter_size = function.stack_frame_size;
 			index++;
@@ -559,7 +559,7 @@ namespace parser
 
 		// The second token of the statement is the variable name.
 		assert(tokens[1].type == TokenType::identifier);
-		node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[1].source, type_found, program);
+		node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[1].source, type_found, local_variable_offset(scope_stack), program);
 
 		// The third token is a '='.
 		assert(tokens[2].type == TokenType::assignment);
@@ -657,7 +657,7 @@ namespace parser
 			else
 			{
 				stmt::VariableDeclarationStatement node;
-				node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[1].source, var_type, program);
+				node.variable_offset = add_variable_to_scope(top(scope_stack), tokens[1].source, var_type, local_variable_offset(scope_stack), program);
 				node.assigned_expression = std::move(expression);
 				return node;
 			}

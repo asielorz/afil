@@ -670,3 +670,30 @@ TEST_CASE("Accessing a variable from outside the block")
 
 	REQUIRE(parse_and_run(src) == 10 - 6);
 }
+
+TEST_CASE("Ensure that variables inside the block do not share an address with the variables in the function")
+{
+	auto const src = R"(
+		let foo = fn (int i, int j) -> int
+		{
+			if (i > j)
+			{
+				int difference = i - j;
+				return difference + i + j;
+			}
+			else
+			{
+				int difference = j - i;
+				return difference + i + j;
+			};
+		};		
+
+		let main = fn () -> int
+		{
+			
+			return foo(6, 10);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 10 - 6 + 10 + 6);
+}

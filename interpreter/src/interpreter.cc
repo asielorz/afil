@@ -46,7 +46,6 @@ namespace interpreter
 		stack.memory.resize(stack_size_in_bytes);
 	}
 
-	// TODO: Alignment
 	auto alloc(ProgramStack & stack, int size, int alignment = 4) noexcept -> int
 	{
 		int const address = align(stack.top_pointer, alignment);

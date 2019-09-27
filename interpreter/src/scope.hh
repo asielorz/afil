@@ -43,10 +43,12 @@ namespace lookup_result
 	struct GlobalVariable { TypeId variable_type; int variable_offset; };
 	struct OverloadSet { std::vector<FunctionId> function_ids; };
 }
-auto lookup_name(ScopeStack const & scope, std::string_view name) noexcept 
+auto lookup_name(ScopeStack const & scope_stack, std::string_view name) noexcept
 	-> std::variant<
 		lookup_result::Nothing, 
 		lookup_result::Variable,
 		lookup_result::GlobalVariable,
 		lookup_result::OverloadSet
 	>;
+
+auto local_variable_offset(ScopeStack const & scope_stack) noexcept -> int;
