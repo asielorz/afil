@@ -695,3 +695,16 @@ TEST_CASE("Ensure that variables inside the block do not share an address with t
 
 	REQUIRE(parse_and_run(src) == 10 - 6 + 10 + 6);
 }
+
+/*****************************************************************
+Backlog
+- mutation (depends on pointers)
+- loops (depends on mutation)
+- struct
+- pointers
+- templates
+- arrays (depends on pointers)
+- strings (depends on arrays)
+- importing other files
+- importing functions in C
+*****************************************************************/

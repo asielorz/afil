@@ -33,7 +33,7 @@ namespace lex
 		char const c = src[index];
 		return 
 			(c == '+') || (c == '-') || (c == '*') || (c == '/') || 
-			(c == '<') || (c == '>')
+			(c == '<') || (c == '>') || (c == '=')
 			|| starts_with(src, index, "=="sv)
 			|| starts_with(src, index, "!="sv)
 			|| starts_with(src, index, "and"sv)
@@ -196,7 +196,6 @@ namespace lex
 		if (src[index] == '}')			return {Token::Type::close_brace,		1};
 		if (src[index] == ';')			return {Token::Type::semicolon,			1};
 		if (src[index] == ',')			return {Token::Type::comma,				1};
-		if (src[index] == '=')			return {Token::Type::assignment,		1};
 		if (is_boolean(src, index))		return {Token::Type::literal_bool,		src[index] == 't' ? 4 : 5};
 		else							return {Token::Type::identifier,		token_length_identifier(src, index)};
 	}

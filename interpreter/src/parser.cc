@@ -51,6 +51,7 @@ namespace parser
 			case '/': return Operator::divide;
 			case '<': return Operator::less;
 			case '>': return Operator::greater;
+			case '=': return Operator::assign;
 		}
 		declare_unreachable();
 	}
@@ -504,7 +505,7 @@ namespace parser
 		index++;
 
 		// The third token is a '='.
-		assert(tokens[index].type == TokenType::assignment);
+		assert(tokens[index].source == "=");
 		index++;
 
 		// The rest is the expression assigned to the variable.
@@ -556,7 +557,7 @@ namespace parser
 		lex::Token const id_token = tokens[index];
 		assert(id_token.type == TokenType::identifier);
 		index++;
-		assert(tokens[index].type == TokenType::assignment);
+		assert(tokens[index].source == "=");
 		index++;
 
 		// Skip the fn.
@@ -596,7 +597,7 @@ namespace parser
 			lex::Token const id_token = tokens[index + 1];
 
 			assert(id_token.type == TokenType::identifier);
-			assert(tokens[index + 2].type == TokenType::assignment);
+			assert(tokens[index + 2].source == "=");
 			index += 3;
 
 			// If the expression returns a function, bind it to its name and return a noop.

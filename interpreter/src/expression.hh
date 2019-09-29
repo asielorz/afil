@@ -22,7 +22,8 @@ namespace expr
 	{
 		add, subtract, multiply, divide, 
 		equal, not_equal, less, less_equal, greater, greater_equal, three_way_compare,
-		and_, or_, xor_
+		and_, or_, xor_,
+		assign
 	};
 	auto precedence(Operator op) noexcept -> int;
 	auto operator_function_name(Operator op) noexcept -> std::string_view;

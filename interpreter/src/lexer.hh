@@ -19,7 +19,6 @@ namespace lex
 			open_brace, close_brace,				// { }
 			semicolon,								// ;
 			comma,									// ,
-			assignment,								// =
 			arrow,									// ->
 		};
 
