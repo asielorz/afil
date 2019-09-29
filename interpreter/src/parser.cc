@@ -417,7 +417,7 @@ namespace parser
 				[&](lookup_result::Variable result) -> ExpressionTree
 				{
 					expr::LocalVariableNode var_node;
-					var_node.variable_type = result.variable_type;
+					var_node.variable_type = make_reference(result.variable_type);
 					var_node.variable_offset = result.variable_offset;
 					index++;
 					return var_node;
@@ -425,7 +425,7 @@ namespace parser
 				[&](lookup_result::GlobalVariable result) -> ExpressionTree
 				{
 					expr::GlobalVariableNode var_node;
-					var_node.variable_type = result.variable_type;
+					var_node.variable_type = make_reference(result.variable_type);
 					var_node.variable_offset = result.variable_offset;
 					index++;
 					return var_node;
@@ -495,9 +495,16 @@ namespace parser
 		stmt::VariableDeclarationStatement node;
 
 		// A statement begins with the type of the declared variable.
-		TypeId const type_found = lookup_type_name(program, tokens[index].source);
+		TypeId type_found = lookup_type_name(program, tokens[index].source);
 		index++;
 		assert(type_found != TypeId::none);
+
+		// Look for mutable qualifier.
+		if (tokens[index].source == "mut")
+		{
+			type_found.is_mutable = true;
+			index++;
+		}
 
 		// The second token of the statement is the variable name.
 		assert(tokens[index].type == TokenType::identifier);
@@ -511,7 +518,7 @@ namespace parser
 		// The rest is the expression assigned to the variable.
 		node.assigned_expression = parse_subexpression(tokens, index, program, scope_stack);
 		// Require that the expression assigned to the variable has the same type as the variable.
-		assert(expression_type_id(node.assigned_expression, program) == type_found);
+		assert(is_convertible(expression_type_id(node.assigned_expression, program), type_found));
 
 		return node;
 	}

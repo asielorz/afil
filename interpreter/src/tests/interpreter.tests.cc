@@ -696,6 +696,20 @@ TEST_CASE("Ensure that variables inside the block do not share an address with t
 	REQUIRE(parse_and_run(src) == 10 - 6 + 10 + 6);
 }
 
+//TEST_CASE("integer assignment")
+//{
+//	auto const src = R"(
+//		let main = fn () -> int
+//		{
+//			int mut i = 5;
+//			i = 6;
+//			return i;
+//		};
+//	)"sv;
+//
+//	REQUIRE(parse_and_run(src) == 6);
+//}
+
 /*****************************************************************
 Backlog
 - mutation (depends on pointers)
@@ -707,4 +721,5 @@ Backlog
 - strings (depends on arrays)
 - importing other files
 - importing functions in C
+- contracts
 *****************************************************************/

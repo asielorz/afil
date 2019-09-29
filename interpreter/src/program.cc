@@ -3,6 +3,7 @@
 #include "parser.hh"
 #include "function_ptr.hh"
 #include <algorithm>
+#include <cassert>
 
 using namespace std::literals;
 
@@ -16,10 +17,10 @@ auto built_in_types() noexcept -> std::vector<Type>
 }
 
 template <typename T> struct id_for_type {};
-template <> struct id_for_type<int> { static constexpr TypeId value = TypeId::int_; };
-template <> struct id_for_type<float> { static constexpr TypeId value = TypeId::float_; };
-template <> struct id_for_type<bool> { static constexpr TypeId value = TypeId::bool_; };
-template <typename T> constexpr TypeId id_for_type_v = id_for_type<T>::value;
+template <> struct id_for_type<int> { static constexpr unsigned value = 0; };
+template <> struct id_for_type<float> { static constexpr unsigned value = 1; };
+template <> struct id_for_type<bool> { static constexpr unsigned value = 2; };
+template <typename T> constexpr unsigned id_for_type_v = id_for_type<T>::value;
 
 template <typename R, typename ... Args>
 auto extern_function_descriptor(auto (*fn)(Args...) noexcept -> R) noexcept -> ExternFunction
@@ -27,8 +28,8 @@ auto extern_function_descriptor(auto (*fn)(Args...) noexcept -> R) noexcept -> E
 	return ExternFunction{
 		static_cast<int>(sizeof(std::tuple<Args...>)),
 		static_cast<int>(std::max({alignof(Args)...})),
-		id_for_type_v<R>,
-		{id_for_type_v<Args>...},
+		TypeId::with_index(id_for_type_v<R>),
+		{TypeId::with_index(id_for_type_v<Args>)...},
 		callc::c_function_caller(fn), 
 		fn
 	};
@@ -123,17 +124,18 @@ auto lookup_type_name(Program const & program, std::string_view name) noexcept -
 {
 	auto const type = std::find_if(program.types.begin(), program.types.end(), name_equal(name));
 	if (type != program.types.end())
-		return static_cast<TypeId>(type - program.types.begin());
+		return TypeId::with_index(static_cast<unsigned>(type - program.types.begin()));
 	else
 		return TypeId::none;
 }
 
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &
 {
-	return program.types[static_cast<int>(id)];
+	assert(!id.is_language_reseved);
+	return program.types[id.index];
 }
 
 auto is_data_type(TypeId id) noexcept -> bool
 {
-	return id >= TypeId::int_;
+	return !id.is_language_reseved;
 }

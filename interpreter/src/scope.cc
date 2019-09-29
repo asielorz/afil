@@ -1,6 +1,24 @@
 #include "scope.hh"
 #include <algorithm>
 
+TypeId const TypeId::int_ = { false, false, false, 0 };
+TypeId const TypeId::float_ = { false, false, false, 1 };
+TypeId const TypeId::bool_ = { false, false, false, 2 };
+
+TypeId const TypeId::none = { true, false, false, 0 };
+TypeId const TypeId::function = { true, false, false, 1 };
+
+auto is_convertible(TypeId from, TypeId to) noexcept -> bool
+{
+	return from.index == to.index;
+}
+
+auto make_reference(TypeId type) noexcept -> TypeId
+{
+	type.is_reference = true;
+	return type;
+}
+
 struct name_equal
 {
 	constexpr name_equal(std::string_view name_) noexcept : name(name_) {}

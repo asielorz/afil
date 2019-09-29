@@ -58,6 +58,11 @@ namespace interpreter
 		stack.top_pointer = address;
 	}
 
+	auto pointer_at_address(ProgramStack & stack, int address) noexcept -> void *
+	{
+		return stack.memory.data() + address;
+	}
+
 	template <typename T>
 	auto push_to_stack_top(ProgramStack & stack, T const & value) noexcept -> int
 	{
@@ -146,12 +151,19 @@ namespace interpreter
 			[&](expr::LocalVariableNode const & var_node)
 			{
 				int const address = stack.base_pointer + var_node.variable_offset;
-				write_word(stack, return_address, read_word(stack, address));
+				write(stack, return_address, pointer_at_address(stack, address));
 			},
 			[&](expr::GlobalVariableNode const & var_node)
 			{
 				int const address = var_node.variable_offset;
-				write_word(stack, return_address, read_word(stack, address));
+				write(stack, return_address, pointer_at_address(stack, address));
+			},
+			[&](expr::DereferenceNode const & deref_node)
+			{
+				StackGuard const g(stack);
+				int const pointer_address = eval_expression_tree(*deref_node.expression, stack, program);
+				auto const pointer = read<void const *>(stack, pointer_address);
+				memcpy(pointer_at_address(stack, return_address), pointer, type_with_id(program, deref_node.variable_type).size);
 			},
 			[&](expr::FunctionNode const & func_node) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
 			{

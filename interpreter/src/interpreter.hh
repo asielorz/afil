@@ -22,6 +22,7 @@ namespace interpreter
 	template <typename T> auto read(ProgramStack const & stack, int address) noexcept -> T const &;
 	template <typename T> auto write(ProgramStack & stack, int address, T const & value) noexcept -> void;
 	auto alloc_stack(ProgramStack & stack, int stack_size_in_bytes) noexcept -> void;
+	auto pointer_at_address(ProgramStack & stack, int address) noexcept -> void *;
 
 	namespace control_flow
 	{

@@ -44,6 +44,12 @@ namespace expr
 	struct LocalVariableNode : VariableNode {};
 	struct GlobalVariableNode : VariableNode {};
 
+	struct DereferenceNode
+	{
+		TypeId variable_type;
+		std::unique_ptr<ExpressionTree> expression;
+	};
+
 	struct FunctionNode
 	{
 		FunctionId function_id;
