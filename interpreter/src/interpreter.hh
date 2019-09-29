@@ -27,8 +27,7 @@ namespace interpreter
 	{
 		struct Nothing {};
 		struct Return { expr::ExpressionTree const * returned_expression; };
-		struct BlockReturn { expr::ExpressionTree const * returned_expression; };
-		using Variant = std::variant<Nothing, Return, BlockReturn>;
+		using Variant = std::variant<Nothing, Return>;
 	}
 
 	// Return value is allocated on top of the stack. Returns address of return value.

@@ -593,7 +593,7 @@ TEST_CASE("Block expression")
 		"{"
 		"    int i = 3;"
 		"    int j = 4;"
-		"    => i * i + j * j;"
+		"    return i * i + j * j;"
 		"}";
 
 	REQUIRE(eval_expression<int>(src) == 3 * 3 + 4 * 4);
@@ -606,9 +606,9 @@ TEST_CASE("Block expressions with multiple return paths")
 		"    int i = 3;"
 		"    int j = 4;"
 		"    if (i > j)"
-		"		 => i * i - j * j;"
+		"		 return i * i - j * j;"
 		"	 else"
-		"		 => j * j - i * i;"
+		"		 return j * j - i * i;"
 		"}";
 
 	REQUIRE(eval_expression<int>(src) == 4 * 4 - 3 * 3);

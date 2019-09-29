@@ -325,28 +325,25 @@ namespace parser
 	struct DeducedReturnType
 	{
 		TypeId return_type;
-		TypeId block_return_type;
 		bool all_branches_return;
 	};
 	auto deduce_return_type(stmt::Statement const & statement, Program const & program) noexcept -> DeducedReturnType
 	{
 		auto const visitor = overload(
-			[](auto const &) { return DeducedReturnType{TypeId::none, TypeId::none, false}; }, // Default case, does not return
-			[&](stmt::ReturnStatement const & ret_node) { return DeducedReturnType{expression_type_id(*ret_node.returned_expression, program), TypeId::none, true}; },
-			[&](stmt::BlockReturnStatement const & ret_node) { return DeducedReturnType{TypeId::none, expression_type_id(*ret_node.returned_expression, program), true}; },
+			[](auto const &) { return DeducedReturnType{TypeId::none, false}; }, // Default case, does not return
+			[&](stmt::ReturnStatement const & ret_node) { return DeducedReturnType{expression_type_id(*ret_node.returned_expression, program), true}; },
 			[&](stmt::IfStatement const & if_node)
 			{
 				if (!if_node.else_case)
 				{
 					auto const left = deduce_return_type(*if_node.then_case, program);
-					return DeducedReturnType{left.return_type, left.block_return_type, false};
+					return DeducedReturnType{left.return_type, false};
 				}
 
 				auto const left = deduce_return_type(*if_node.then_case, program);
 				auto const right = deduce_return_type(*if_node.else_case, program);
 				return DeducedReturnType{
 					common_type(left.return_type, right.return_type),
-					common_type(left.block_return_type, right.block_return_type),
 					left.all_branches_return && right.all_branches_return
 				};
 			}
@@ -374,7 +371,7 @@ namespace parser
 		// Deduce return type
 		auto const deduced_return_type = deduce_return_type(node.statements.back(), program);
 		assert(deduced_return_type.all_branches_return);
-		node.return_type = deduced_return_type.block_return_type;
+		node.return_type = deduced_return_type.return_type;
 
 		// Skip closing brace.
 		index++;
@@ -642,23 +639,6 @@ namespace parser
 		return node;
 	}
 
-	auto parse_block_return_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::BlockReturnStatement
-	{
-		// A block return must appear in a statement block scope. Any other is wrong.
-		assert(scope_stack.back().type == ScopeType::block);
-
-		// Skip => token
-		index++;
-
-		stmt::BlockReturnStatement node;
-		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
-
-		// Cannot return special types that do not represent data types.
-		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
-
-		return node;
-	}
-
 	auto parse_if_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::IfStatement
 	{
 		// Skip the if
@@ -721,8 +701,6 @@ namespace parser
 			result = parse_let_statement(tokens, index, program, scope_stack);
 		else if (tokens[index].source == "return")
 			result = parse_return_statement(tokens, index, program, scope_stack);
-		else if (tokens[index].type == TokenType::block_return)
-			result = parse_block_return_statement(tokens, index, program, scope_stack);
 		else if (tokens[index].source == "if")
 			return parse_if_statement(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
 		else if (tokens[index].type == TokenType::open_brace)

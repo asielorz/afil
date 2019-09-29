@@ -210,7 +210,7 @@ namespace interpreter
 				for (auto const & statement : block_node.statements)
 				{
 					auto const cf = run_statement(statement, stack, program);
-					if (auto const ret = try_get<control_flow::BlockReturn>(cf))
+					if (auto const ret = try_get<control_flow::Return>(cf))
 					{
 						eval_expression_tree(*ret->returned_expression, stack, program, return_address);
 						break;
@@ -237,10 +237,6 @@ namespace interpreter
 			[](stmt::ReturnStatement const & return_node)
 			{
 				return control_flow::Return{return_node.returned_expression.get()};
-			},
-			[](stmt::BlockReturnStatement const & return_node)
-			{
-				return control_flow::BlockReturn{return_node.returned_expression.get()};
 			},
 			[&](stmt::IfStatement const & if_node) -> control_flow::Variant
 			{

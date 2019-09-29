@@ -21,7 +21,6 @@ namespace lex
 			comma,									// ,
 			assignment,								// =
 			arrow,									// ->
-			block_return,							// =>
 		};
 
 		std::string_view source;

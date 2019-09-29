@@ -67,11 +67,6 @@ namespace lex
 		return starts_with(src, index, "->"sv);
 	}
 
-	auto is_block_return(std::string_view src, int index) noexcept -> bool
-	{
-		return starts_with(src, index, "=>"sv);
-	}
-
 	auto is_boolean(std::string_view src, int index) noexcept -> bool
 	{
 		return starts_with(src, index, "true"sv) || starts_with(src, index, "false"sv);
@@ -194,7 +189,6 @@ namespace lex
 	{
 		if (is_number(src[index]))		return token_type_and_length_number(src, index);
 		if (is_arrow(src, index))		return {Token::Type::arrow,				2};
-		if (is_block_return(src, index))return {Token::Type::block_return,		2};
 		if (is_operator(src, index))	return {Token::Type::operator_,			token_length_operator(src, index)};
 		if (src[index] == '(')			return {Token::Type::open_parenthesis,	1};
 		if (src[index] == ')')			return {Token::Type::close_parenthesis,	1};

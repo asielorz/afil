@@ -23,11 +23,6 @@ namespace stmt
 		std::unique_ptr<expr::ExpressionTree> returned_expression;
 	};
 
-	struct BlockReturnStatement // =>
-	{
-		std::unique_ptr<expr::ExpressionTree> returned_expression;
-	};
-
 	struct IfStatement
 	{
 		expr::ExpressionTree condition;
@@ -45,8 +40,7 @@ namespace stmt
 	{
 		using StatementBase = std::variant<
 			VariableDeclarationStatement, ExpressionStatement, 
-			ReturnStatement, BlockReturnStatement, 
-			IfStatement, StatementBlock
+			ReturnStatement, IfStatement, StatementBlock
 		>;
 	}
 
