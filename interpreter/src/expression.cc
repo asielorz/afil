@@ -52,6 +52,7 @@ namespace expr
 			[](Literal<int>) { return TypeId::int_; },
 			[](Literal<float>) { return TypeId::float_; },
 			[](Literal<bool>) { return TypeId::bool_; },
+			[](DereferenceNode const & deref_node) { return deref_node.variable_type; },
 			[](LocalVariableNode const & var_node) { return var_node.variable_type; },
 			[](GlobalVariableNode const & var_node) { return var_node.variable_type; },
 			[](FunctionNode const &) { return TypeId::function; },

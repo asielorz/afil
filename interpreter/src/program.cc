@@ -90,30 +90,13 @@ struct name_equal
 
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId
 {
+	// TODO: This finds first valid candidate. It should find best match.
 	for (FunctionId function_id : overload_set)
 	{
-		if (!function_id.is_extern)
+		auto const param_types = parameter_types(program, function_id);
+		if (std::equal(param_types.begin(), param_types.end(), parameters.begin(), parameters.end(), is_convertible))
 		{
-			Function const & function = program.functions[function_id.index];
-			if (std::equal(
-				function.variables.begin(), function.variables.begin() + function.parameter_count,
-				parameters.begin(), parameters.end(),
-				[](Variable const & var, TypeId type) { return var.type == type; }
-			))
-			{
-				return function_id;
-			}
-		}
-		else
-		{
-			ExternFunction const & function = program.extern_functions[function_id.index];
-			if (std::equal(
-				function.parameter_types.begin(), function.parameter_types.end(),
-				parameters.begin(), parameters.end()
-			))
-			{
-				return function_id;
-			}
+			return function_id;
 		}
 	}
 
@@ -139,3 +122,20 @@ auto is_data_type(TypeId id) noexcept -> bool
 {
 	return !id.is_language_reseved;
 }
+
+auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
+{
+	if (id.is_extern)
+	{
+		return program.extern_functions[id.index].parameter_types;
+	}
+	else
+	{
+		Function const & fn = program.functions[id.index];
+		std::vector<TypeId> types(fn.parameter_count);
+		for (int i = 0; i < fn.parameter_count; ++i)
+			types[i] = fn.variables[i].type;
+		return types;
+	}
+}
+

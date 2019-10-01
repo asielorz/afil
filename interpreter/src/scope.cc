@@ -1,21 +1,45 @@
 #include "scope.hh"
 #include <algorithm>
 
-TypeId const TypeId::int_ = { false, false, false, 0 };
-TypeId const TypeId::float_ = { false, false, false, 1 };
-TypeId const TypeId::bool_ = { false, false, false, 2 };
+TypeId const TypeId::int_ = {false, false, false, 0};
+TypeId const TypeId::float_ = {false, false, false, 1};
+TypeId const TypeId::bool_ = {false, false, false, 2};
 
-TypeId const TypeId::none = { true, false, false, 0 };
-TypeId const TypeId::function = { true, false, false, 1 };
+TypeId const TypeId::none = {true, false, false, 0};
+TypeId const TypeId::function = {true, false, false, 1};
 
 auto is_convertible(TypeId from, TypeId to) noexcept -> bool
 {
-	return from.index == to.index;
+	// No conversions between different types (for now).
+	if (from.index != to.index)
+		return false;
+
+	// Both T and any reference are convertible to T.
+	if (!to.is_reference)
+		return true;
+
+	// Both T and any reference are convertible to const &
+	if (!to.is_mutable)
+		return true;
+
+	// Mutable reference is convertible to everything.
+	if (from.is_mutable && from.is_reference)
+		return true;
+
+	// Otherwise there is no conversion.
+	return false;
 }
 
 auto make_reference(TypeId type) noexcept -> TypeId
 {
 	type.is_reference = true;
+	return type;
+}
+
+auto decay(TypeId type) noexcept -> TypeId
+{
+	type.is_mutable = false;
+	type.is_reference = false;
 	return type;
 }
 

@@ -85,7 +85,8 @@ namespace expr
 	namespace detail
 	{
 		using ExpressionTreeBase = std::variant<
-			Literal<int>, Literal<float>, Literal<bool>, 
+			Literal<int>, Literal<float>, Literal<bool>,
+			DereferenceNode,
 			LocalVariableNode, GlobalVariableNode, 
 			FunctionNode, FunctionCallNode, RelationalOperatorCallNode,
 			IfNode, StatementBlockNode

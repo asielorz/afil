@@ -57,6 +57,43 @@ namespace parser
 	}
 	auto top(ScopeStack & stack) noexcept -> Scope & { return *stack.back().scope; }
 
+	auto insert_conversion_node(ExpressionTree tree, TypeId from, TypeId to) noexcept -> ExpressionTree
+	{
+		if (from.index == to.index)
+		{
+			// From reference to reference there is no conversion. A pointer is a pointer, regardless of constness.
+			if (from.is_reference && to.is_reference)
+				return tree;
+
+			expr::DereferenceNode deref_node;
+			deref_node.expression = std::make_unique<ExpressionTree>(std::move(tree));
+			deref_node.variable_type = to;
+			return deref_node;
+		}
+		// TODO: Conversions between types.
+		declare_unreachable();
+	}
+
+	auto resolve_function_overloading_and_insert_conversions(
+		span<FunctionId const> overload_set,
+		span<ExpressionTree> parameters,
+		span<TypeId const> parsed_parameter_types,
+		Program const & program) noexcept -> FunctionId
+	{
+		FunctionId const function_id = resolve_function_overloading(overload_set, parsed_parameter_types, program);
+		assert(function_id != invalid_function_id);
+
+		// If any conversion is needed in order to call the function, perform the conversion.
+		auto const target_parameter_types = parameter_types(program, function_id);
+		for (size_t i = 0; i < target_parameter_types.size(); ++i)
+		{
+			if (parsed_parameter_types[i] != target_parameter_types[i])
+				parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i]);
+		}
+
+		return function_id;
+	}
+
 	auto insert_expression(OperatorTree & tree, OperatorTree & new_node) noexcept -> void
 	{
 		OperatorNode & tree_op = std::get<OperatorNode>(tree);
@@ -105,8 +142,12 @@ namespace parser
 		if (is_operator_node(tree))
 		{
 			auto & node = std::get<OperatorNode>(tree);
-			ExpressionTree left = resolve_operator_overloading(std::move(*node.left), program, scope_stack);
-			ExpressionTree right = resolve_operator_overloading(std::move(*node.right), program, scope_stack);
+			ExpressionTree operands[2] = {
+				resolve_operator_overloading(std::move(*node.left), program, scope_stack),
+				resolve_operator_overloading(std::move(*node.right), program, scope_stack) 
+			};
+			ExpressionTree & left = operands[0];
+			ExpressionTree & right = operands[1];
 			Operator const op = node.op;
 
 			auto const visitor = overload(
@@ -116,7 +157,7 @@ namespace parser
 				[&](lookup_result::OverloadSet const & overload_set) -> ExpressionTree
 				{
 					TypeId const operand_types[] = {expression_type_id(left, program), expression_type_id(right, program)};
-					auto const function_id = resolve_function_overloading(overload_set.function_ids, operand_types, program);
+					auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set.function_ids, operands, operand_types, program);
 					if (function_id != invalid_function_id)
 					{
 						if (op == Operator::not_equal || op == Operator::less || op == Operator::greater ||
@@ -259,13 +300,13 @@ namespace parser
 		expr::FunctionCallNode node;
 		node.parameters.reserve(param_count);
 
-		std::vector<TypeId> parameter_types;
+		std::vector<TypeId> parsed_parameter_types;
 
 		for (;;)
 		{
 			// Parse a parameter.
 			node.parameters.push_back(parse_subexpression(tokens, index, program, scope_stack));
-			parameter_types.push_back(expression_type_id(node.parameters.back(), program));
+			parsed_parameter_types.push_back(expression_type_id(node.parameters.back(), program));
 
 			// If after a parameter we find a close parenthesis, end parameter list.
 			if (tokens[index].type == TokenType::close_parenthesis)
@@ -281,8 +322,7 @@ namespace parser
 				declare_unreachable();
 		}
 
-		node.function_id = resolve_function_overloading(overload_set, parameter_types, program);
-		assert(node.function_id != invalid_function_id);
+		node.function_id = resolve_function_overloading_and_insert_conversions(overload_set, node.parameters, parsed_parameter_types, program);
 
 		return node;
 	}
@@ -517,8 +557,11 @@ namespace parser
 
 		// The rest is the expression assigned to the variable.
 		node.assigned_expression = parse_subexpression(tokens, index, program, scope_stack);
-		// Require that the expression assigned to the variable has the same type as the variable.
-		assert(is_convertible(expression_type_id(node.assigned_expression, program), type_found));
+		TypeId const assigned_type = expression_type_id(node.assigned_expression, program);
+		// Require that the expression assigned to the variable is convertible to the type of the variable.
+		assert(is_convertible(assigned_type, type_found));
+		if (assigned_type != type_found)
+			node.assigned_expression = insert_conversion_node(std::move(node.assigned_expression), assigned_type, type_found);
 
 		return node;
 	}
@@ -609,8 +652,8 @@ namespace parser
 
 			// If the expression returns a function, bind it to its name and return a noop.
 			expr::ExpressionTree expression = parse_subexpression(tokens, index, program, scope_stack);
-			TypeId const var_type = expression_type_id(expression, program);
-			if (var_type == TypeId::function)
+			TypeId const expr_type = expression_type_id(expression, program);
+			if (expr_type == TypeId::function)
 			{
 				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
 				bind_function_name(id_token.source, function_id, program, top(scope_stack));
@@ -618,9 +661,13 @@ namespace parser
 			}
 			else
 			{
+				TypeId const var_type = decay(expr_type);
 				stmt::VariableDeclarationStatement node;
 				node.variable_offset = add_variable_to_scope(top(scope_stack), id_token.source, var_type, local_variable_offset(scope_stack), program);
-				node.assigned_expression = std::move(expression);
+				if (var_type == expr_type)
+					node.assigned_expression = std::move(expression);
+				else
+					node.assigned_expression = insert_conversion_node(std::move(expression), expr_type, var_type);
 				return node;
 			}
 		}
