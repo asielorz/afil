@@ -1,8 +1,8 @@
 #pragma once
 
 #include "function_id.hh"
+#include "span.hh"
 #include <string_view>
-#include <vector>
 #include <variant>
 
 struct TypeId
@@ -36,6 +36,7 @@ constexpr auto operator != (TypeId a, TypeId b) noexcept -> bool { return !(a ==
 auto is_convertible(TypeId from, TypeId to) noexcept -> bool;
 auto make_reference(TypeId type) noexcept -> TypeId;
 auto decay(TypeId type) noexcept -> TypeId;
+auto common_type(TypeId a, TypeId b) noexcept -> TypeId; // Returns TypeID::none if there is no common type.
 
 struct Variable
 {
@@ -65,6 +66,7 @@ struct CurrentScope
 	ScopeType type;
 };
 using ScopeStack = std::vector<CurrentScope>;
+using ScopeStackView = span<const CurrentScope>;
 
 namespace lookup_result
 {
@@ -73,7 +75,7 @@ namespace lookup_result
 	struct GlobalVariable { TypeId variable_type; int variable_offset; };
 	struct OverloadSet { std::vector<FunctionId> function_ids; };
 }
-auto lookup_name(ScopeStack const & scope_stack, std::string_view name) noexcept
+auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 	-> std::variant<
 		lookup_result::Nothing, 
 		lookup_result::Variable,
@@ -81,4 +83,4 @@ auto lookup_name(ScopeStack const & scope_stack, std::string_view name) noexcept
 		lookup_result::OverloadSet
 	>;
 
-auto local_variable_offset(ScopeStack const & scope_stack) noexcept -> int;
+auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int;

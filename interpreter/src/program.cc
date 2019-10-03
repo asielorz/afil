@@ -139,3 +139,10 @@ auto parameter_types(Program const & program, FunctionId id) noexcept -> std::ve
 	}
 }
 
+auto return_type(Program const & program, FunctionId id) noexcept -> TypeId
+{
+	if (id.is_extern)
+		return program.extern_functions[id.index].return_type;
+	else
+		return program.functions[id.index].return_type;
+}

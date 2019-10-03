@@ -351,18 +351,19 @@ namespace parser
 
 		if_node.else_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
 
-		assert(expression_type_id(*if_node.then_case, program) == expression_type_id(*if_node.else_case, program));
+		// Ensure that both branches return the same type.
+		TypeId const then_type = expression_type_id(*if_node.then_case, program);
+		TypeId const else_type = expression_type_id(*if_node.else_case, program);
+		TypeId const common = common_type(then_type, else_type);
+		assert(common != TypeId::none);
+		if (then_type != common)
+			*if_node.then_case = insert_conversion_node(std::move(*if_node.then_case), then_type, common);
+		if (else_type != common)
+			*if_node.else_case = insert_conversion_node(std::move(*if_node.else_case), else_type, common);
 
 		return if_node;
 	}
 
-	auto common_type(TypeId a, TypeId b) noexcept -> TypeId
-	{
-		if (a == TypeId::none) return b;
-		if (b == TypeId::none) return a;
-		assert(a == b);
-		return a;
-	}
 	struct DeducedReturnType
 	{
 		TypeId return_type;
@@ -685,8 +686,16 @@ namespace parser
 		// Skip return token.
 		index++;
 
+		ExpressionTree return_expr = parse_subexpression(tokens, index, program, scope_stack);
+
+		// TODO: Possibility of returning references
+		TypeId const return_expr_type = expression_type_id(return_expr, program);
+		TypeId const return_type = decay(return_expr_type);
+		if (return_expr_type != return_type)
+			return_expr = insert_conversion_node(std::move(return_expr), return_expr_type, return_type);
+
 		stmt::ReturnStatement node;
-		node.returned_expression = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, program, scope_stack));
+		node.returned_expression = std::make_unique<ExpressionTree>(std::move(return_expr));
 
 		// Cannot return special types that do not represent data types.
 		assert(is_data_type(expression_type_id(*node.returned_expression, program)));

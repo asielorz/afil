@@ -43,6 +43,20 @@ auto decay(TypeId type) noexcept -> TypeId
 	return type;
 }
 
+auto common_type(TypeId a, TypeId b) noexcept -> TypeId
+{
+	if (a == b)
+		return a;
+
+	if (is_convertible(a, b))
+		return b;
+
+	if (is_convertible(b, a))
+		return a;
+
+	return TypeId::none;
+}
+
 struct name_equal
 {
 	constexpr name_equal(std::string_view name_) noexcept : name(name_) {}
@@ -56,7 +70,7 @@ struct name_equal
 	std::string_view name;
 };
 
-auto lookup_name(ScopeStack const & scope_stack, std::string_view name) noexcept
+auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 	-> std::variant<
 		lookup_result::Nothing, 
 		lookup_result::Variable,
@@ -107,7 +121,7 @@ auto lookup_name(ScopeStack const & scope_stack, std::string_view name) noexcept
 		return overload_set;
 }
 
-auto local_variable_offset(ScopeStack const & scope_stack) noexcept -> int
+auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int
 {
 	int const start = static_cast<int>(scope_stack.size() - 1);
 	if (scope_stack[start].type == ScopeType::global || scope_stack[start].type == ScopeType::function)

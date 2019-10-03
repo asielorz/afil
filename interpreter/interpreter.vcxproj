@@ -57,6 +57,7 @@
     <ClInclude Include="src\span.hh" />
     <ClInclude Include="src\lexer.hh" />
     <ClInclude Include="src\statement.hh" />
+    <ClInclude Include="src\string.hh" />
     <ClInclude Include="src\unreachable.hh" />
     <ClInclude Include="src\utils.hh" />
     <ClInclude Include="src\variant.hh" />

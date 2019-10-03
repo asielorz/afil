@@ -7,15 +7,55 @@
 using namespace std::literals;
 
 template <typename T>
+auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Program & program) noexcept -> T
+{
+	if (stack.top_pointer == 0)
+		stack.top_pointer = program.global_scope.stack_frame_size;
+
+	ScopeStack scope_stack;
+	scope_stack.push_back({ &program.global_scope, ScopeType::global });
+
+	auto const expr_tree = parser::parse_expression(lex::tokenize(src), program, scope_stack);
+	int const return_address = interpreter::eval_expression_tree(expr_tree, stack, program);
+
+	TypeId const expr_type = expression_type_id(expr_tree, program);
+	if constexpr (std::is_pointer_v<T>)
+	{
+		assert(expr_type.is_reference);
+		return interpreter::read<T>(stack, return_address);
+	}
+	else
+	{
+		if (expr_type.is_reference)
+			return *interpreter::read<T *>(stack, return_address);
+		else
+			return interpreter::read<T>(stack, return_address);
+	}
+}
+
+template <typename T>
 auto eval_expression(std::string_view src)
 {
 	Program program;
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
+	return eval_expression<T>(src, stack, program);
+}
+
+auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Scope & scope) noexcept -> void
+{
+	Program program;
 	ScopeStack scope_stack;
-	scope_stack.push_back({&program.global_scope, ScopeType::global});
-	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope_stack), stack, program);
-	return interpreter::read<T>(stack, return_address);
+	scope_stack.push_back({ &program.global_scope, ScopeType::global });
+	scope_stack.push_back({ &scope, ScopeType::function });
+	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), program, scope_stack), stack, program);
+}
+
+auto pretty_print_expr(std::string_view source, Program & program)
+{
+	ScopeStack scope_stack;
+	scope_stack.push_back({ &program.global_scope, ScopeType::global });
+	printf("%s", pretty_print(parser::parse_expression(lex::tokenize(source), program, scope_stack), program).c_str());
 }
 
 TEST_CASE("basic arithmetic expressions")
@@ -48,37 +88,6 @@ TEST_CASE("Multiplication has more precedence than addition")
 	REQUIRE(eval_expression<int>("2 * 3 + 4") == 2 * 3 + 4);
 	REQUIRE(eval_expression<int>("6 - 4 / 2") == 6 - 4 / 2);
 	REQUIRE(eval_expression<int>("2 * 3 * 2 - 4 * 5 + 6 / 3 * 2 + 1 + 1 + 1 * 3") == 2 * 3 * 2 - 4 * 5 + 6 / 3 * 2 + 1 + 1 + 1 * 3);
-}
-
-auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Scope & scope) noexcept -> void
-{
-	Program program;
-	ScopeStack scope_stack;
-	scope_stack.push_back({&program.global_scope, ScopeType::global});
-	scope_stack.push_back({&scope, ScopeType::function});
-	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), program, scope_stack), stack, program);
-}
-
-auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Scope & scope) noexcept -> int
-{
-	Program program;
-	ScopeStack scope_stack;
-	scope_stack.push_back({&scope, ScopeType::function});
-	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope_stack), stack, program);
-	return read_word(stack, return_address);
-}
-
-template <typename T>
-auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Program & program) noexcept -> T
-{
-	if (stack.top_pointer == 0)
-		stack.top_pointer = program.global_scope.stack_frame_size;
-	
-	ScopeStack scope_stack;
-	scope_stack.push_back({&program.global_scope, ScopeType::global});
-
-	int const return_address = interpreter::eval_expression_tree(parser::parse_expression(lex::tokenize(src), program, scope_stack), stack, program);
-	return interpreter::read<T>(stack, return_address);
 }
 
 TEST_CASE("A statement declares a variable and assigns it an expression, then ends with a semicolon")
