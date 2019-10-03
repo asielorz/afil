@@ -108,14 +108,13 @@ namespace interpreter
 			// Run the function.
 			for (auto const & statement : func.statements)
 			{
-				auto const cf = run_statement(statement, stack, program);
+				auto const cf = run_statement(statement, stack, program, return_address);
 				if (auto const ret = try_get<control_flow::Return>(cf))
 				{
 					// Read the previous ebp from the stack.
 					int const prev_ebp_address = stack.base_pointer - sizeof(int);
 					int const prev_ebp = read_word(stack, prev_ebp_address);
-					eval_expression_tree(*ret->returned_expression, stack, program, return_address);
-					stack.top_pointer = prev_ebp_address + expression_type(*ret->returned_expression, program).size;
+					stack.top_pointer = prev_ebp_address + type_with_id(program, func.return_type).size;
 					stack.base_pointer = prev_ebp;
 
 					break;
@@ -221,19 +220,16 @@ namespace interpreter
 				// Run the function.
 				for (auto const & statement : block_node.statements)
 				{
-					auto const cf = run_statement(statement, stack, program);
+					auto const cf = run_statement(statement, stack, program, return_address);
 					if (auto const ret = try_get<control_flow::Return>(cf))
-					{
-						eval_expression_tree(*ret->returned_expression, stack, program, return_address);
 						break;
-					}
 				}
 			}
 		);
 		std::visit(visitor, tree.as_variant());
 	}
 
-	auto run_statement(stmt::Statement const & tree, ProgramStack & stack, Program const & program) noexcept 
+	auto run_statement(stmt::Statement const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept
 		-> control_flow::Variant
 	{
 		auto const visitor = overload_default_ret(control_flow::Variant(),
@@ -246,9 +242,10 @@ namespace interpreter
 			{
 				eval_expression_tree(expr_node.expression, stack, program, stack.top_pointer);
 			},
-			[](stmt::ReturnStatement const & return_node)
+			[&](stmt::ReturnStatement const & return_node)
 			{
-				return control_flow::Return{return_node.returned_expression.get()};
+				eval_expression_tree(return_node.returned_expression, stack, program, return_address);
+				return control_flow::Return{};
 			},
 			[&](stmt::IfStatement const & if_node) -> control_flow::Variant
 			{
@@ -258,7 +255,7 @@ namespace interpreter
 
 				stmt::Statement const * const statement = condition ? if_node.then_case.get() : if_node.else_case.get();
 				if (statement)
-					return run_statement(*statement, stack, program);
+					return run_statement(*statement, stack, program, return_address);
 				else
 					return control_flow::Nothing();
 			},
@@ -270,7 +267,7 @@ namespace interpreter
 				// Run the function.
 				for (auto const & statement : block_node.statements)
 				{
-					auto const cf = run_statement(statement, stack, program);
+					auto const cf = run_statement(statement, stack, program, return_address);
 					if (auto const ret = try_get<control_flow::Return>(cf))
 						return cf;
 				}
@@ -291,7 +288,7 @@ namespace interpreter
 		// Initialization of globals.
 		alloc(stack, program.global_scope.stack_frame_size);
 		for (auto const & statement : program.global_initialization_statements)
-			run_statement(statement, stack, program);
+			run_statement(statement, stack, program, 0);
 
 		// Run main.
 		int const return_address = alloc(stack, sizeof(int), alignof(int));

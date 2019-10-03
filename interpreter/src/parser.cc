@@ -373,7 +373,7 @@ namespace parser
 	{
 		auto const visitor = overload(
 			[](auto const &) { return DeducedReturnType{TypeId::none, false}; }, // Default case, does not return
-			[&](stmt::ReturnStatement const & ret_node) { return DeducedReturnType{expression_type_id(*ret_node.returned_expression, program), true}; },
+			[&](stmt::ReturnStatement const & ret_node) { return DeducedReturnType{expression_type_id(ret_node.returned_expression, program), true}; },
 			[&](stmt::IfStatement const & if_node)
 			{
 				if (!if_node.else_case)
@@ -695,10 +695,10 @@ namespace parser
 			return_expr = insert_conversion_node(std::move(return_expr), return_expr_type, return_type);
 
 		stmt::ReturnStatement node;
-		node.returned_expression = std::make_unique<ExpressionTree>(std::move(return_expr));
+		node.returned_expression = std::move(return_expr);
 
 		// Cannot return special types that do not represent data types.
-		assert(is_data_type(expression_type_id(*node.returned_expression, program)));
+		assert(is_data_type(expression_type_id(node.returned_expression, program)));
 
 		return node;
 	}

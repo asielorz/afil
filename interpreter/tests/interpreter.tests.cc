@@ -2,6 +2,7 @@
 #include "interpreter.hh"
 #include "lexer.hh"
 #include "program.hh"
+#include "pretty_print.hh"
 #include <catch2/catch.hpp>
 
 using namespace std::literals;
@@ -48,7 +49,7 @@ auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Scop
 	ScopeStack scope_stack;
 	scope_stack.push_back({ &program.global_scope, ScopeType::global });
 	scope_stack.push_back({ &scope, ScopeType::function });
-	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), program, scope_stack), stack, program);
+	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), program, scope_stack), stack, program, 0);
 }
 
 auto pretty_print_expr(std::string_view source, Program & program)
@@ -653,6 +654,13 @@ TEST_CASE("A more imperative fibonacci")
 	REQUIRE(eval_expression<int>("fib(10)", stack, program) == 55);
 }
 
+auto parse_and_print(std::string_view src) noexcept -> void
+{
+	Program const program = parser::parse_source(src);
+	for (Function const & fn : program.functions)
+		printf("%s\n", pretty_print(fn, program).c_str());
+}
+
 TEST_CASE("Accessing a variable from outside the block")
 {
 	auto const src = R"(
@@ -676,6 +684,7 @@ TEST_CASE("Accessing a variable from outside the block")
 		};
 	)"sv;
 
+	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 10 - 6);
 }
 

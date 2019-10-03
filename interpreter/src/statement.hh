@@ -20,7 +20,7 @@ namespace stmt
 
 	struct ReturnStatement
 	{
-		std::unique_ptr<expr::ExpressionTree> returned_expression;
+		expr::ExpressionTree returned_expression;
 	};
 
 	struct IfStatement

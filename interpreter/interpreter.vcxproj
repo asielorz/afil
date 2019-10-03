@@ -30,17 +30,18 @@
     <ClCompile Include="src\callc.cc" />
     <ClCompile Include="src\expression.cc" />
     <ClCompile Include="src\main.cc" />
+    <ClCompile Include="src\pretty_print.cc" />
     <ClCompile Include="src\program.cc" />
     <ClCompile Include="src\interpreter.cc" />
     <ClCompile Include="src\parser.cc" />
     <ClCompile Include="src\scope.cc" />
-    <ClCompile Include="src\tests\callc.tests.cc" />
-    <ClCompile Include="src\tests\interpreter.tests.cc" />
-    <ClCompile Include="src\tests\main.tests.cc" />
-    <ClCompile Include="src\tests\span.tests.cc" />
     <ClCompile Include="src\lexer.cc" />
     <ClCompile Include="src\unreachable.cc" />
     <ClCompile Include="src\utils.cc" />
+    <ClCompile Include="tests\callc.tests.cc" />
+    <ClCompile Include="tests\interpreter.tests.cc" />
+    <ClCompile Include="tests\main.tests.cc" />
+    <ClCompile Include="tests\span.tests.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\callc.hh" />
@@ -48,6 +49,7 @@
     <ClInclude Include="src\function_id.hh" />
     <ClInclude Include="src\function_ptr.hh" />
     <ClInclude Include="src\multicomparison.hh" />
+    <ClInclude Include="src\pretty_print.hh" />
     <ClInclude Include="src\program.hh" />
     <ClInclude Include="src\interpreter.hh" />
     <ClInclude Include="src\overload.hh" />

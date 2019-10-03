@@ -27,7 +27,7 @@ namespace interpreter
 	namespace control_flow
 	{
 		struct Nothing {};
-		struct Return { expr::ExpressionTree const * returned_expression; };
+		struct Return {};
 		using Variant = std::variant<Nothing, Return>;
 	}
 
@@ -36,7 +36,7 @@ namespace interpreter
 	// Return value is written at the given address.
 	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept -> void;
 
-	auto run_statement(stmt::Statement const & tree, ProgramStack & stack, Program const & program) noexcept
+	auto run_statement(stmt::Statement const & tree, ProgramStack & stack, Program const & program, int return_address) noexcept
 		-> control_flow::Variant;
 
 	// TODO: argc, argv. Decide a good stack size.
