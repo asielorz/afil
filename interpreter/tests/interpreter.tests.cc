@@ -684,7 +684,6 @@ TEST_CASE("Accessing a variable from outside the block")
 		};
 	)"sv;
 
-	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 10 - 6);
 }
 
@@ -714,19 +713,19 @@ TEST_CASE("Ensure that variables inside the block do not share an address with t
 	REQUIRE(parse_and_run(src) == 10 - 6 + 10 + 6);
 }
 
-//TEST_CASE("integer assignment")
-//{
-//	auto const src = R"(
-//		let main = fn () -> int
-//		{
-//			int mut i = 5;
-//			i = 6;
-//			return i;
-//		};
-//	)"sv;
-//
-//	REQUIRE(parse_and_run(src) == 6);
-//}
+TEST_CASE("integer assignment")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			int mut i = 5;
+			i = 6;
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 6);
+}
 
 /*****************************************************************
 Backlog

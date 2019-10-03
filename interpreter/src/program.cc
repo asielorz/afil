@@ -16,20 +16,39 @@ auto built_in_types() noexcept -> std::vector<Type>
 	};
 }
 
-template <typename T> struct id_for_type {};
-template <> struct id_for_type<int> { static constexpr unsigned value = 0; };
-template <> struct id_for_type<float> { static constexpr unsigned value = 1; };
-template <> struct id_for_type<bool> { static constexpr unsigned value = 2; };
-template <typename T> constexpr unsigned id_for_type_v = id_for_type<T>::value;
+template <typename T> struct index_for_type {};
+template <> struct index_for_type<int> { static constexpr unsigned value = 0; };
+template <> struct index_for_type<float> { static constexpr unsigned value = 1; };
+template <> struct index_for_type<bool> { static constexpr unsigned value = 2; };
+template <typename T> constexpr unsigned index_for_type_v = index_for_type<T>::value;
+
+using mpl::BoxedType;
+using mpl::box;
+
+template <typename T>
+constexpr auto id_for(BoxedType<T>) noexcept -> TypeId
+{
+	return TypeId::with_index(index_for_type_v<T>);
+}
+template <typename T>
+constexpr auto id_for(BoxedType<T &>) noexcept -> TypeId
+{
+	return make_mutable(make_reference(TypeId::with_index(index_for_type_v<T>)));
+}
+template <typename T>
+constexpr auto id_for(BoxedType<T const &>) noexcept -> TypeId
+{
+	return make_reference(TypeId::with_index(index_for_type_v<T>));
+}
 
 template <typename R, typename ... Args>
 auto extern_function_descriptor(auto (*fn)(Args...) noexcept -> R) noexcept -> ExternFunction
 {
 	return ExternFunction{
 		static_cast<int>(sizeof(std::tuple<Args...>)),
-		static_cast<int>(std::max({alignof(Args)...})),
-		TypeId::with_index(id_for_type_v<R>),
-		{TypeId::with_index(id_for_type_v<Args>)...},
+		static_cast<int>(alignof(std::tuple<Args...>)),
+		id_for(box<R>),
+		{id_for(box<Args>)...},
 		callc::c_function_caller(fn), 
 		fn
 	};
@@ -44,6 +63,7 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 		{"operator/"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a / b; })},
 		{"operator=="sv,	extern_function_descriptor(+[](int a, int b) noexcept -> bool { return a == b; })},
 		{"operator<=>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
+		{"operator="sv,		extern_function_descriptor(+[](int & a, int b) noexcept -> int & { return a = b; })}, // TODO: Assignment should return void (support for void return in callc)
 
 		{"operator+"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a + b; })},
 		{"operator-"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
@@ -116,6 +136,14 @@ auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &
 {
 	assert(!id.is_language_reseved);
 	return program.types[id.index];
+}
+
+auto type_size(Program const & program, TypeId id) noexcept -> int
+{
+	if (id.is_reference)
+		return sizeof(void *);
+	else
+		return type_with_id(program, id).size;
 }
 
 auto is_data_type(TypeId id) noexcept -> bool

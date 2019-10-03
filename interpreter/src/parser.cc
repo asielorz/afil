@@ -61,8 +61,8 @@ namespace parser
 	{
 		if (from.index == to.index)
 		{
-			// From reference to reference there is no conversion. A pointer is a pointer, regardless of constness.
-			if (from.is_reference && to.is_reference)
+			// From reference to reference and value to value there is no conversion. A pointer is a pointer, regardless of constness.
+			if (from.is_reference == to.is_reference)
 				return tree;
 
 			expr::DereferenceNode deref_node;

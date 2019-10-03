@@ -73,7 +73,7 @@ namespace interpreter
 
 	auto eval_expression_tree(expr::ExpressionTree const & tree, ProgramStack & stack, Program const & program) noexcept -> int
 	{
-		int const address = alloc(stack, expression_type(tree, program).size);
+		int const address = alloc(stack, expression_type_size(tree, program));
 		eval_expression_tree(tree, stack, program, address);
 		return address;
 	}
@@ -98,7 +98,7 @@ namespace interpreter
 			for (int i = 0, next_parameter_address = parameters_start; i < parameters.size(); ++i)
 			{
 				eval_expression_tree(parameters[i], stack, program, next_parameter_address);
-				next_parameter_address += expression_type(parameters[i], program).size;
+				next_parameter_address += expression_type_size(parameters[i], program);
 			}
 
 			// Move the stack pointers.
@@ -114,7 +114,7 @@ namespace interpreter
 					// Read the previous ebp from the stack.
 					int const prev_ebp_address = stack.base_pointer - sizeof(int);
 					int const prev_ebp = read_word(stack, prev_ebp_address);
-					stack.top_pointer = prev_ebp_address + type_with_id(program, func.return_type).size;
+					stack.top_pointer = prev_ebp_address + type_size(program, func.return_type);
 					stack.base_pointer = prev_ebp;
 
 					break;
@@ -133,7 +133,7 @@ namespace interpreter
 			for (int i = 0, next_parameter_address = parameters_start; i < parameters.size(); ++i)
 			{
 				eval_expression_tree(parameters[i], stack, program, next_parameter_address);
-				next_parameter_address += expression_type(parameters[i], program).size;
+				next_parameter_address += expression_type_size(parameters[i], program);
 			}
 
 			func.caller(func.function_pointer, stack.memory.data() + parameters_start, stack.memory.data() + return_address);
@@ -162,7 +162,7 @@ namespace interpreter
 				StackGuard const g(stack);
 				int const pointer_address = eval_expression_tree(*deref_node.expression, stack, program);
 				auto const pointer = read<void const *>(stack, pointer_address);
-				memcpy(pointer_at_address(stack, return_address), pointer, type_with_id(program, deref_node.variable_type).size);
+				memcpy(pointer_at_address(stack, return_address), pointer, type_size(program, deref_node.variable_type));
 			},
 			[&](expr::FunctionNode const & func_node) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
 			{

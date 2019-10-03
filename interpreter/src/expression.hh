@@ -125,5 +125,6 @@ namespace expr
 	auto is_operator_node(OperatorTree const & tree) noexcept -> bool;
 	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> Type;
 	auto expression_type_id(ExpressionTree const & tree, Program const & program) noexcept -> TypeId;
+	auto expression_type_size(ExpressionTree const & tree, Program const & program) noexcept -> int;
 
 } // namespace expr

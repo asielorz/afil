@@ -65,4 +65,9 @@ namespace expr
 		return std::visit(visitor, tree.as_variant());
 	}
 
+	auto expression_type_size(ExpressionTree const & tree, Program const & program) noexcept -> int
+	{
+		return type_size(program, expression_type_id(tree, program));
+	}
+
 } // namespace expr

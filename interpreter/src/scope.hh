@@ -35,6 +35,7 @@ constexpr auto operator != (TypeId a, TypeId b) noexcept -> bool { return !(a ==
 
 auto is_convertible(TypeId from, TypeId to) noexcept -> bool;
 auto make_reference(TypeId type) noexcept -> TypeId;
+auto make_mutable(TypeId type) noexcept -> TypeId;
 auto decay(TypeId type) noexcept -> TypeId;
 auto common_type(TypeId a, TypeId b) noexcept -> TypeId; // Returns TypeID::none if there is no common type.
 

@@ -48,7 +48,8 @@ struct Program
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept ->FunctionId;
 
 auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId;
-auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
+auto type_with_id(Program const & program, TypeId id) noexcept->Type const &;
+auto type_size(Program const & program, TypeId id) noexcept -> int;
 auto is_data_type(TypeId id) noexcept -> bool;
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
