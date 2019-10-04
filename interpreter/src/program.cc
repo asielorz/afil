@@ -74,11 +74,13 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 		{"operator/"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a / b; })},
 		{"operator=="sv,	extern_function_descriptor(+[](float a, float b) noexcept -> bool { return a == b; })},
 		{"operator<=>"sv,	extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
+		{"operator="sv,		extern_function_descriptor(+[](float & a, float b) noexcept -> void { a = b; })},
 
 		{"operator and"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a && b; })},
 		{"operator or"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a || b; })},
 		{"operator xor"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a != b; })},
 		{"operator=="sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a == b; })},
+		{"operator="sv,		extern_function_descriptor(+[](bool & a, bool b) noexcept -> void { a = b; })},
 	};
 }
 
