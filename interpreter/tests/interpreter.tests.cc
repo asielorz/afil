@@ -727,9 +727,27 @@ TEST_CASE("integer assignment")
 	REQUIRE(parse_and_run(src) == 6);
 }
 
+TEST_CASE("while loop")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			int i = 1;
+			int sum = 0;
+			while (i < 10)
+			{
+				sum = sum + i;
+				i = i + 1;
+			}
+			return sum;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9);
+}
+
 /*****************************************************************
 Backlog
-- mutation (depends on pointers)
 - loops (depends on mutation)
 - struct
 - pointers

@@ -155,6 +155,13 @@ auto pretty_print_rec(Statement const & statement, Program const & program, int 
 			for (Statement const & statement : block_node.statements)
 				str += pretty_print_rec(statement, program, indentation_level + 1);
 			return str;
+		},
+		[&](WhileStatement const & while_node)
+		{
+			return join(indent(indentation_level), "while\n",
+				pretty_print_rec(while_node.condition, program, indentation_level + 1),
+				pretty_print_rec(*while_node.body, program, indentation_level + 1)
+			);
 		}
 	);
 	return std::visit(visitor, statement.as_variant());

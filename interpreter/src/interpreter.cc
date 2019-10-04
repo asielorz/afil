@@ -273,6 +273,26 @@ namespace interpreter
 				}
 
 				return control_flow::Nothing();
+			},
+			[&](stmt::WhileStatement const & while_node) -> control_flow::Variant
+			{
+				for (;;)
+				{
+					int const result_addr = eval_expression_tree(while_node.condition, stack, program);
+					bool const condition = read<bool>(stack, result_addr);
+					free_up_to(stack, result_addr);
+
+					if (condition)
+					{
+						auto const cf = run_statement(*while_node.body, stack, program, return_address);
+						if (has_type<control_flow::Return>(cf))
+							return cf;
+					}
+					else
+					{
+						return control_flow::Nothing();
+					}
+				}
 			}
 		);
 		return std::visit(visitor, tree.as_variant());

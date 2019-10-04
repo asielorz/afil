@@ -713,6 +713,7 @@ namespace parser
 
 		stmt::IfStatement node;
 		node.condition = parse_subexpression(tokens, index, program, scope_stack);
+		assert(expression_type_id(node.condition, program) == TypeId::bool_);
 
 		assert(tokens[index].type == TokenType::close_parenthesis);
 		index++;
@@ -757,6 +758,32 @@ namespace parser
 		return node;
 	}
 
+	auto parse_while_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::WhileStatement
+	{
+		// Skip while token.
+		index++;
+
+		// Condition goes inside parenthesis.
+		assert(tokens[index].type == TokenType::open_parenthesis);
+		index++;
+
+		stmt::WhileStatement node;
+
+		// Parse condition. Must return bool.
+		node.condition = parse_subexpression(tokens, index, program, scope_stack);
+		assert(expression_type_id(node.condition, program) == TypeId::bool_);
+
+		assert(tokens[index].type == TokenType::close_parenthesis);
+		index++;
+
+		// Parse body
+		auto body = parse_substatement(tokens, index, program, scope_stack);
+		assert(body.has_value()); // Do not allow no-ops as bodies of whiles.
+		node.body = std::make_unique<stmt::Statement>(std::move(*body));
+
+		return node;
+	}
+
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>
 	{
 		std::optional<stmt::Statement> result;
@@ -769,6 +796,8 @@ namespace parser
 			return parse_if_statement(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
 		else if (tokens[index].type == TokenType::open_brace)
 			return parse_statement_block(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
+		else if (tokens[index].source == "while")
+			return parse_while_statement(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
 		else if (lookup_type_name(program, tokens[index].source) != TypeId::none)
 			result = parse_variable_declaration_statement(tokens, index, program, scope_stack);
 		else

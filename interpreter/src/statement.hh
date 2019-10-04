@@ -36,11 +36,17 @@ namespace stmt
 		std::vector<stmt::Statement> statements;
 	};
 
+	struct WhileStatement
+	{
+		expr::ExpressionTree condition;
+		std::unique_ptr<Statement> body;
+	};
+
 	namespace detail
 	{
 		using StatementBase = std::variant<
 			VariableDeclarationStatement, ExpressionStatement, 
-			ReturnStatement, IfStatement, StatementBlock
+			ReturnStatement, IfStatement, StatementBlock, WhileStatement
 		>;
 	}
 
