@@ -61,6 +61,7 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 		{"operator-"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
 		{"operator*"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a * b; })},
 		{"operator/"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a / b; })},
+		{"operator%"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a % b; })},
 		{"operator=="sv,	extern_function_descriptor(+[](int a, int b) noexcept -> bool { return a == b; })},
 		{"operator<=>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
 		{"operator="sv,		extern_function_descriptor(+[](int & a, int b) noexcept -> int & { return a = b; })}, // TODO: Assignment should return void (support for void return in callc)

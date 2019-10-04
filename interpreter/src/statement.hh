@@ -42,11 +42,24 @@ namespace stmt
 		std::unique_ptr<Statement> body;
 	};
 
+	struct ForStatement
+	{
+		Scope scope;
+		std::unique_ptr<Statement> init_statement;
+		expr::ExpressionTree condition;
+		expr::ExpressionTree end_expression;
+		std::unique_ptr<Statement> body;
+	};
+
+	struct BreakStatement {};
+	struct ContinueStatement {};
+
 	namespace detail
 	{
 		using StatementBase = std::variant<
 			VariableDeclarationStatement, ExpressionStatement, 
-			ReturnStatement, IfStatement, StatementBlock, WhileStatement
+			IfStatement, StatementBlock, WhileStatement, ForStatement,
+			ReturnStatement, BreakStatement, ContinueStatement
 		>;
 	}
 

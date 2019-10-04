@@ -10,7 +10,7 @@ namespace expr
 
 	auto precedence(Operator op) noexcept -> int
 	{
-		constexpr int precedences[] = { 6, 6, 7, 7, 3, 3, 4, 4, 4, 4, 5, 2, 0, 1, -1 };
+		constexpr int precedences[] = { 6, 6, 7, 7, 7, 3, 3, 4, 4, 4, 4, 5, 2, 0, 1, -1 };
 		return precedences[static_cast<int>(op)];
 	}
 
@@ -22,6 +22,7 @@ namespace expr
 			case Operator::subtract:			return "operator-";
 			case Operator::multiply:			return "operator*";
 			case Operator::divide:				return "operator/";
+			case Operator::modulo:				return "operator%";
 			case Operator::equal:				return "operator==";
 			case Operator::not_equal:			return "operator==";
 			case Operator::less:				return "operator<=>";

@@ -264,11 +264,11 @@ namespace interpreter
 				StackGuard const stack_guard(stack);
 				stack.top_pointer += block_node.scope.stack_frame_size;
 
-				// Run the function.
+				// Run the statements.
 				for (auto const & statement : block_node.statements)
 				{
 					auto const cf = run_statement(statement, stack, program, return_address);
-					if (auto const ret = try_get<control_flow::Return>(cf))
+					if (has_type<control_flow::Return>(cf) || has_type<control_flow::Break>(cf) || has_type<control_flow::Continue>(cf))
 						return cf;
 				}
 
@@ -287,12 +287,56 @@ namespace interpreter
 						auto const cf = run_statement(*while_node.body, stack, program, return_address);
 						if (has_type<control_flow::Return>(cf))
 							return cf;
+						if (has_type<control_flow::Break>(cf))
+							return control_flow::Nothing();
 					}
 					else
 					{
 						return control_flow::Nothing();
 					}
 				}
+			},
+			[&](stmt::ForStatement const & for_node) -> control_flow::Variant
+			{
+				// Allocate stack frame for the scope.
+				StackGuard const stack_guard(stack);
+				stack.top_pointer += for_node.scope.stack_frame_size;
+
+				// Run init statement.
+				run_statement(*for_node.init_statement, stack, program, return_address);
+
+				for (;;)
+				{
+					// Check condition.
+					int const result_addr = eval_expression_tree(for_node.condition, stack, program);
+					bool const condition = read<bool>(stack, result_addr);
+					free_up_to(stack, result_addr);
+
+					if (condition)
+					{
+						// Run body.
+						auto const cf = run_statement(*for_node.body, stack, program, return_address);
+						if (has_type<control_flow::Return>(cf))
+							return cf;
+						if (has_type<control_flow::Break>(cf))
+							return control_flow::Nothing();
+
+						// Run end expression.
+						eval_expression_tree(for_node.end_expression, stack, program, stack.top_pointer);
+					}
+					else
+					{
+						return control_flow::Nothing();
+					}
+				}
+			},
+			[&](stmt::BreakStatement const &) -> control_flow::Variant
+			{
+				return control_flow::Break();
+			},
+			[&](stmt::ContinueStatement const &) -> control_flow::Variant
+			{
+				return control_flow::Continue();
 			}
 		);
 		return std::visit(visitor, tree.as_variant());

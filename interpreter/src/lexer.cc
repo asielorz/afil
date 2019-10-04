@@ -24,7 +24,7 @@ namespace lex
 	auto is_first_char_of_operator(char c) noexcept -> bool
 	{
 		return
-			(c == '+') || (c == '-') || (c == '*') || (c == '/') ||
+			(c == '+') || (c == '-') || (c == '*') || (c == '/') || (c == '%') ||
 			(c == '<') || (c == '>') || (c == '=') || (c == '!');
 	}
 
@@ -32,8 +32,7 @@ namespace lex
 	{
 		char const c = src[index];
 		return 
-			(c == '+') || (c == '-') || (c == '*') || (c == '/') || 
-			(c == '<') || (c == '>') || (c == '=')
+			is_first_char_of_operator(c)
 			|| starts_with(src, index, "=="sv)
 			|| starts_with(src, index, "!="sv)
 			|| starts_with(src, index, "and"sv)

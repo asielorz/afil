@@ -746,6 +746,63 @@ TEST_CASE("while loop")
 	REQUIRE(parse_and_run(src) == 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9);
 }
 
+TEST_CASE("for loop")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			int sum = 0;
+			for (int i = 1; i < 10; i = i + 1)
+				sum = sum + i;
+
+			return sum;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 1 + 2 + 3 + 4 + 5 + 6 + 7 + 8 + 9);
+}
+
+TEST_CASE("break")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			int sum = 0;
+			for (int i = 1; i < 10; i = i + 1)
+			{
+				sum = sum + i;
+				if (i == 6)
+					break;
+			}
+
+			return sum;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 1 + 2 + 3 + 4 + 5 + 6);
+}
+
+TEST_CASE("continue")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			int sum = 0;
+			for (int i = 1; i < 10; i = i + 1)
+			{
+				// Ignore multiples of 3.
+				if (i % 3 == 0)
+					continue;
+				sum = sum + i;
+			}
+
+			return sum;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 1 + 2 + 4 + 5 + 7 + 8);
+}
+
 /*****************************************************************
 Backlog
 - loops (depends on mutation)

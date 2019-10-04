@@ -162,6 +162,23 @@ auto pretty_print_rec(Statement const & statement, Program const & program, int 
 				pretty_print_rec(while_node.condition, program, indentation_level + 1),
 				pretty_print_rec(*while_node.body, program, indentation_level + 1)
 			);
+		},
+		[&](ForStatement const & for_node)
+		{
+			return join(indent(indentation_level), "for\n",
+				pretty_print_rec(*for_node.init_statement, program, indentation_level + 1),
+				pretty_print_rec(for_node.condition, program, indentation_level + 1),
+				pretty_print_rec(for_node.end_expression, program, indentation_level + 1),
+				pretty_print_rec(*for_node.body, program, indentation_level + 1)
+			);
+		},
+		[&](BreakStatement const &)
+		{
+			return join(indent(indentation_level), "break\n");
+		},
+		[&](ContinueStatement const &)
+		{
+			return join(indent(indentation_level), "continue\n");
 		}
 	);
 	return std::visit(visitor, statement.as_variant());

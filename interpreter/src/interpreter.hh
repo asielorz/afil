@@ -28,7 +28,9 @@ namespace interpreter
 	{
 		struct Nothing {};
 		struct Return {};
-		using Variant = std::variant<Nothing, Return>;
+		struct Break {};
+		struct Continue {};
+		using Variant = std::variant<Nothing, Return, Break, Continue>;
 	}
 
 	// Return value is allocated on top of the stack. Returns address of return value.

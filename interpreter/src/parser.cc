@@ -49,6 +49,7 @@ namespace parser
 			case '-': return Operator::subtract;
 			case '*': return Operator::multiply;
 			case '/': return Operator::divide;
+			case '%': return Operator::modulo;
 			case '<': return Operator::less;
 			case '>': return Operator::greater;
 			case '=': return Operator::assign;
@@ -741,16 +742,16 @@ namespace parser
 		index++;
 
 		stmt::StatementBlock node;
+		scope_stack.push_back({&node.scope, ScopeType::block});
 
 		// Parse all statements in the function.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			scope_stack.push_back({ &node.scope, ScopeType::block });
 			auto statement = parse_substatement(tokens, index, program, scope_stack);
-			scope_stack.pop_back();
 			if (statement)
 				node.statements.push_back(std::move(*statement));
 		}
+		scope_stack.pop_back();
 
 		// Skip closing brace.
 		index++;
@@ -784,6 +785,61 @@ namespace parser
 		return node;
 	}
 
+	auto parse_for_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> stmt::ForStatement
+	{
+		// Syntax of for loop
+		// for (declaration-or-expression; condition-expression; end-expression)
+		//	   statement 
+
+		// Skip while token.
+		index++;
+
+		// Condition goes inside parenthesis.
+		assert(tokens[index].type == TokenType::open_parenthesis);
+		index++;
+
+		stmt::ForStatement for_node;
+		scope_stack.push_back({&for_node.scope, ScopeType::block});
+
+		// Parse init statement. Must be an expression or a declaration.
+		auto init_statement = parse_substatement(tokens, index, program, scope_stack);
+		assert(init_statement.has_value() && (has_type<stmt::VariableDeclarationStatement>(*init_statement) || has_type<stmt::ExpressionStatement>(*init_statement)));
+		for_node.init_statement = std::make_unique<stmt::Statement>(std::move(*init_statement));
+
+		// Parse condition. Must return bool.
+		for_node.condition = parse_subexpression(tokens, index, program, scope_stack);
+		assert(expression_type_id(for_node.condition, program) == TypeId::bool_);
+
+		// Parse ; after condition.
+		assert(tokens[index].type == TokenType::semicolon);
+		index++;
+
+		// Parse end expression.
+		for_node.end_expression = parse_subexpression(tokens, index, program, scope_stack);
+
+		assert(tokens[index].type == TokenType::close_parenthesis);
+		index++;
+
+		// Parse body
+		auto body = parse_substatement(tokens, index, program, scope_stack);
+		assert(body.has_value()); // Do not allow no-ops as bodies of whiles.
+		for_node.body = std::make_unique<stmt::Statement>(std::move(*body));
+
+		scope_stack.pop_back();
+
+		return for_node;
+	}
+
+	template <typename Stmt>
+	auto parse_break_or_return_statement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) -> Stmt
+	{
+		// Should check if parsing a loop and otherwise give an error.
+
+		static_cast<void>(tokens, program, scope_stack);
+		index++;
+		return Stmt();
+	}
+
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>
 	{
 		std::optional<stmt::Statement> result;
@@ -792,12 +848,19 @@ namespace parser
 			result = parse_let_statement(tokens, index, program, scope_stack);
 		else if (tokens[index].source == "return")
 			result = parse_return_statement(tokens, index, program, scope_stack);
+		// With if, {}, while and for statements, return to avoid checking for final ';' because it is not needed.
 		else if (tokens[index].source == "if")
-			return parse_if_statement(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
+			return parse_if_statement(tokens, index, program, scope_stack);
 		else if (tokens[index].type == TokenType::open_brace)
-			return parse_statement_block(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
+			return parse_statement_block(tokens, index, program, scope_stack);
 		else if (tokens[index].source == "while")
-			return parse_while_statement(tokens, index, program, scope_stack); // Avoid checking for final ; because it is not needed.
+			return parse_while_statement(tokens, index, program, scope_stack);
+		else if (tokens[index].source == "for")
+			return parse_for_statement(tokens, index, program, scope_stack);
+		else if (tokens[index].source == "break")
+			result = parse_break_or_return_statement<stmt::BreakStatement>(tokens, index, program, scope_stack);
+		else if (tokens[index].source == "continue")
+			result = parse_break_or_return_statement<stmt::ContinueStatement>(tokens, index, program, scope_stack);
 		else if (lookup_type_name(program, tokens[index].source) != TypeId::none)
 			result = parse_variable_declaration_statement(tokens, index, program, scope_stack);
 		else
