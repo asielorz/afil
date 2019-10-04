@@ -655,6 +655,7 @@ namespace parser
 			// If the expression returns a function, bind it to its name and return a noop.
 			expr::ExpressionTree expression = parse_subexpression(tokens, index, program, scope_stack);
 			TypeId const expr_type = expression_type_id(expression, program);
+			
 			if (expr_type == TypeId::function)
 			{
 				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
@@ -663,6 +664,7 @@ namespace parser
 			}
 			else
 			{
+				assert(is_data_type(expr_type));
 				TypeId const var_type = decay(expr_type);
 				stmt::VariableDeclarationStatement node;
 				node.variable_offset = add_variable_to_scope(top(scope_stack), id_token.source, var_type, local_variable_offset(scope_stack), program);

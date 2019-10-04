@@ -1,12 +1,18 @@
 #include "scope.hh"
 #include <algorithm>
 
-TypeId const TypeId::int_ = {false, false, false, 0};
-TypeId const TypeId::float_ = {false, false, false, 1};
-TypeId const TypeId::bool_ = {false, false, false, 2};
+TypeId const TypeId::void_ = {false, false, false, 0};
+TypeId const TypeId::int_ = {false, false, false, 1};
+TypeId const TypeId::float_ = {false, false, false, 2};
+TypeId const TypeId::bool_ = {false, false, false, 3};
 
 TypeId const TypeId::none = {true, false, false, 0};
 TypeId const TypeId::function = {true, false, false, 1};
+
+auto is_data_type(TypeId id) noexcept -> bool
+{
+	return !id.is_language_reseved && id.index != TypeId::void_.index;
+}
 
 auto is_convertible(TypeId from, TypeId to) noexcept -> bool
 {

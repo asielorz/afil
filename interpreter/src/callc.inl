@@ -23,7 +23,11 @@ namespace callc
 	template <typename T>
 	constexpr auto type_descriptor_for(mpl::BoxedType<T &>) noexcept -> TypeDescriptor
 	{
-		return { sizeof(T *), false };
+		return {sizeof(T *), false};
+	}
+	constexpr auto type_descriptor_for(mpl::BoxedType<void>) noexcept -> TypeDescriptor
+	{
+		return {0, false};
 	}
 
 	template <typename R, typename ... Args>

@@ -22,6 +22,7 @@ struct TypeId
 
 	static constexpr auto with_index(unsigned index) noexcept -> TypeId { return TypeId{false, false, false, index}; }
 
+	static TypeId const void_; // TODO: Maybe void can be confusing so think of another name?
 	static TypeId const int_;
 	static TypeId const float_;
 	static TypeId const bool_;
@@ -33,6 +34,7 @@ struct TypeId
 constexpr auto operator == (TypeId a, TypeId b) noexcept -> bool { return a.flat_value == b.flat_value; };
 constexpr auto operator != (TypeId a, TypeId b) noexcept -> bool { return !(a == b); };
 
+auto is_data_type(TypeId id) noexcept -> bool;
 auto is_convertible(TypeId from, TypeId to) noexcept -> bool;
 auto make_reference(TypeId type) noexcept -> TypeId;
 auto make_mutable(TypeId type) noexcept -> TypeId;

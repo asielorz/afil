@@ -10,6 +10,7 @@ using namespace std::literals;
 auto built_in_types() noexcept -> std::vector<Type>
 {
 	return {
+		{"void", 0, 1},
 		{"int", 4, 4},
 		{"float", 4, 4},
 		{"bool", 1, 1},
@@ -17,9 +18,10 @@ auto built_in_types() noexcept -> std::vector<Type>
 }
 
 template <typename T> struct index_for_type {};
-template <> struct index_for_type<int> { static constexpr unsigned value = 0; };
-template <> struct index_for_type<float> { static constexpr unsigned value = 1; };
-template <> struct index_for_type<bool> { static constexpr unsigned value = 2; };
+template <> struct index_for_type<void> { static constexpr unsigned value = 0; };
+template <> struct index_for_type<int> { static constexpr unsigned value = 1; };
+template <> struct index_for_type<float> { static constexpr unsigned value = 2; };
+template <> struct index_for_type<bool> { static constexpr unsigned value = 3; };
 template <typename T> constexpr unsigned index_for_type_v = index_for_type<T>::value;
 
 using mpl::BoxedType;
@@ -64,7 +66,7 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 		{"operator%"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a % b; })},
 		{"operator=="sv,	extern_function_descriptor(+[](int a, int b) noexcept -> bool { return a == b; })},
 		{"operator<=>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
-		{"operator="sv,		extern_function_descriptor(+[](int & a, int b) noexcept -> int & { return a = b; })}, // TODO: Assignment should return void (support for void return in callc)
+		{"operator="sv,		extern_function_descriptor(+[](int & a, int b) noexcept -> void { a = b; })},
 
 		{"operator+"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a + b; })},
 		{"operator-"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
@@ -145,11 +147,6 @@ auto type_size(Program const & program, TypeId id) noexcept -> int
 		return sizeof(void *);
 	else
 		return type_with_id(program, id).size;
-}
-
-auto is_data_type(TypeId id) noexcept -> bool
-{
-	return !id.is_language_reseved;
 }
 
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>

@@ -62,6 +62,8 @@ namespace callc
 		}
 	} // namespace callers
 
+	struct EmptyType {};
+
 #define C_FUNCTION_CALLER_IMPL_BODY(type, next_template_to_call)											\
 	if (type.is_float)																						\
 	{																										\
@@ -84,6 +86,28 @@ namespace callc
 		}																									\
 	}																										\
 
+#define C_FUNCTION_CALLER_IMPL_BODY_RET(type, next_template_to_call)										\
+	if (type.is_float)																						\
+	{																										\
+		switch (type.size)																					\
+		{																									\
+			case 4: return next_template_to_call<Ts..., float>(param_types);								\
+			case 8: return next_template_to_call<Ts..., double>(param_types);								\
+			default: declare_unreachable();																	\
+		}																									\
+	}																										\
+	else																									\
+	{																										\
+		switch (type.size)																					\
+		{																									\
+			case 0: return next_template_to_call<Ts..., EmptyType>(param_types);							\
+			case 1: return next_template_to_call<Ts..., uint8_t>(param_types);								\
+			case 2: return next_template_to_call<Ts..., uint16_t>(param_types);								\
+			case 4: return next_template_to_call<Ts..., uint32_t>(param_types);								\
+			case 8: return next_template_to_call<Ts..., uint64_t>(param_types);								\
+			default: declare_unreachable();																	\
+		}																									\
+	}																										\
 
 	//***************************************************************************************************************************************************
 	// 0 args
@@ -97,7 +121,7 @@ namespace callc
 	template <typename ... Ts>
 	auto c_function_caller_impl_0_args_0(span<TypeDescriptor const> param_types, TypeDescriptor return_value_type) noexcept -> CFunctionCaller
 	{
-		C_FUNCTION_CALLER_IMPL_BODY(return_value_type, c_function_caller_impl_0_args_1);
+		C_FUNCTION_CALLER_IMPL_BODY_RET(return_value_type, c_function_caller_impl_0_args_1);
 	}
 
 	//***************************************************************************************************************************************************
@@ -119,7 +143,7 @@ namespace callc
 	template <typename ... Ts>
 	auto c_function_caller_impl_1_args_0(span<TypeDescriptor const> param_types, TypeDescriptor return_value_type) noexcept -> CFunctionCaller
 	{
-		C_FUNCTION_CALLER_IMPL_BODY(return_value_type, c_function_caller_impl_1_args_1);
+		C_FUNCTION_CALLER_IMPL_BODY_RET(return_value_type, c_function_caller_impl_1_args_1);
 	}
 
 	//***************************************************************************************************************************************************
@@ -141,7 +165,7 @@ namespace callc
 	template <typename ... Ts>
 	auto c_function_caller_impl_2_args_0(span<TypeDescriptor const> param_types, TypeDescriptor return_value_type) noexcept -> CFunctionCaller
 	{
-		C_FUNCTION_CALLER_IMPL_BODY(return_value_type, c_function_caller_impl_2_args_1);
+		C_FUNCTION_CALLER_IMPL_BODY_RET(return_value_type, c_function_caller_impl_2_args_1);
 	}
 
 	//***************************************************************************************************************************************************
@@ -163,7 +187,7 @@ namespace callc
 	template <typename ... Ts>
 	auto c_function_caller_impl_3_args_0(span<TypeDescriptor const> param_types, TypeDescriptor return_value_type) noexcept -> CFunctionCaller
 	{
-		C_FUNCTION_CALLER_IMPL_BODY(return_value_type, c_function_caller_impl_3_args_1);
+		C_FUNCTION_CALLER_IMPL_BODY_RET(return_value_type, c_function_caller_impl_3_args_1);
 	}
 
 	//***************************************************************************************************************************************************
@@ -185,7 +209,7 @@ namespace callc
 	template <typename ... Ts>
 	auto c_function_caller_impl_4_args_0(span<TypeDescriptor const> param_types, TypeDescriptor return_value_type) noexcept -> CFunctionCaller
 	{
-		C_FUNCTION_CALLER_IMPL_BODY(return_value_type, c_function_caller_impl_4_args_1);
+		C_FUNCTION_CALLER_IMPL_BODY_RET(return_value_type, c_function_caller_impl_4_args_1);
 	}
 
 	//***************************************************************************************************************************************************
