@@ -135,9 +135,22 @@ namespace interpreter
 				eval_expression_tree(parameters[i], stack, program, next_parameter_address);
 				next_parameter_address += expression_type_size(parameters[i], program);
 			}
-
-			func.caller(func.function_pointer, stack.memory.data() + parameters_start, stack.memory.data() + return_address);
+			
+			func.caller(func.function_pointer, pointer_at_address(stack, parameters_start), pointer_at_address(stack, return_address));
 			free_up_to(stack, prev_stack_top);
+		}
+	}
+
+	auto eval_variable_node(TypeId variable_type, int address, ProgramStack & stack, int return_address) noexcept -> void
+	{
+		if (variable_type.is_reference)
+		{
+			auto const pointer = read<void const *>(stack, address);
+			write(stack, return_address, pointer);
+		}
+		else
+		{
+			write(stack, return_address, pointer_at_address(stack, address));
 		}
 	}
 
@@ -150,12 +163,12 @@ namespace interpreter
 			[&](expr::LocalVariableNode const & var_node)
 			{
 				int const address = stack.base_pointer + var_node.variable_offset;
-				write(stack, return_address, pointer_at_address(stack, address));
+				eval_variable_node(var_node.variable_type, address, stack, return_address);
 			},
 			[&](expr::GlobalVariableNode const & var_node)
 			{
 				int const address = var_node.variable_offset;
-				write(stack, return_address, pointer_at_address(stack, address));
+				eval_variable_node(var_node.variable_type, address, stack, return_address);
 			},
 			[&](expr::DereferenceNode const & deref_node)
 			{

@@ -4,6 +4,7 @@
 #include "program.hh"
 #include "pretty_print.hh"
 #include <catch2/catch.hpp>
+#include <iostream>
 
 using namespace std::literals;
 
@@ -57,6 +58,12 @@ auto pretty_print_expr(std::string_view source, Program & program)
 	ScopeStack scope_stack;
 	scope_stack.push_back({ &program.global_scope, ScopeType::global });
 	printf("%s", pretty_print(parser::parse_expression(lex::tokenize(source), program, scope_stack), program).c_str());
+}
+
+auto parse_and_print(std::string_view src) noexcept -> void
+{
+	Program const program = parser::parse_source(src);
+	printf("%s\n", pretty_print(program).c_str());
 }
 
 TEST_CASE("basic arithmetic expressions")
@@ -654,13 +661,6 @@ TEST_CASE("A more imperative fibonacci")
 	REQUIRE(eval_expression<int>("fib(10)", stack, program) == 55);
 }
 
-auto parse_and_print(std::string_view src) noexcept -> void
-{
-	Program const program = parser::parse_source(src);
-	for (Function const & fn : program.functions)
-		printf("%s\n", pretty_print(fn, program).c_str());
-}
-
 TEST_CASE("Accessing a variable from outside the block")
 {
 	auto const src = R"(
@@ -819,8 +819,41 @@ TEST_CASE("function that takes a reference")
 		};
 	)"sv;
 
+	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 6);
 }
+
+TEST_CASE("Reference types in the stack")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			int mut i = 5;
+			int mut & ri = i;
+			ri = 6;		// Mutate through the reference
+			return i;	// Return the original value
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 6);
+}
+
+//TEST_CASE("Returning references")
+//{
+//	auto const src = R"(
+//		let id = fn (int mut & i) -> int mut & { return i; };
+//	
+//		let main = fn () -> int
+//		{
+//			int mut i = 0;
+//			int mut & ri = id(i);
+//			ri = -7;
+//			return i;
+//		};
+//	)"sv;
+//
+//	REQUIRE(parse_and_run(src) == -7);
+//}
 
 /*****************************************************************
 Backlog
@@ -832,4 +865,5 @@ Backlog
 - importing other files
 - importing functions in C
 - contracts
+- errors
 *****************************************************************/

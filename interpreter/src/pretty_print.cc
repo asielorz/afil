@@ -206,3 +206,11 @@ auto pretty_print(Function const & function, Program const & program) noexcept -
 
 	return str;
 }
+
+auto pretty_print(Program const & program) noexcept -> std::string
+{
+	std::string str;
+	for (Function const & fn : program.functions)
+		str += pretty_print(fn, program);
+	return str;
+}

@@ -246,6 +246,7 @@ namespace parser
 		while (tokens[index].type == TokenType::identifier)
 		{
 			TypeId const arg_type = parse_type_name(tokens, index, program);
+			assert(is_data_type(arg_type)); // An argument cannot be void
 
 			add_variable_to_scope(function, tokens[index].source, arg_type, 0, program);
 			function.parameter_count++;
@@ -268,9 +269,7 @@ namespace parser
 		index++;
 
 		// Return type. By now only int supported.
-		function.return_type = lookup_type_name(program, tokens[index].source);
-		assert(function.return_type != TypeId::none);
-		index++;
+		function.return_type = parse_type_name(tokens, index, program);
 	}
 
 	auto parse_function_body(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack, Function & function) noexcept -> void
@@ -482,7 +481,7 @@ namespace parser
 				[&](lookup_result::Variable result) -> ExpressionTree
 				{
 					expr::LocalVariableNode var_node;
-					var_node.variable_type = make_reference(result.variable_type);
+					var_node.variable_type = result.variable_type;
 					var_node.variable_offset = result.variable_offset;
 					index++;
 					return var_node;
@@ -490,7 +489,7 @@ namespace parser
 				[&](lookup_result::GlobalVariable result) -> ExpressionTree
 				{
 					expr::GlobalVariableNode var_node;
-					var_node.variable_type = make_reference(result.variable_type);
+					var_node.variable_type = result.variable_type;
 					var_node.variable_offset = result.variable_offset;
 					index++;
 					return var_node;
