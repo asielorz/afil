@@ -110,16 +110,14 @@ namespace interpreter
 			{
 				auto const cf = run_statement(statement, stack, program, return_address);
 				if (auto const ret = try_get<control_flow::Return>(cf))
-				{
-					// Read the previous ebp from the stack.
-					int const prev_ebp_address = stack.base_pointer - sizeof(int);
-					int const prev_ebp = read_word(stack, prev_ebp_address);
-					stack.top_pointer = prev_ebp_address + type_size(program, func.return_type);
-					stack.base_pointer = prev_ebp;
-
 					break;
-				}
 			}
+
+			// Read the previous ebp from the stack.
+			int const prev_ebp_address = stack.base_pointer - sizeof(int);
+			int const prev_ebp = read_word(stack, prev_ebp_address);
+			stack.top_pointer = prev_ebp_address + type_size(program, func.return_type);
+			stack.base_pointer = prev_ebp;
 		}
 		else
 		{
