@@ -803,9 +803,27 @@ TEST_CASE("continue")
 	REQUIRE(parse_and_run(src) == 1 + 2 + 4 + 5 + 7 + 8);
 }
 
+TEST_CASE("function that takes a reference")
+{
+	auto const src = R"(
+		let assign = fn (int mut & a, int b) -> void
+		{
+			a = b;
+		};	
+
+		let main = fn () -> int
+		{
+			int mut i = 5;
+			assign(i, 6);
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 6);
+}
+
 /*****************************************************************
 Backlog
-- returning void
 - struct
 - pointers
 - templates

@@ -196,13 +196,15 @@ namespace parser
 	auto add_variable_to_scope(Scope & scope, std::string_view name, TypeId type_id, int scope_offset, Program const & program) -> int
 	{
 		Type const & type = type_with_id(program, type_id);
+		int const size = type_id.is_reference ? sizeof(void *) : type.size;
+		int const alignment = type_id.is_reference ? alignof(void *) : type.alignment;
 
 		Variable var;
 		var.name = name;
 		var.type = type_id;
-		var.offset = scope_offset + align(scope.stack_frame_size, type.alignment);
-		scope.stack_frame_size = var.offset + type.size;
-		scope.stack_frame_alignment = std::max(scope.stack_frame_alignment, type.alignment);
+		var.offset = scope_offset + align(scope.stack_frame_size, alignment);
+		scope.stack_frame_size = var.offset + size;
+		scope.stack_frame_alignment = std::max(scope.stack_frame_alignment, alignment);
 		scope.variables.push_back(var);
 		return var.offset;
 	}
@@ -210,6 +212,29 @@ namespace parser
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> ExpressionTree;
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, Program & program, ScopeStack & scope_stack) noexcept -> std::optional<stmt::Statement>;
 
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> TypeId
+	{
+		// Lookup type name.
+		TypeId type_found = lookup_type_name(program, tokens[index].source);
+		index++;
+		assert(type_found != TypeId::none);
+
+		// Look for mutable qualifier.
+		if (tokens[index].source == "mut")
+		{
+			type_found.is_mutable = true;
+			index++;
+		}
+
+		// Look for reference qualifier.
+		if (tokens[index].source == "&")
+		{
+			type_found.is_reference = true;
+			index++;
+		}
+
+		return type_found;
+	}
 
 	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, Program & program, Function & function) noexcept -> void
 	{
@@ -220,11 +245,9 @@ namespace parser
 		// Parse arguments.
 		while (tokens[index].type == TokenType::identifier)
 		{
-			TypeId const type_found = lookup_type_name(program, tokens[index].source);
-			assert(type_found != TypeId::none);
-			index++;
+			TypeId const arg_type = parse_type_name(tokens, index, program);
 
-			add_variable_to_scope(function, tokens[index].source, type_found, 0, program);
+			add_variable_to_scope(function, tokens[index].source, arg_type, 0, program);
 			function.parameter_count++;
 			function.parameter_size = function.stack_frame_size;
 			index++;
@@ -537,16 +560,7 @@ namespace parser
 		stmt::VariableDeclarationStatement node;
 
 		// A statement begins with the type of the declared variable.
-		TypeId type_found = lookup_type_name(program, tokens[index].source);
-		index++;
-		assert(type_found != TypeId::none);
-
-		// Look for mutable qualifier.
-		if (tokens[index].source == "mut")
-		{
-			type_found.is_mutable = true;
-			index++;
-		}
+		TypeId const type_found = parse_type_name(tokens, index, program);
 
 		// The second token of the statement is the variable name.
 		assert(tokens[index].type == TokenType::identifier);
