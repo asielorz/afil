@@ -17,7 +17,8 @@ auto eval_expression(std::string_view src, interpreter::ProgramStack & stack, Pr
 	ScopeStack scope_stack;
 	scope_stack.push_back({ &program.global_scope, ScopeType::global });
 
-	auto const expr_tree = parser::parse_expression(lex::tokenize(src), program, scope_stack);
+	TypeId global_return_type = TypeId::none;
+	auto const expr_tree = parser::parse_expression(lex::tokenize(src), {program, scope_stack, global_return_type});
 	int const return_address = interpreter::eval_expression_tree(expr_tree, stack, program);
 
 	TypeId const expr_type = expression_type_id(expr_tree, program);
@@ -50,14 +51,16 @@ auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Scop
 	ScopeStack scope_stack;
 	scope_stack.push_back({ &program.global_scope, ScopeType::global });
 	scope_stack.push_back({ &scope, ScopeType::function });
-	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), program, scope_stack), stack, program, 0);
+	TypeId type = TypeId::none;
+	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), {program, scope_stack, type}), stack, program, 0);
 }
 
 auto pretty_print_expr(std::string_view source, Program & program)
 {
 	ScopeStack scope_stack;
 	scope_stack.push_back({ &program.global_scope, ScopeType::global });
-	printf("%s", pretty_print(parser::parse_expression(lex::tokenize(source), program, scope_stack), program).c_str());
+	TypeId type = TypeId::none;
+	printf("%s", pretty_print(parser::parse_expression(lex::tokenize(source), {program, scope_stack, type}), program).c_str());
 }
 
 auto parse_and_print(std::string_view src) noexcept -> void
@@ -124,26 +127,26 @@ TEST_CASE("A variable can be accessed from expressions after it is declared")
 	REQUIRE(eval_expression<int>("i * i - 4 + i / 6 - 3 * i", stack, program) == i * i - 4 + i / 6 - 3 * i);
 }
 
-TEST_CASE("Identity function expression")
+auto parse_expression(std::string_view src, Program & program) noexcept -> void
 {
-	Program program;
 	ScopeStack scope_stack;
-	scope_stack.push_back({&program.global_scope, ScopeType::global});
-	parser::parse_expression(lex::tokenize("fn (int x) -> int { return x; }"), program, scope_stack);
+	scope_stack.push_back({ &program.global_scope, ScopeType::global });
+	TypeId global_return_type = TypeId::none;
+	parser::parse_expression(lex::tokenize(src), {program, scope_stack, global_return_type});
 }
 
 auto parse_statement(std::string_view source, Program & program) noexcept -> void
 {
 	ScopeStack scope_stack;
-	scope_stack.push_back({&program.global_scope, ScopeType::global});
-	parser::parse_statement(lex::tokenize(source), program, scope_stack);
+	scope_stack.push_back({ &program.global_scope, ScopeType::global });
+	TypeId global_return_type = TypeId::none;
+	parser::parse_statement(lex::tokenize(source), { program, scope_stack, global_return_type });
 }
 
-auto parse_expression(std::string_view source, Program & program) noexcept -> void
+TEST_CASE("Identity function expression")
 {
-	ScopeStack scope_stack;
-	scope_stack.push_back({ &program.global_scope, ScopeType::global });
-	parser::parse_expression(lex::tokenize(source), program, scope_stack);
+	Program program;
+	parse_expression("fn (int x) -> int { return x; }", program);
 }
 
 TEST_CASE("Use let to name a function")
@@ -838,25 +841,26 @@ TEST_CASE("Reference types in the stack")
 	REQUIRE(parse_and_run(src) == 6);
 }
 
-//TEST_CASE("Returning references")
-//{
-//	auto const src = R"(
-//		let id = fn (int mut & i) -> int mut & { return i; };
-//	
-//		let main = fn () -> int
-//		{
-//			int mut i = 0;
-//			int mut & ri = id(i);
-//			ri = -7;
-//			return i;
-//		};
-//	)"sv;
-//
-//	REQUIRE(parse_and_run(src) == -7);
-//}
+TEST_CASE("Returning references")
+{
+	auto const src = R"(
+		let id = fn (int mut & i) -> int mut & { return i; };
+	
+		let main = fn () -> int
+		{
+			int mut i = 0;
+			int mut & ri = id(i);
+			ri = 0 - 7;
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -7);
+}
 
 /*****************************************************************
 Backlog
+- unary operators
 - struct
 - pointers
 - templates

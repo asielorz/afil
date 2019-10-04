@@ -8,6 +8,7 @@ TypeId const TypeId::bool_ = {false, false, false, 3};
 
 TypeId const TypeId::none = {true, false, false, 0};
 TypeId const TypeId::function = {true, false, false, 1};
+TypeId const TypeId::deduce = {true, false, false, 2};
 
 auto is_data_type(TypeId id) noexcept -> bool
 {

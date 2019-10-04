@@ -29,6 +29,7 @@ struct TypeId
 
 	static TypeId const none;
 	static TypeId const function;
+	static TypeId const deduce;
 };
 
 constexpr auto operator == (TypeId a, TypeId b) noexcept -> bool { return a.flat_value == b.flat_value; };
