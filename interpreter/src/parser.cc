@@ -387,30 +387,19 @@ namespace parser
 		return if_node;
 	}
 
-	struct DeducedReturnType
-	{
-		TypeId return_type;
-		bool all_branches_return;
-	};
-	auto deduce_return_type(stmt::Statement const & statement, Program const & program) noexcept -> DeducedReturnType
+	auto all_branches_return(stmt::Statement const & statement, Program const & program) noexcept -> bool
 	{
 		auto const visitor = overload(
-			[](auto const &) { return DeducedReturnType{TypeId::none, false}; }, // Default case, does not return
-			[&](stmt::ReturnStatement const & ret_node) { return DeducedReturnType{expression_type_id(ret_node.returned_expression, program), true}; },
+			[](auto const &) { return false; }, // Default case, does not return
+			[](stmt::ReturnStatement const &) { return true; },
 			[&](stmt::IfStatement const & if_node)
 			{
-				if (!if_node.else_case)
-				{
-					auto const left = deduce_return_type(*if_node.then_case, program);
-					return DeducedReturnType{left.return_type, false};
-				}
-
-				auto const left = deduce_return_type(*if_node.then_case, program);
-				auto const right = deduce_return_type(*if_node.else_case, program);
-				return DeducedReturnType{
-					common_type(left.return_type, right.return_type),
-					left.all_branches_return && right.all_branches_return
-				};
+				return all_branches_return(*if_node.then_case, program)
+					&& all_branches_return(*if_node.else_case, program);
+			},
+			[&](stmt::StatementBlock const & block_node)
+			{
+				return all_branches_return(block_node.statements.back(), program);
 			}
 		);
 		return std::visit(visitor, statement.as_variant());
@@ -435,8 +424,7 @@ namespace parser
 		}
 
 		// Ensure that all branches return.
-		auto const deduced_return_type = deduce_return_type(node.statements.back(), p.program);
-		assert(deduced_return_type.all_branches_return);
+		assert(all_branches_return(node.statements.back(), p.program));
 
 		// Skip closing brace.
 		index++;
