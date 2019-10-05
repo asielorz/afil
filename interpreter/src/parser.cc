@@ -428,7 +428,7 @@ namespace parser
 		while (tokens[index].type != TokenType::close_brace)
 		{
 			p.scope_stack.push_back({&node.scope, ScopeType::block});
-			auto statement = parse_substatement(tokens, index, {p.program, p.scope_stack, p.current_return_type});
+			auto statement = parse_substatement(tokens, index, {p.program, p.scope_stack, node.return_type});
 			p.scope_stack.pop_back();
 			if (statement)
 				node.statements.push_back(std::move(*statement));
@@ -699,6 +699,8 @@ namespace parser
 
 	auto parse_return_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::ReturnStatement
 	{
+		assert(p.current_return_type != TypeId::none);
+
 		// Skip return token.
 		index++;
 

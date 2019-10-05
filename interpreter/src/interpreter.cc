@@ -86,12 +86,11 @@ namespace interpreter
 
 			int const parameter_size = func.parameter_size;
 
-			// Write ebp to the stack so that we can return to our stack frame when the function ends.
-			int const ebp_address = alloc(stack, sizeof(int));
-			write_word(stack, ebp_address, stack.base_pointer);
+			// Save previous stack frame bounds.
+			int const prev_ebp = stack.base_pointer;
+			int const prev_esp = stack.top_pointer;
 
-			// Push stack pointer to the end of parameters. This is to avoid that the expressions that compute
-			// the parameters of the function overwrite the memory reserved for the parameters.
+			// Allocate memory for the parameters.
 			int const parameters_start = alloc(stack, parameter_size, func.stack_frame_alignment);
 
 			// Evaluate the expressions that yield the parameters of the function.
@@ -113,10 +112,8 @@ namespace interpreter
 					break;
 			}
 
-			// Read the previous ebp from the stack.
-			int const prev_ebp_address = stack.base_pointer - sizeof(int);
-			int const prev_ebp = read_word(stack, prev_ebp_address);
-			stack.top_pointer = prev_ebp_address + type_size(program, func.return_type);
+			// Restore previous stack frame.
+			stack.top_pointer = prev_esp;
 			stack.base_pointer = prev_ebp;
 		}
 		else

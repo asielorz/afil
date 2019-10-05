@@ -822,7 +822,6 @@ TEST_CASE("function that takes a reference")
 		};
 	)"sv;
 
-	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 6);
 }
 
