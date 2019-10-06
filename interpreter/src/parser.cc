@@ -58,6 +58,12 @@ namespace parser
 	}
 	auto top(ScopeStack & stack) noexcept -> Scope & { return *stack.back().scope; }
 
+	auto is_unary_operator(lex::Token const & token) noexcept -> bool
+	{
+		return token.type == TokenType::operator_ &&
+			token.source == "-";
+	}
+
 	auto insert_conversion_node(ExpressionTree tree, TypeId from, TypeId to) noexcept -> ExpressionTree
 	{
 		if (from.index == to.index)
@@ -210,6 +216,7 @@ namespace parser
 	}
 
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
+	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::optional<stmt::Statement>;
 
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> TypeId
@@ -436,6 +443,36 @@ namespace parser
 		return node;
 	}
 
+	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::FunctionCallNode
+	{
+		std::string_view function_name = operator_function_name(parse_operator(tokens[index].source));
+		index++;
+
+		auto operand = parse_single_expression(tokens, index, p);
+
+		auto const visitor = overload(
+			[](lookup_result::Nothing) -> expr::FunctionCallNode { declare_unreachable(); },
+			[](lookup_result::Variable) -> expr::FunctionCallNode { declare_unreachable(); },
+			[](lookup_result::GlobalVariable) -> expr::FunctionCallNode { declare_unreachable(); },
+			[&](lookup_result::OverloadSet const & overload_set) -> expr::FunctionCallNode
+			{
+				TypeId const operand_type = expression_type_id(operand, p.program);
+				auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set.function_ids, {&operand, 1}, {&operand_type, 1}, p.program);
+				if (function_id != invalid_function_id)
+				{
+					expr::FunctionCallNode func_node;
+					func_node.function_id = function_id;
+					func_node.parameters.push_back(std::move(operand));
+					return func_node;
+				}
+				else declare_unreachable();
+			}
+		);
+
+		auto const lookup = lookup_name(p.scope_stack, function_name);
+		return std::visit(visitor, lookup);
+	}
+
 	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree
 	{
 		if (tokens[index].source == "fn")
@@ -509,6 +546,10 @@ namespace parser
 			index++;
 
 			return expr;
+		}
+		else if (is_unary_operator(tokens[index]))
+		{
+			return parse_unary_operator(tokens, index, p);
 		}
 		else declare_unreachable(); // TODO: Actual error handling.
 	}

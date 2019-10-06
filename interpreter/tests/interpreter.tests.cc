@@ -871,9 +871,20 @@ TEST_CASE("Deducing return type of functions")
 	REQUIRE(parse_and_run(src) == 5);
 }
 
+TEST_CASE("Negative numbers")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			return -5;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -5);
+}
+
 /*****************************************************************
 Backlog
-- unary operators
 - struct
 - pointers
 - templates
