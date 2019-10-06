@@ -264,12 +264,16 @@ namespace parser
 		assert(tokens[index].type == TokenType::close_parenthesis);
 		index++;
 
-		// Return type is introduced with an arrow.
-		assert(tokens[index].type == TokenType::arrow);
-		index++;
+		// Return type is introduced with an arrow (optional).
+		if (tokens[index].type == TokenType::arrow)
+		{
+			index++;
 
-		// Return type. By now only int supported.
-		function.return_type = parse_type_name(tokens, index, program);
+			// Return type. By now only int supported.
+			function.return_type = parse_type_name(tokens, index, program);
+		}
+		else
+			function.return_type = TypeId::deduce;
 	}
 
 	auto parse_function_body(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void

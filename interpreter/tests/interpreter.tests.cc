@@ -857,6 +857,20 @@ TEST_CASE("Returning references")
 	REQUIRE(parse_and_run(src) == -7);
 }
 
+TEST_CASE("Deducing return type of functions")
+{
+	auto const src = R"(
+		let id = fn (int i) { return i; };
+	
+		let main = fn () -> int
+		{
+			return id(5);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - unary operators
