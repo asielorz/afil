@@ -44,7 +44,7 @@ struct Program
 	FunctionId main_function = invalid_function_id;
 };
 
-// Returns id of function found or -1 on failure.
+// Returns id of function found or invalid_function_id on failure.
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
 
 auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId;
