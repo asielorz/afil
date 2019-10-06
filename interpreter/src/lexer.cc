@@ -38,6 +38,7 @@ namespace lex
 			|| starts_with(src, index, "and"sv)
 			|| starts_with(src, index, "or"sv)
 			|| starts_with(src, index, "xor"sv)
+			|| starts_with(src, index, "not"sv)
 			;
 	}
 
@@ -163,7 +164,7 @@ namespace lex
 
 	auto token_length_operator(std::string_view src, int index) noexcept -> int
 	{
-		constexpr std::string_view three_char_ops[] = { "<=>", "and", "xor" };
+		constexpr std::string_view three_char_ops[] = { "<=>", "and", "xor", "not" };
 		for (auto const s : three_char_ops)
 			if (starts_with(src, index, s))
 				return 3;

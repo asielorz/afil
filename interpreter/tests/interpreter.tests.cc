@@ -883,6 +883,21 @@ TEST_CASE("Negative numbers")
 	REQUIRE(parse_and_run(src) == -5);
 }
 
+TEST_CASE("Negation operator")
+{
+	auto const src = R"(
+		let main = fn () -> int
+		{
+			if (not (3 < 4))
+				return 5;
+			else
+				return -5;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -5);
+}
+
 /*****************************************************************
 Backlog
 - struct

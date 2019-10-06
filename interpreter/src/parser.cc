@@ -42,6 +42,7 @@ namespace parser
 		if (token_source == "and"sv) return Operator::and_;
 		if (token_source == "or"sv) return Operator::or_;
 		if (token_source == "xor"sv) return Operator::xor_;
+		if (token_source == "not"sv) return Operator::not;
 
 		switch (token_source[0])
 		{
@@ -61,7 +62,8 @@ namespace parser
 	auto is_unary_operator(lex::Token const & token) noexcept -> bool
 	{
 		return token.type == TokenType::operator_ &&
-			token.source == "-";
+			token.source == "-"sv || 
+			token.source == "not"sv;
 	}
 
 	auto insert_conversion_node(ExpressionTree tree, TypeId from, TypeId to) noexcept -> ExpressionTree

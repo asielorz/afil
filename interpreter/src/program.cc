@@ -81,6 +81,7 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 		{"operator and"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a && b; })},
 		{"operator or"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a || b; })},
 		{"operator xor"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a != b; })},
+		{"operator not"sv,	extern_function_descriptor(+[](bool a) noexcept -> bool { return !a; })},
 		{"operator=="sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a == b; })},
 		{"operator="sv,		extern_function_descriptor(+[](bool & a, bool b) noexcept -> void { a = b; })},
 	};
