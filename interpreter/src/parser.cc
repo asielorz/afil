@@ -160,9 +160,7 @@ namespace parser
 			Operator const op = node.op;
 
 			auto const visitor = overload(
-				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); },
-				[](lookup_result::Variable) -> ExpressionTree { declare_unreachable(); },
-				[](lookup_result::GlobalVariable) -> ExpressionTree { declare_unreachable(); },
+				[](auto) -> ExpressionTree { declare_unreachable(); },
 				[&](lookup_result::OverloadSet const & overload_set) -> ExpressionTree
 				{
 					TypeId const operand_types[] = {expression_type_id(left, program), expression_type_id(right, program)};
@@ -201,7 +199,9 @@ namespace parser
 			return std::move(std::get<ExpressionTree>(tree));
 	}
 
-	auto add_variable_to_scope(Scope & scope, std::string_view name, TypeId type_id, int scope_offset, Program const & program) -> int
+	auto add_variable_to_scope(
+		std::vector<Variable> & variables, int & scope_size, int & scope_alignment, 
+		std::string_view name, TypeId type_id, int scope_offset, Program const & program) -> int
 	{
 		Type const & type = type_with_id(program, type_id);
 		int const size = type_id.is_reference ? sizeof(void *) : type.size;
@@ -210,21 +210,26 @@ namespace parser
 		Variable var;
 		var.name = name;
 		var.type = type_id;
-		var.offset = scope_offset + align(scope.stack_frame_size, alignment);
-		scope.stack_frame_size = var.offset + size;
-		scope.stack_frame_alignment = std::max(scope.stack_frame_alignment, alignment);
-		scope.variables.push_back(var);
+		var.offset = scope_offset + align(scope_size, alignment);
+		scope_size = var.offset + size;
+		scope_alignment = std::max(scope_alignment, alignment);
+		variables.push_back(var);
 		return var.offset;
+	}
+
+	auto add_variable_to_scope(Scope & scope, std::string_view name, TypeId type_id, int scope_offset, Program const & program) -> int
+	{
+		return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
 	}
 
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
 	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::optional<stmt::Statement>;
 
-	auto parse_type_name(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> TypeId
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack) noexcept -> TypeId
 	{
 		// Lookup type name.
-		TypeId type_found = lookup_type_name(program, tokens[index].source);
+		TypeId type_found = lookup_type_name(scope_stack, tokens[index].source);
 		index++;
 		assert(type_found != TypeId::none);
 
@@ -245,7 +250,7 @@ namespace parser
 		return type_found;
 	}
 
-	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, Program & program, Function & function) noexcept -> void
+	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void
 	{
 		// Parameters must be between parenthesis.
 		assert(tokens[index].type == TokenType::open_parenthesis);
@@ -254,10 +259,10 @@ namespace parser
 		// Parse arguments.
 		while (tokens[index].type == TokenType::identifier)
 		{
-			TypeId const arg_type = parse_type_name(tokens, index, program);
+			TypeId const arg_type = parse_type_name(tokens, index, p.scope_stack);
 			assert(is_data_type(arg_type)); // An argument cannot be void
 
-			add_variable_to_scope(function, tokens[index].source, arg_type, 0, program);
+			add_variable_to_scope(function, tokens[index].source, arg_type, 0, p.program);
 			function.parameter_count++;
 			function.parameter_size = function.stack_frame_size;
 			index++;
@@ -279,7 +284,7 @@ namespace parser
 			index++;
 
 			// Return type. By now only int supported.
-			function.return_type = parse_type_name(tokens, index, program);
+			function.return_type = parse_type_name(tokens, index, p.scope_stack);
 		}
 		else
 			function.return_type = TypeId::deduce;
@@ -314,7 +319,7 @@ namespace parser
 
 		Function function;
 
-		parse_function_prototype(tokens, index, p.program, function);
+		parse_function_prototype(tokens, index, p, function);
 		parse_function_body(tokens, index, p, function);
 
 		// Add the function to the program.
@@ -453,9 +458,7 @@ namespace parser
 		auto operand = parse_single_expression(tokens, index, p);
 
 		auto const visitor = overload(
-			[](lookup_result::Nothing) -> expr::FunctionCallNode { declare_unreachable(); },
-			[](lookup_result::Variable) -> expr::FunctionCallNode { declare_unreachable(); },
-			[](lookup_result::GlobalVariable) -> expr::FunctionCallNode { declare_unreachable(); },
+			[](auto) -> expr::FunctionCallNode { declare_unreachable(); },
 			[&](lookup_result::OverloadSet const & overload_set) -> expr::FunctionCallNode
 			{
 				TypeId const operand_type = expression_type_id(operand, p.program);
@@ -533,6 +536,7 @@ namespace parser
 					else
 						return expr::FunctionNode{result.function_ids[0]}; // TODO: Overload set node?
 				},
+				[](lookup_result::Type) -> ExpressionTree { declare_unreachable(); },
 				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); }
 			);
 			auto const lookup = lookup_name(p.scope_stack, tokens[index].source);
@@ -594,7 +598,7 @@ namespace parser
 		stmt::VariableDeclarationStatement node;
 
 		// A statement begins with the type of the declared variable.
-		TypeId const type_found = parse_type_name(tokens, index, p.program);
+		TypeId const type_found = parse_type_name(tokens, index, p.scope_stack);
 
 		// The second token of the statement is the variable name.
 		assert(tokens[index].type == TokenType::identifier);
@@ -669,7 +673,7 @@ namespace parser
 		Function & function = p.program.functions.emplace_back();
 		// Add the function name to the scope.
 		auto const function_id = FunctionId{0, static_cast<unsigned>(p.program.functions.size() - 1)};
-		parse_function_prototype(tokens, index, p.program, function);
+		parse_function_prototype(tokens, index, p, function);
 		bind_function_name(id_token.source, function_id, p.program, top(p.scope_stack));
 
 		// Operate on a local temporary to avoid invalidation of the reference on reallocation.
@@ -894,6 +898,53 @@ namespace parser
 		return Stmt();
 	}
 
+	auto parse_struct_declaration(span<lex::Token const> tokens, size_t & index, ParseParams p) -> std::nullopt_t
+	{
+		// Skip struct token.
+		index++;
+
+		// Parse name
+		assert(tokens[index].type == TokenType::identifier);
+		std::string_view const type_name = tokens[index].source;
+		index++;
+
+		Type new_type;
+		new_type.size = 0;
+		new_type.alignment = 1;
+
+		// Skip { token.
+		assert(tokens[index].type == TokenType::open_brace);
+		index++;
+
+		Struct str;
+		// Parse member variables.
+		while (tokens[index].type != TokenType::close_brace)
+		{
+			TypeId const type = parse_type_name(tokens, index, p.scope_stack);
+			assert(is_data_type(type));
+			
+			assert(tokens[index].type == TokenType::identifier);
+			std::string_view const name = tokens[index].source;
+			add_variable_to_scope(str.member_variables, new_type.size, new_type.alignment, name, type, 0, p.program);
+			index++;
+
+			assert(tokens[index].type == TokenType::semicolon);
+			index++;
+		}
+
+		// Skip } token.
+		assert(tokens[index].type == TokenType::close_brace);
+		index++;
+
+		new_type.struct_index = static_cast<int>(p.program.structs.size());
+		int const type_index = static_cast<int>(p.program.types.size());
+		p.program.structs.push_back(std::move(str));
+		p.program.types.push_back(std::move(new_type));
+		top(p.scope_stack).types.push_back({type_name, TypeId::with_index(type_index)});
+
+		return std::nullopt;
+	}
+
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::optional<stmt::Statement>
 	{
 		std::optional<stmt::Statement> result;
@@ -915,7 +966,9 @@ namespace parser
 			result = parse_break_or_return_statement<stmt::BreakStatement>(tokens, index, p);
 		else if (tokens[index].source == "continue")
 			result = parse_break_or_return_statement<stmt::ContinueStatement>(tokens, index, p);
-		else if (lookup_type_name(p.program, tokens[index].source) != TypeId::none)
+		else if (tokens[index].source == "struct")
+			return parse_struct_declaration(tokens, index, p);
+		else if (lookup_type_name(p.scope_stack, tokens[index].source) != TypeId::none)
 			result = parse_variable_declaration_statement(tokens, index, p);
 		else
 			result = parse_expression_statement(tokens, index, p);

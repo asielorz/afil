@@ -9,9 +9,9 @@ namespace stmt { struct Statement; }
 
 struct Type
 {
-	std::string_view name;
 	int size;
 	int alignment;
+	int struct_index;
 };
 
 struct Function : Scope
@@ -32,11 +32,17 @@ struct ExternFunction
 	void const * function_pointer;
 };
 
+struct Struct
+{
+	std::vector<Variable> member_variables;
+};
+
 struct Program
 {
 	Program();
 
 	std::vector<Type> types;
+	std::vector<Struct> structs;
 	std::vector<Function> functions;
 	std::vector<ExternFunction> extern_functions;
 	std::vector<stmt::Statement> global_initialization_statements;
@@ -47,7 +53,6 @@ struct Program
 // Returns id of function found or invalid_function_id on failure.
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
 
-auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept->Type const &;
 auto type_size(Program const & program, TypeId id) noexcept -> int;
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?

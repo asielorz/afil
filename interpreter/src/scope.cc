@@ -1,4 +1,5 @@
 #include "scope.hh"
+#include "overload.hh"
 #include <algorithm>
 
 TypeId const TypeId::void_ = {false, false, false, 0};
@@ -88,7 +89,8 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		lookup_result::Nothing, 
 		lookup_result::Variable,
 		lookup_result::GlobalVariable,
-		lookup_result::OverloadSet
+		lookup_result::OverloadSet,
+		lookup_result::Type
 	>
 {
 	lookup_result::OverloadSet overload_set;
@@ -101,7 +103,7 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 	{
 		Scope const & scope = *scope_stack[i].scope;
 
-		// Search variables only if we don't already know this is a function name.
+		// Search variables and types only if we don't already know this is a function name.
 		if (overload_set.function_ids.empty())
 		{
 			if (scope_stack[i].type == ScopeType::global)
@@ -116,6 +118,10 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 				if (var != scope.variables.end())
 					return lookup_result::Variable{var->type, var->offset};
 			}
+			
+			auto const type = std::find_if(scope.types.begin(), scope.types.end(), name_equal(name));
+			if (type != scope.types.end())
+				return lookup_result::Type{type->id};
 		}
 
 		// Functions.
@@ -132,6 +138,15 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		return lookup_result::Nothing();
 	else
 		return overload_set;
+}
+
+auto lookup_type_name(ScopeStackView scope_stack, std::string_view name) noexcept -> TypeId
+{
+	auto const visitor = overload(
+		[](auto const &) { return TypeId::none; },
+		[](lookup_result::Type type) { return type.type_id; }
+	);
+	return std::visit(visitor, lookup_name(scope_stack, name));
 }
 
 auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int

@@ -55,12 +55,19 @@ struct FunctionName
 	FunctionId id;
 };
 
+struct TypeName
+{
+	std::string_view name;
+	TypeId id;
+};
+
 struct Scope
 {
 	int stack_frame_size = 0;
-	int stack_frame_alignment = 1; // Alignment requirement of the stack frame.
+	int stack_frame_alignment = 1;
 	std::vector<Variable> variables;
 	std::vector<FunctionName> functions;
+	std::vector<TypeName> types;
 };
 enum struct ScopeType { global, function, block };
 
@@ -78,13 +85,16 @@ namespace lookup_result
 	struct Variable { TypeId variable_type; int variable_offset; };
 	struct GlobalVariable { TypeId variable_type; int variable_offset; };
 	struct OverloadSet { std::vector<FunctionId> function_ids; };
+	struct Type { TypeId type_id; };
 }
 auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 	-> std::variant<
 		lookup_result::Nothing, 
 		lookup_result::Variable,
 		lookup_result::GlobalVariable,
-		lookup_result::OverloadSet
+		lookup_result::OverloadSet,
+		lookup_result::Type
 	>;
+auto lookup_type_name(ScopeStackView program, std::string_view name) noexcept -> TypeId;
 
 auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int;

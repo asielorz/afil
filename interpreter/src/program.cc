@@ -7,13 +7,13 @@
 
 using namespace std::literals;
 
-auto built_in_types() noexcept -> std::vector<Type>
+auto built_in_types() noexcept -> std::vector<std::pair<std::string_view, Type>>
 {
 	return {
-		{"void", 0, 1},
-		{"int", 4, 4},
-		{"float", 4, 4},
-		{"bool", 1, 1},
+		{"void",  {0, 1, -1}},
+		{"int",   {4, 4, -1}},
+		{"float", {4, 4, -1}},
+		{"bool",  {1, 1, -1}},
 	};
 }
 
@@ -89,7 +89,18 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 
 Program::Program()
 {
-	types = built_in_types();
+	auto const built_in_types_to_add = built_in_types();
+
+	types.reserve(built_in_types_to_add.size());
+	global_scope.types.reserve(built_in_types_to_add.size());
+
+	for (auto const type : built_in_types_to_add)
+	{
+		global_scope.types.push_back({type.first, {false, false, false, static_cast<unsigned>(types.size())}});
+		types.push_back(type.second);
+	}
+
+	//*******************************************************************
 
 	auto const extern_functions_to_add = default_extern_functions();
 
@@ -129,15 +140,6 @@ auto resolve_function_overloading(span<FunctionId const> overload_set, span<Type
 	}
 
 	return invalid_function_id;
-}
-
-auto lookup_type_name(Program const & program, std::string_view name) noexcept -> TypeId
-{
-	auto const type = std::find_if(program.types.begin(), program.types.end(), name_equal(name));
-	if (type != program.types.end())
-		return TypeId::with_index(static_cast<unsigned>(type - program.types.begin()));
-	else
-		return TypeId::none;
 }
 
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &

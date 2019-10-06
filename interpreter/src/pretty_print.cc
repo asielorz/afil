@@ -9,8 +9,16 @@ using stmt::Statement;
 
 auto to_string(TypeId id, Program const & program) noexcept -> std::string
 {
-	Type const & type = type_with_id(program, id);
-	auto type_name = std::string(type.name);
+	// TODO: Maybe a more exhaustive search? Same for functions.
+	auto const found_type = std::find_if(program.global_scope.types.begin(), program.global_scope.types.end(),
+		[id](TypeName const & type_name) { return type_name.id == id; });
+
+	std::string type_name;
+	if (found_type == program.global_scope.types.end())
+		type_name = "<function>(";
+	else
+		type_name = std::string(found_type->name) + '(';
+
 	if (id.is_mutable)
 		type_name += " mut";
 	if (id.is_reference)
@@ -25,15 +33,15 @@ auto indent(int indentation_level) noexcept -> std::string
 
 auto pretty_print_function_node(FunctionId function_id, Program const & program) noexcept -> std::string
 {
-	auto const found_id = std::find_if(program.global_scope.functions.begin(), program.global_scope.functions.end(),
+	auto const found_fn = std::find_if(program.global_scope.functions.begin(), program.global_scope.functions.end(),
 		[function_id](FunctionName const & fn_name) { return fn_name.id == function_id; });
 	
 	std::string str;
 
-	if (found_id == program.global_scope.functions.end())
-		str = "function(";
+	if (found_fn == program.global_scope.functions.end())
+		str = "<function>(";
 	else
-		str = std::string(found_id->name) + '(';
+		str = std::string(found_fn->name) + '(';
 
 	auto const param_types = parameter_types(program, function_id);
 	for (TypeId const & id : param_types)

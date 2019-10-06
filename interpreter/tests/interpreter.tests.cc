@@ -898,6 +898,38 @@ TEST_CASE("Negation operator")
 	REQUIRE(parse_and_run(src) == -5);
 }
 
+TEST_CASE("Struct")
+{
+	auto const src = R"(
+		struct vec2
+		{
+			int x;
+			int y;
+		}
+	)"sv;
+
+	parser::parse_source(src);
+}
+
+TEST_CASE("A struct can be used inside another struct")
+{
+	auto const src = R"(
+		struct vec2
+		{
+			float x;
+			float y;
+		}
+
+		struct AABB
+		{
+			vec2 min;
+			vec2 max;
+		}
+	)"sv;
+
+	parser::parse_source(src);
+}
+
 /*****************************************************************
 Backlog
 - struct
@@ -909,4 +941,5 @@ Backlog
 - importing functions in C
 - contracts
 - errors
+- avoiding name collisions with keywords or declared symbols (int int = 5; // Should be an error)
 *****************************************************************/
