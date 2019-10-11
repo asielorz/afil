@@ -1023,7 +1023,6 @@ TEST_CASE("Member access to an rvalue")
 		};
 	)"sv;
 
-	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 5);
 }
 

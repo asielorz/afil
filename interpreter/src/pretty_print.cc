@@ -75,15 +75,19 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 		},
 		[&](GlobalVariableNode const & var_node) 
 		{
-			auto const found_id = std::find_if(program.global_scope.variables.begin(), program.global_scope.variables.end(),
+			auto const found_var = std::find_if(program.global_scope.variables.begin(), program.global_scope.variables.end(),
 				[var_node](Variable const & var) { return var.offset == var_node.variable_offset; });
 
-			return join(indent(indentation_level), "global<", to_string(var_node.variable_type, program), ">: ", found_id->name, '\n');
+			return join(indent(indentation_level), "global<", to_string(var_node.variable_type, program), ">: ", found_var->name, '\n');
 		},
 		[&](MemberVariableNode const & var_node)
 		{
+			Struct const & s = program.structs[type_with_id(program, expression_type_id(*var_node.owner, program)).struct_index];
+			auto const found_var = std::find_if(s.member_variables.begin(), s.member_variables.end(), 
+				[&](Variable const & var) { return var.offset == var_node.variable_offset; });
+
 			return join(
-				indent(indentation_level), "member<", to_string(decay(var_node.variable_type), program), ">: ", var_node.variable_offset, '\n',
+				indent(indentation_level), "member<", to_string(decay(var_node.variable_type), program), ">: ", found_var->name, '\n',
 				pretty_print_rec(*var_node.owner, program, indentation_level + 1));
 		},
 		[&](FunctionNode const & func_node) 
