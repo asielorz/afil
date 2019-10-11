@@ -17,7 +17,7 @@ auto to_string(TypeId id, Program const & program) noexcept -> std::string
 	if (found_type == program.global_scope.types.end())
 		type_name = "<type>";
 	else
-		type_name = std::string(found_type->name) + '(';
+		type_name = std::string(found_type->name);
 
 	if (id.is_mutable)
 		type_name += " mut";

@@ -608,6 +608,8 @@ namespace parser
 				expr::MemberVariableNode var_node;
 				var_node.owner = std::make_unique<ExpressionTree>(std::move(tree));
 				var_node.variable_type = member_variable->type;
+				if (last_operand_type_id.is_mutable)
+					var_node.variable_type = make_mutable(var_node.variable_type);
 				var_node.variable_offset = member_variable->offset;
 				tree = std::move(var_node);
 			}
@@ -959,7 +961,7 @@ namespace parser
 	}
 
 	template <typename Stmt>
-	auto parse_break_or_return_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) -> Stmt
+	auto parse_break_or_continue_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) -> Stmt
 	{
 		// Should check if parsing a loop and otherwise give an error.
 
@@ -1033,9 +1035,9 @@ namespace parser
 		else if (tokens[index].source == "for")
 			return parse_for_statement(tokens, index, p);
 		else if (tokens[index].source == "break")
-			result = parse_break_or_return_statement<stmt::BreakStatement>(tokens, index, p);
+			result = parse_break_or_continue_statement<stmt::BreakStatement>(tokens, index, p);
 		else if (tokens[index].source == "continue")
-			result = parse_break_or_return_statement<stmt::ContinueStatement>(tokens, index, p);
+			result = parse_break_or_continue_statement<stmt::ContinueStatement>(tokens, index, p);
 		else if (tokens[index].source == "struct")
 			return parse_struct_declaration(tokens, index, p);
 		else if (lookup_type_name(p.scope_stack, tokens[index].source) != TypeId::none)

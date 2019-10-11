@@ -735,8 +735,8 @@ TEST_CASE("while loop")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int i = 1;
-			int sum = 0;
+			int mut i = 1;
+			int mut sum = 0;
 			while (i < 10)
 			{
 				sum = sum + i;
@@ -754,8 +754,8 @@ TEST_CASE("for loop")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int sum = 0;
-			for (int i = 1; i < 10; i = i + 1)
+			int mut sum = 0;
+			for (int mut i = 1; i < 10; i = i + 1)
 				sum = sum + i;
 
 			return sum;
@@ -770,8 +770,8 @@ TEST_CASE("break")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int sum = 0;
-			for (int i = 1; i < 10; i = i + 1)
+			int mut sum = 0;
+			for (int mut i = 1; i < 10; i = i + 1)
 			{
 				sum = sum + i;
 				if (i == 6)
@@ -790,8 +790,8 @@ TEST_CASE("continue")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int sum = 0;
-			for (int i = 1; i < 10; i = i + 1)
+			int mut sum = 0;
+			for (int mut i = 1; i < 10; i = i + 1)
 			{
 				// Ignore multiples of 3.
 				if (i % 3 == 0)
@@ -985,6 +985,27 @@ TEST_CASE("Mutating a member")
 	)"sv;
 
 	REQUIRE(parse_and_run(src) == 5 + -7);
+}
+
+TEST_CASE("Conversions between reference types of different mutability")
+{
+	TypeId const int_ = TypeId::int_;
+	TypeId const int_ref = make_reference(int_);
+	TypeId const int_mut_ref = make_mutable(int_ref);
+
+	// Conversion to itself.
+	REQUIRE(is_convertible(int_, int_));
+	REQUIRE(is_convertible(int_ref, int_ref));
+	REQUIRE(is_convertible(int_mut_ref, int_mut_ref));
+
+	// Reference to T.
+	REQUIRE(is_convertible(int_ref, int_));
+	REQUIRE(is_convertible(int_mut_ref, int_));
+
+	// Mutable reference to reference
+	REQUIRE(is_convertible(int_mut_ref, int_ref));
+	REQUIRE(!is_convertible(int_ref, int_mut_ref));
+	REQUIRE(!is_convertible(int_, int_mut_ref));
 }
 
 /*****************************************************************

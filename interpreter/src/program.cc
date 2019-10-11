@@ -121,7 +121,7 @@ auto resolve_function_overloading(span<FunctionId const> overload_set, span<Type
 	for (FunctionId function_id : overload_set)
 	{
 		auto const param_types = parameter_types(program, function_id);
-		if (std::equal(param_types.begin(), param_types.end(), parameters.begin(), parameters.end(), is_convertible))
+		if (std::equal(parameters.begin(), parameters.end(), param_types.begin(), param_types.end(), is_convertible))
 		{
 			return function_id;
 		}
