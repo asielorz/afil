@@ -75,13 +75,13 @@ namespace expr
 			[](Literal<float>) { return TypeId::float_; },
 			[](Literal<bool>) { return TypeId::bool_; },
 			[](DereferenceNode const & deref_node) { return deref_node.variable_type; },
-			[](LocalVariableNode const & var_node) { return make_reference(var_node.variable_type); },
-			[](GlobalVariableNode const & var_node) { return make_reference(var_node.variable_type); },
+			[](VariableNode const & var_node) { return make_reference(var_node.variable_type); },
 			[](FunctionNode const &) { return TypeId::function; },
 			[&](FunctionCallNode const & func_call_node) { return return_type(program, func_call_node.function_id); },
 			[](RelationalOperatorCallNode const &) { return TypeId::bool_; },
 			[&](IfNode const & if_node) { return expression_type_id(*if_node.then_case, program); },
-			[](StatementBlockNode const & block_node) { return block_node.return_type; }
+			[](StatementBlockNode const & block_node) { return block_node.return_type; },
+			[](StructConstructorNode const & constructor_node) { return constructor_node.constructed_type; }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}

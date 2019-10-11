@@ -8,6 +8,7 @@
 #include "multicomparison.hh"
 #include "utils.hh"
 #include "variant.hh"
+#include "map.hh"
 #include <cassert>
 #include <charconv>
 
@@ -83,6 +84,15 @@ namespace parser
 		declare_unreachable();
 	}
 
+	auto insert_conversions(span<ExpressionTree> parameters, span<TypeId const> parsed_parameter_types, span<TypeId const> target_parameter_types)
+	{
+		for (size_t i = 0; i < target_parameter_types.size(); ++i)
+		{
+			if (parsed_parameter_types[i] != target_parameter_types[i])
+				parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i]);
+		}
+	}
+
 	auto resolve_function_overloading_and_insert_conversions(
 		span<FunctionId const> overload_set,
 		span<ExpressionTree> parameters,
@@ -94,11 +104,7 @@ namespace parser
 
 		// If any conversion is needed in order to call the function, perform the conversion.
 		auto const target_parameter_types = parameter_types(program, function_id);
-		for (size_t i = 0; i < target_parameter_types.size(); ++i)
-		{
-			if (parsed_parameter_types[i] != target_parameter_types[i])
-				parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i]);
-		}
+		insert_conversions(parameters, parsed_parameter_types, target_parameter_types);
 
 		return function_id;
 	}
@@ -223,7 +229,7 @@ namespace parser
 	}
 
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
-	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
+	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::optional<stmt::Statement>;
 
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack) noexcept -> TypeId
@@ -329,25 +335,18 @@ namespace parser
 		return expr::FunctionNode{func_id};
 	}
 
-	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, span<FunctionId const> overload_set) noexcept -> expr::FunctionCallNode
+	auto parse_comma_separated_expression_list(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::vector<ExpressionTree>
 	{
+		std::vector<ExpressionTree> parsed_expressions;
+
 		// Parameter list starts with (
 		assert(tokens[index].type == TokenType::open_parenthesis);
 		index++;
 
-		// Parse parameters.
-		int param_count = 0;
-
-		expr::FunctionCallNode node;
-		node.parameters.reserve(param_count);
-
-		std::vector<TypeId> parsed_parameter_types;
-
 		for (;;)
 		{
 			// Parse a parameter.
-			node.parameters.push_back(parse_subexpression(tokens, index, p));
-			parsed_parameter_types.push_back(expression_type_id(node.parameters.back(), p.program));
+			parsed_expressions.push_back(parse_subexpression(tokens, index, p));
 
 			// If after a parameter we find a close parenthesis, end parameter list.
 			if (tokens[index].type == TokenType::close_parenthesis)
@@ -363,6 +362,14 @@ namespace parser
 				declare_unreachable();
 		}
 
+		return parsed_expressions;
+	}
+
+	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, span<FunctionId const> overload_set) noexcept -> expr::FunctionCallNode
+	{
+		expr::FunctionCallNode node;
+		node.parameters = parse_comma_separated_expression_list(tokens, index, p);
+		std::vector<TypeId> const  parsed_parameter_types = map(node.parameters, expr::expression_type_id(p.program));
 		node.function_id = resolve_function_overloading_and_insert_conversions(overload_set, node.parameters, parsed_parameter_types, p.program);
 
 		return node;
@@ -455,7 +462,7 @@ namespace parser
 		std::string_view function_name = operator_function_name(parse_operator(tokens[index].source));
 		index++;
 
-		auto operand = parse_single_expression(tokens, index, p);
+		auto operand = parse_expression_and_trailing_subexpressions(tokens, index, p);
 
 		auto const visitor = overload(
 			[](auto) -> expr::FunctionCallNode { declare_unreachable(); },
@@ -517,7 +524,6 @@ namespace parser
 					expr::LocalVariableNode var_node;
 					var_node.variable_type = result.variable_type;
 					var_node.variable_offset = result.variable_offset;
-					index++;
 					return var_node;
 				},
 				[&](lookup_result::GlobalVariable result) -> ExpressionTree
@@ -525,21 +531,40 @@ namespace parser
 					expr::GlobalVariableNode var_node;
 					var_node.variable_type = result.variable_type;
 					var_node.variable_offset = result.variable_offset;
-					index++;
 					return var_node;
 				},
 				[&](lookup_result::OverloadSet result) -> ExpressionTree
 				{
-					index++;
 					if (tokens[index].type == TokenType::open_parenthesis)
 						return parse_function_call_expression(tokens, index, p, result.function_ids);
 					else
 						return expr::FunctionNode{result.function_ids[0]}; // TODO: Overload set node?
 				},
-				[](lookup_result::Type) -> ExpressionTree { declare_unreachable(); },
+				[&](lookup_result::Type result) -> ExpressionTree 
+				{
+					Type const & type = type_with_id(p.program, result.type_id);
+					assert(is_struct(type)); // Type must be a struct (by now).
+					Struct const & struct_data = p.program.structs[type.struct_index];
+					auto const struct_member_types = map(struct_data.member_variables, &Variable::type);
+
+					expr::StructConstructorNode node;
+					node.parameters = parse_comma_separated_expression_list(tokens, index, p);
+					node.constructed_type = result.type_id;
+					
+					assert(struct_member_types.size() == node.parameters.size());
+					for (size_t i = 0; i < node.parameters.size(); ++i)
+					{
+						TypeId const parsed_type = expression_type_id(node.parameters[i], p.program);
+						assert(is_convertible(parsed_type, struct_member_types[i]));
+						node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, struct_member_types[i]);
+					}
+
+					return node;
+				},
 				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); }
 			);
 			auto const lookup = lookup_name(p.scope_stack, tokens[index].source);
+			index++;
 			return std::visit(visitor, lookup);
 		}
 		else if (tokens[index].type == TokenType::open_parenthesis)
@@ -560,15 +585,46 @@ namespace parser
 		else declare_unreachable(); // TODO: Actual error handling.
 	}
 
+	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree
+	{
+		ExpressionTree tree = parse_single_expression(tokens, index, p);
+
+		while (index < tokens.size())
+		{
+			// Loop to possibly parse chains of member accesses.
+			if (tokens[index].type == TokenType::period)
+			{
+				index++;
+				TypeId const last_operand_type_id = expression_type_id(tree, p.program);
+				Type const & last_operand_type = type_with_id(p.program, last_operand_type_id);
+				assert(is_struct(last_operand_type));
+
+				assert(tokens[index].type == TokenType::identifier);
+				std::string_view const member_name = tokens[index].source;
+				Variable const * const member_variable = find_member_variable(p.program.structs[last_operand_type.struct_index], member_name);
+				assert(member_variable);
+				index++;
+
+				expr::MemberVariableNode var_node;
+				var_node.owner = std::make_unique<ExpressionTree>(std::move(tree));
+				var_node.variable_type = member_variable->type;
+				var_node.variable_offset = member_variable->offset;
+				tree = std::move(var_node);
+			}
+			else break;
+		}
+
+		return tree;
+	}
+
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree
 	{
 		std::vector<ExpressionTree> operands;
 		std::vector<Operator> operators;
 
-		// Parse the expression.
 		while (index < tokens.size())
 		{
-			operands.push_back(parse_single_expression(tokens, index, p));
+			operands.push_back(parse_expression_and_trailing_subexpressions(tokens, index, p));
 
 			// If the next token is an operator, parse the operator and repeat. Otherwise end the loop and return the expression.
 			if (index < tokens.size() && tokens[index].type == TokenType::operator_)
@@ -698,11 +754,24 @@ namespace parser
 			return parse_function_declaration_statement(tokens, index, p);
 		else
 		{
-			lex::Token const id_token = tokens[index + 1];
+			// Skip let token.
+			index++;
+
+			bool is_mutable = false;
+
+			// Look for mutable qualifier.
+			if (tokens[index].source == "mut")
+			{
+				is_mutable = true;
+				index++;
+			}
+
+			lex::Token const id_token = tokens[index];
+			index++;
 
 			assert(id_token.type == TokenType::identifier);
-			assert(tokens[index + 2].source == "=");
-			index += 3;
+			assert(tokens[index].source == "=");
+			index++;
 
 			// If the expression returns a function, bind it to its name and return a noop.
 			expr::ExpressionTree expression = parse_subexpression(tokens, index, p);
@@ -710,6 +779,7 @@ namespace parser
 			
 			if (expr_type == TypeId::function)
 			{
+				assert(!is_mutable); // A function cannot be mutable.
 				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
 				bind_function_name(id_token.source, function_id, p.program, top(p.scope_stack));
 				return std::nullopt;
@@ -717,7 +787,7 @@ namespace parser
 			else
 			{
 				assert(is_data_type(expr_type));
-				TypeId const var_type = decay(expr_type);
+				TypeId const var_type = is_mutable ? make_mutable(decay(expr_type)) : decay(expr_type);
 				stmt::VariableDeclarationStatement node;
 				node.variable_offset = add_variable_to_scope(top(p.scope_stack), id_token.source, var_type, local_variable_offset(p.scope_stack), p.program);
 				if (var_type == expr_type)

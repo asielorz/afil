@@ -48,7 +48,9 @@
     <ClInclude Include="src\expression.hh" />
     <ClInclude Include="src\function_id.hh" />
     <ClInclude Include="src\function_ptr.hh" />
+    <ClInclude Include="src\map.hh" />
     <ClInclude Include="src\multicomparison.hh" />
+    <ClInclude Include="src\name_equal.hh" />
     <ClInclude Include="src\pretty_print.hh" />
     <ClInclude Include="src\program.hh" />
     <ClInclude Include="src\interpreter.hh" />

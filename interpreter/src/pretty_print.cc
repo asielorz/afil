@@ -15,7 +15,7 @@ auto to_string(TypeId id, Program const & program) noexcept -> std::string
 
 	std::string type_name;
 	if (found_type == program.global_scope.types.end())
-		type_name = "<function>(";
+		type_name = "<type>";
 	else
 		type_name = std::string(found_type->name) + '(';
 
@@ -78,6 +78,10 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 
 			return join(indent(indentation_level), "global<", to_string(var_node.variable_type, program), ">: ", found_id->name, '\n');
 		},
+		[&](MemberVariableNode const & var_node)
+		{
+			return join(indent(indentation_level), "member<", to_string(var_node.variable_type, program), ">: ", var_node.variable_offset, '\n');
+		},
 		[&](FunctionNode const & func_node) 
 		{ 
 			return join(indent(indentation_level), pretty_print_function_node(func_node.function_id, program));
@@ -121,6 +125,13 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 			std::string str = join(indent(indentation_level), "statement block expression<", to_string(block_node.return_type, program), ">\n");
 			for (stmt::Statement const & statement : block_node.statements)
 				str += pretty_print_rec(statement, program, indentation_level + 1);
+			return str;
+		},
+		[&](StructConstructorNode const & ctor_node)
+		{
+			std::string str = join(indent(indentation_level), to_string(ctor_node.constructed_type, program) ,'\n');
+			for (ExpressionTree const & param : ctor_node.parameters)
+				str += pretty_print_rec(param, program, indentation_level + 1);
 			return str;
 		}
 	);

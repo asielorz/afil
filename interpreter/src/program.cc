@@ -2,6 +2,7 @@
 #include "lexer.hh"
 #include "parser.hh"
 #include "function_ptr.hh"
+#include "name_equal.hh"
 #include <algorithm>
 #include <cassert>
 
@@ -114,19 +115,6 @@ Program::Program()
 	}
 }
 
-struct name_equal
-{
-	constexpr name_equal(std::string_view name_) noexcept : name(name_) {}
-
-	template <typename T>
-	constexpr auto operator () (T const & t) const noexcept
-	{
-		return t.name == name;
-	}
-
-	std::string_view name;
-};
-
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId
 {
 	// TODO: This finds first valid candidate. It should find best match.
@@ -140,6 +128,20 @@ auto resolve_function_overloading(span<FunctionId const> overload_set, span<Type
 	}
 
 	return invalid_function_id;
+}
+
+auto is_struct(Type const & type) noexcept -> bool
+{
+	return type.struct_index != -1;
+}
+
+auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> Variable const *
+{
+	auto const it = std::find_if(type.member_variables.begin(), type.member_variables.end(), name_equal(member_name));
+	if (it == type.member_variables.end())
+		return nullptr;
+	else
+		return &*it;
 }
 
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &

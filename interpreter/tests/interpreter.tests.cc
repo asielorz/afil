@@ -930,6 +930,63 @@ TEST_CASE("A struct can be used inside another struct")
 	parser::parse_source(src);
 }
 
+TEST_CASE("A struct can be constructed by giving values to each member")
+{
+	auto const src = R"(
+		struct vec2
+		{
+			float x;
+			float y;
+		}
+
+		let main = fn() -> int
+		{
+			let v = vec2(3.5, 2.22);
+		};
+	)"sv;
+
+	parser::parse_source(src);
+}
+
+TEST_CASE("Member access")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x;
+			int y;
+		}
+
+		let main = fn() -> int
+		{
+			let v = ivec2(3, -7);
+			return v.x + v.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 + -7);
+}
+
+TEST_CASE("Mutating a member")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x;
+			int y;
+		}
+
+		let main = fn() -> int
+		{
+			let mut v = ivec2(3, -7);
+			v.x = 5;
+			return v.x + v.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5 + -7);
+}
+
 /*****************************************************************
 Backlog
 - struct

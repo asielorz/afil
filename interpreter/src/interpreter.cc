@@ -58,7 +58,7 @@ namespace interpreter
 		stack.top_pointer = address;
 	}
 
-	auto pointer_at_address(ProgramStack & stack, int address) noexcept -> void *
+	auto pointer_at_address(ProgramStack & stack, int address) noexcept -> char *
 	{
 		return stack.memory.data() + address;
 	}
@@ -165,6 +165,19 @@ namespace interpreter
 				int const address = var_node.variable_offset;
 				eval_variable_node(var_node.variable_type, address, stack, return_address);
 			},
+			[&](expr::MemberVariableNode const & var_node)
+			{
+				int const owner_address = eval_expression_tree(*var_node.owner, stack, program);
+				if (expression_type_id(*var_node.owner, program).is_reference)
+				{
+					char * const owner_ptr = read<char *>(stack, owner_address);
+					write(stack, return_address, owner_ptr + var_node.variable_offset);
+				}
+				else
+				{
+					mark_as_to_do();
+				}
+			},
 			[&](expr::DereferenceNode const & deref_node)
 			{
 				StackGuard const g(stack);
@@ -232,6 +245,12 @@ namespace interpreter
 					if (auto const ret = try_get<control_flow::Return>(cf))
 						break;
 				}
+			},
+			[&](expr::StructConstructorNode const & ctor_node)
+			{
+				Struct const & struct_data = program.structs[type_with_id(program, ctor_node.constructed_type).struct_index];
+				for (size_t i = 0; i < struct_data.member_variables.size(); ++i)
+					eval_expression_tree(ctor_node.parameters[i], stack, program, return_address + struct_data.member_variables[i].offset);
 			}
 		);
 		std::visit(visitor, tree.as_variant());

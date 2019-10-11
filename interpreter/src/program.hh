@@ -53,7 +53,9 @@ struct Program
 // Returns id of function found or invalid_function_id on failure.
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
 
-auto type_with_id(Program const & program, TypeId id) noexcept->Type const &;
+auto is_struct(Type const & type) noexcept -> bool;
+auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> Variable const *;
+auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
 auto type_size(Program const & program, TypeId id) noexcept -> int;
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
