@@ -608,8 +608,14 @@ namespace parser
 				expr::MemberVariableNode var_node;
 				var_node.owner = std::make_unique<ExpressionTree>(std::move(tree));
 				var_node.variable_type = member_variable->type;
-				if (last_operand_type_id.is_mutable)
-					var_node.variable_type = make_mutable(var_node.variable_type);
+
+				if (last_operand_type_id.is_reference)
+				{
+					var_node.variable_type.is_reference = true;
+
+					if (last_operand_type_id.is_mutable)
+						var_node.variable_type.is_mutable = true;
+				}
 				var_node.variable_offset = member_variable->offset;
 				tree = std::move(var_node);
 			}

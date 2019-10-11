@@ -9,9 +9,11 @@ using stmt::Statement;
 
 auto to_string(TypeId id, Program const & program) noexcept -> std::string
 {
+	TypeId const decayed_id = decay(id);
+
 	// TODO: Maybe a more exhaustive search? Same for functions.
 	auto const found_type = std::find_if(program.global_scope.types.begin(), program.global_scope.types.end(),
-		[id](TypeName const & type_name) { return type_name.id == id; });
+		[decayed_id](TypeName const & type_name) { return type_name.id == decayed_id; });
 
 	std::string type_name;
 	if (found_type == program.global_scope.types.end())
@@ -80,7 +82,9 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 		},
 		[&](MemberVariableNode const & var_node)
 		{
-			return join(indent(indentation_level), "member<", to_string(var_node.variable_type, program), ">: ", var_node.variable_offset, '\n');
+			return join(
+				indent(indentation_level), "member<", to_string(decay(var_node.variable_type), program), ">: ", var_node.variable_offset, '\n',
+				pretty_print_rec(*var_node.owner, program, indentation_level + 1));
 		},
 		[&](FunctionNode const & func_node) 
 		{ 

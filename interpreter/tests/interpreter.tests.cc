@@ -1008,6 +1008,25 @@ TEST_CASE("Conversions between reference types of different mutability")
 	REQUIRE(!is_convertible(int_, int_mut_ref));
 }
 
+TEST_CASE("Member access to an rvalue")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x;
+			int y;
+		}
+
+		let main = fn() -> int
+		{
+			return ivec2(2, 5).y;
+		};
+	)"sv;
+
+	parse_and_print(src);
+	REQUIRE(parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - struct

@@ -76,6 +76,7 @@ namespace expr
 			[](Literal<bool>) { return TypeId::bool_; },
 			[](DereferenceNode const & deref_node) { return deref_node.variable_type; },
 			[](VariableNode const & var_node) { return make_reference(var_node.variable_type); },
+			[](MemberVariableNode const & var_node) { return var_node.variable_type; },
 			[](FunctionNode const &) { return TypeId::function; },
 			[&](FunctionCallNode const & func_call_node) { return return_type(program, func_call_node.function_id); },
 			[](RelationalOperatorCallNode const &) { return TypeId::bool_; },

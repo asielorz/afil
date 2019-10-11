@@ -167,15 +167,18 @@ namespace interpreter
 			},
 			[&](expr::MemberVariableNode const & var_node)
 			{
+				// If the owner is an lvalue, return a reference to the member.
 				int const owner_address = eval_expression_tree(*var_node.owner, stack, program);
 				if (expression_type_id(*var_node.owner, program).is_reference)
 				{
 					char * const owner_ptr = read<char *>(stack, owner_address);
 					write(stack, return_address, owner_ptr + var_node.variable_offset);
 				}
+				// If the owner is an rvalue, return the member by value.
 				else
 				{
-					mark_as_to_do();
+					int const variable_size = type_size(program, var_node.variable_type);
+					memcpy(pointer_at_address(stack, return_address), pointer_at_address(stack, owner_address + var_node.variable_offset), variable_size);
 				}
 			},
 			[&](expr::DereferenceNode const & deref_node)
