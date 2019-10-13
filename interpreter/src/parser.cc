@@ -205,21 +205,22 @@ namespace parser
 			return std::move(std::get<ExpressionTree>(tree));
 	}
 
+	template <typename T>
 	auto add_variable_to_scope(
-		std::vector<Variable> & variables, int & scope_size, int & scope_alignment, 
+		std::vector<T> & variables, int & scope_size, int & scope_alignment, 
 		std::string_view name, TypeId type_id, int scope_offset, Program const & program) -> int
 	{
 		Type const & type = type_with_id(program, type_id);
 		int const size = type_id.is_reference ? sizeof(void *) : type.size;
 		int const alignment = type_id.is_reference ? alignof(void *) : type.alignment;
 
-		Variable var;
+		T var;
 		var.name = name;
 		var.type = type_id;
 		var.offset = scope_offset + align(scope_size, alignment);
 		scope_size = var.offset + size;
 		scope_alignment = std::max(scope_alignment, alignment);
-		variables.push_back(var);
+		variables.push_back(std::move(var));
 		return var.offset;
 	}
 
@@ -343,6 +344,13 @@ namespace parser
 		assert(tokens[index].type == TokenType::open_parenthesis);
 		index++;
 
+		// Check for empty list.
+		if (tokens[index].type == TokenType::close_parenthesis)
+		{
+			index++;
+			return parsed_expressions;
+		}
+
 		for (;;)
 		{
 			// Parse a parameter.
@@ -371,6 +379,107 @@ namespace parser
 		node.parameters = parse_comma_separated_expression_list(tokens, index, p);
 		std::vector<TypeId> const  parsed_parameter_types = map(node.parameters, expr::expression_type_id(p.program));
 		node.function_id = resolve_function_overloading_and_insert_conversions(overload_set, node.parameters, parsed_parameter_types, p.program);
+
+		return node;
+	}
+
+	auto parse_struct_member_initializer_by_name_list(span<lex::Token const> tokens, size_t & index, ParseParams p, Struct const & struct_data) noexcept -> std::vector<ExpressionTree>
+	{
+		auto parsed_expressions = std::vector<ExpressionTree>(struct_data.member_variables.size());
+		auto expression_initialized = std::vector<bool>(struct_data.member_variables.size(), false);
+
+		// Parameter list starts with (
+		assert(tokens[index].type == TokenType::open_parenthesis);
+		index++;
+
+		for (;;)
+		{
+			// A member initializer by name starts with a period.
+			assert(tokens[index].type == TokenType::period);
+			index++;
+
+			// Find the member to initialize.
+			assert(tokens[index].type == TokenType::identifier);
+			std::string_view const member_name = tokens[index].source;
+			index++;
+
+			int const member_variable_index = find_member_variable(struct_data, member_name);
+			assert(member_variable_index != -1);
+			assert(!expression_initialized[member_variable_index]); // Avoid initializing the same variable twice.
+
+			// Next token must be =
+			assert(tokens[index].source == "=");
+			index++;
+
+			// Parse a parameter.
+			parsed_expressions[member_variable_index] = parse_subexpression(tokens, index, p);
+			expression_initialized[member_variable_index] = true;
+
+			// If after a parameter we find a close parenthesis, end parameter list.
+			if (tokens[index].type == TokenType::close_parenthesis)
+			{
+				index++;
+				break;
+			}
+			// If we find a comma, parse next parameter.
+			else if (tokens[index].type == TokenType::comma)
+				index++;
+			// Anything else we find is wrong.
+			else
+				declare_unreachable();
+		}
+
+		// For any value that is not given an initializer, use the default if available or fail to parse.
+		for (size_t i = 0; i < parsed_expressions.size(); ++i)
+		{
+			if (!expression_initialized[i])
+			{
+				MemberVariable const & variable = struct_data.member_variables[i];
+				assert(variable.initializer_expression.has_value());
+				parsed_expressions[i] = *variable.initializer_expression;
+			}
+		}
+		
+		return parsed_expressions;
+	}
+
+	auto parse_struct_constructor_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, TypeId type_id) noexcept -> expr::StructConstructorNode
+	{
+		Type const & type = type_with_id(p.program, type_id);
+		assert(is_struct(type)); // Type must be a struct (by now).
+		Struct const & struct_data = p.program.structs[type.struct_index];
+		auto const struct_member_types = map(struct_data.member_variables, &Variable::type);
+
+		expr::StructConstructorNode node;
+
+		if (tokens[index + 1].type == TokenType::period)
+			node.parameters = parse_struct_member_initializer_by_name_list(tokens, index, p, struct_data);
+		else
+			node.parameters = parse_comma_separated_expression_list(tokens, index, p);
+
+		node.constructed_type = type_id;
+
+		// If constructing from no parameters, check if the struct is default constructible
+		// and add default constructor if so.
+		if (node.parameters.empty())
+		{
+			// TODO: Recursive default construction.
+
+			node.parameters.reserve(struct_data.member_variables.size());
+			for (MemberVariable const & var : struct_data.member_variables)
+			{
+				assert(var.initializer_expression.has_value());
+				node.parameters.push_back(*var.initializer_expression);
+			}
+		}
+
+		assert(struct_member_types.size() == node.parameters.size());
+		for (size_t i = 0; i < node.parameters.size(); ++i)
+		{
+			TypeId const parsed_type = expression_type_id(node.parameters[i], p.program);
+			assert(is_convertible(parsed_type, struct_member_types[i]));
+			node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, struct_member_types[i]);
+		}
 
 		return node;
 	}
@@ -542,24 +651,7 @@ namespace parser
 				},
 				[&](lookup_result::Type result) -> ExpressionTree 
 				{
-					Type const & type = type_with_id(p.program, result.type_id);
-					assert(is_struct(type)); // Type must be a struct (by now).
-					Struct const & struct_data = p.program.structs[type.struct_index];
-					auto const struct_member_types = map(struct_data.member_variables, &Variable::type);
-
-					expr::StructConstructorNode node;
-					node.parameters = parse_comma_separated_expression_list(tokens, index, p);
-					node.constructed_type = result.type_id;
-					
-					assert(struct_member_types.size() == node.parameters.size());
-					for (size_t i = 0; i < node.parameters.size(); ++i)
-					{
-						TypeId const parsed_type = expression_type_id(node.parameters[i], p.program);
-						assert(is_convertible(parsed_type, struct_member_types[i]));
-						node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, struct_member_types[i]);
-					}
-
-					return node;
+					return parse_struct_constructor_expression(tokens, index, p, result.type_id);
 				},
 				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); }
 			);
@@ -598,16 +690,18 @@ namespace parser
 				TypeId const last_operand_type_id = expression_type_id(tree, p.program);
 				Type const & last_operand_type = type_with_id(p.program, last_operand_type_id);
 				assert(is_struct(last_operand_type));
+				Struct const & last_operand_struct = p.program.structs[last_operand_type.struct_index];
 
 				assert(tokens[index].type == TokenType::identifier);
 				std::string_view const member_name = tokens[index].source;
-				Variable const * const member_variable = find_member_variable(p.program.structs[last_operand_type.struct_index], member_name);
-				assert(member_variable);
+				int const member_variable_index = find_member_variable(last_operand_struct, member_name);
+				assert(member_variable_index != -1);
 				index++;
+				Variable const & member_variable = last_operand_struct.member_variables[member_variable_index];
 
 				expr::MemberVariableNode var_node;
 				var_node.owner = std::make_unique<ExpressionTree>(std::move(tree));
-				var_node.variable_type = member_variable->type;
+				var_node.variable_type = member_variable.type;
 
 				if (last_operand_type_id.is_reference)
 				{
@@ -616,7 +710,7 @@ namespace parser
 					if (last_operand_type_id.is_mutable)
 						var_node.variable_type.is_mutable = true;
 				}
-				var_node.variable_offset = member_variable->offset;
+				var_node.variable_offset = member_variable.offset;
 				tree = std::move(var_node);
 			}
 			else break;
@@ -1000,11 +1094,19 @@ namespace parser
 		{
 			TypeId const type = parse_type_name(tokens, index, p.scope_stack);
 			assert(is_data_type(type));
+			assert(!type.is_reference);
 			
 			assert(tokens[index].type == TokenType::identifier);
 			std::string_view const name = tokens[index].source;
 			add_variable_to_scope(str.member_variables, new_type.size, new_type.alignment, name, type, 0, p.program);
 			index++;
+
+			// Initialization expression.
+			if (tokens[index].source == "=")
+			{
+				index++;
+				str.member_variables.back().initializer_expression = parse_subexpression(tokens, index, p);
+			}
 
 			assert(tokens[index].type == TokenType::semicolon);
 			index++;

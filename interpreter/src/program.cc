@@ -135,13 +135,13 @@ auto is_struct(Type const & type) noexcept -> bool
 	return type.struct_index != -1;
 }
 
-auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> Variable const *
+auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> int
 {
 	auto const it = std::find_if(type.member_variables.begin(), type.member_variables.end(), name_equal(member_name));
 	if (it == type.member_variables.end())
-		return nullptr;
+		return -1;
 	else
-		return &*it;
+		return static_cast<int>(it - type.member_variables.begin());
 }
 
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &

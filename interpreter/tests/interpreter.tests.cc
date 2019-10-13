@@ -1026,9 +1026,91 @@ TEST_CASE("Member access to an rvalue")
 	REQUIRE(parse_and_run(src) == 5);
 }
 
+TEST_CASE("Member access to the result of a function")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x;
+			int y;
+		}
+
+		let make_vector = fn(int x, int y)
+		{
+			return ivec2(x, y);
+		};
+
+		let main = fn() -> int
+		{
+			return make_vector(2, 5).y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
+
+TEST_CASE("Designated initializers")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x;
+			int y;
+		}
+
+		let main = fn() -> int
+		{
+			let v = ivec2(.y = 3, .x = 7);
+			return v.x - v.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 7 - 3);
+}
+
+TEST_CASE("Default values for struct members")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+
+		let main = fn() -> int
+		{
+			let v = ivec2(.y = 5);
+			return v.x - v.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0 - 5);
+}
+
+TEST_CASE("Default constructor for structs that have a default value for all members")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+
+		let main = fn() -> int
+		{
+			let v = ivec2();
+			return v.x + v.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0 + 0);
+}
+
 /*****************************************************************
 Backlog
-- struct
+- operator overloading
+- designated initializers
+- default values for struct members
 - pointers
 - templates
 - arrays (depends on pointers)

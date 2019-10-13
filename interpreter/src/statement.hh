@@ -26,8 +26,8 @@ namespace stmt
 	struct IfStatement
 	{
 		expr::ExpressionTree condition;
-		std::unique_ptr<Statement> then_case;
-		std::unique_ptr<Statement> else_case;
+		value_ptr<Statement> then_case;
+		value_ptr<Statement> else_case;
 	};
 
 	struct StatementBlock
@@ -39,16 +39,16 @@ namespace stmt
 	struct WhileStatement
 	{
 		expr::ExpressionTree condition;
-		std::unique_ptr<Statement> body;
+		value_ptr<Statement> body;
 	};
 
 	struct ForStatement
 	{
 		Scope scope;
-		std::unique_ptr<Statement> init_statement;
+		value_ptr<Statement> init_statement;
 		expr::ExpressionTree condition;
 		expr::ExpressionTree end_expression;
-		std::unique_ptr<Statement> body;
+		value_ptr<Statement> body;
 	};
 
 	struct BreakStatement {};

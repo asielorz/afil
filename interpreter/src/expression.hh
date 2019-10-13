@@ -2,7 +2,7 @@
 
 #include "function_id.hh"
 #include "scope.hh"
-#include <memory>
+#include "value_ptr.hh"
 #include <vector>
 #include <variant>
 #include <array>
@@ -45,13 +45,13 @@ namespace expr
 	struct GlobalVariableNode : VariableNode {};
 	struct MemberVariableNode : VariableNode 
 	{
-		std::unique_ptr<ExpressionTree> owner;
+		value_ptr<ExpressionTree> owner;
 	};
 
 	struct DereferenceNode
 	{
 		TypeId variable_type;
-		std::unique_ptr<ExpressionTree> expression;
+		value_ptr<ExpressionTree> expression;
 	};
 
 	struct FunctionNode
@@ -69,14 +69,14 @@ namespace expr
 	{
 		FunctionId function_id;
 		Operator op;
-		std::unique_ptr<std::array<ExpressionTree, 2>> parameters;
+		value_ptr<std::array<ExpressionTree, 2>> parameters;
 	};
 
 	struct IfNode
 	{
-		std::unique_ptr<ExpressionTree> condition;
-		std::unique_ptr<ExpressionTree> then_case;
-		std::unique_ptr<ExpressionTree> else_case;
+		value_ptr<ExpressionTree> condition;
+		value_ptr<ExpressionTree> then_case;
+		value_ptr<ExpressionTree> else_case;
 	};
 
 	struct StatementBlockNode

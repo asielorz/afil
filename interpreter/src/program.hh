@@ -1,9 +1,11 @@
 #pragma once
 
+#include "expression.hh"
 #include "scope.hh"
 #include "span.hh"
 #include "callc.hh"
 #include <variant>
+#include <optional>
 
 namespace stmt { struct Statement; }
 
@@ -32,9 +34,14 @@ struct ExternFunction
 	void const * function_pointer;
 };
 
+struct MemberVariable : Variable
+{
+	std::optional<expr::ExpressionTree> initializer_expression;
+};
+
 struct Struct
 {
-	std::vector<Variable> member_variables;
+	std::vector<MemberVariable> member_variables;
 };
 
 struct Program
@@ -54,7 +61,7 @@ struct Program
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
 
 auto is_struct(Type const & type) noexcept -> bool;
-auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> Variable const *;
+auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> int;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
 auto type_size(Program const & program, TypeId id) noexcept -> int;
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?

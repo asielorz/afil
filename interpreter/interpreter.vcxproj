@@ -42,6 +42,7 @@
     <ClCompile Include="tests\interpreter.tests.cc" />
     <ClCompile Include="tests\main.tests.cc" />
     <ClCompile Include="tests\span.tests.cc" />
+    <ClCompile Include="tests\value_ptr.tests.cc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\callc.hh" />
@@ -64,6 +65,7 @@
     <ClInclude Include="src\string.hh" />
     <ClInclude Include="src\unreachable.hh" />
     <ClInclude Include="src\utils.hh" />
+    <ClInclude Include="src\value_ptr.hh" />
     <ClInclude Include="src\variant.hh" />
   </ItemGroup>
   <ItemGroup>
