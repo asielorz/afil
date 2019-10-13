@@ -1107,6 +1107,27 @@ namespace parser
 				index++;
 				str.member_variables.back().initializer_expression = parse_subexpression(tokens, index, p);
 			}
+			else
+			{
+				// If the type is default constructible synthesize an initializer expression from the default constructor.
+				Type const & type_data = type_with_id(p.program, type);
+				if (type_data.struct_index != -1)
+				{
+					Struct const & struct_data = p.program.structs[type_data.struct_index];
+
+					if (std::all_of(struct_data.member_variables.begin(), struct_data.member_variables.end(),
+						[](MemberVariable const & var) { return var.initializer_expression.has_value(); }))
+					{
+						expr::StructConstructorNode default_constructor_node;
+						default_constructor_node.constructed_type = type;
+						default_constructor_node.parameters.reserve(struct_data.member_variables.size());
+						for (MemberVariable const & var : struct_data.member_variables)
+							default_constructor_node.parameters.push_back(*var.initializer_expression);
+
+						str.member_variables.back().initializer_expression = std::move(default_constructor_node);
+					}
+				}
+			}
 
 			assert(tokens[index].type == TokenType::semicolon);
 			index++;

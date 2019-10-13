@@ -6,6 +6,8 @@
 template <typename T>
 struct value_ptr : public std::unique_ptr<T>
 {
+	static_assert(!std::is_array_v<T>, "T can't be an array type because we cannot copy it. If the array is of a size known in compile-time, you can use std::array");
+
 	using std::unique_ptr<T>::unique_ptr;
 	value_ptr() noexcept = default;
 	value_ptr(value_ptr &&) noexcept = default;

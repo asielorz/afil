@@ -1106,6 +1106,31 @@ TEST_CASE("Default constructor for structs that have a default value for all mem
 	REQUIRE(parse_and_run(src) == 0 + 0);
 }
 
+TEST_CASE("Structs with default constructor do not need a default value for the type that contains them to be default constructible")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+		struct aabb
+		{
+			// aabb is default constructible because ivec2 is.
+			ivec2 min;
+			ivec2 max;
+		}
+
+		let main = fn() -> int
+		{
+			let box = aabb();
+			return box.min.x;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+
 /*****************************************************************
 Backlog
 - operator overloading
