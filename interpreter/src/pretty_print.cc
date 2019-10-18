@@ -3,6 +3,7 @@
 #include "program.hh"
 #include "string.hh"
 #include "overload.hh"
+#include "variant.hh"
 
 using expr::ExpressionTree;
 using stmt::Statement;
@@ -69,6 +70,20 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 				indent(indentation_level), "dereference<", to_string(deref_node.variable_type, program), ">\n",
 				pretty_print_rec(*deref_node.expression, program, indentation_level + 1));
 		},
+		[&](AddressofNode const & addressof_node)
+		{
+			return join(
+				indent(indentation_level), "addressof<", to_string(addressof_node.return_type, program), ">\n",
+				pretty_print_rec(*addressof_node.operand, program, indentation_level + 1)
+			);
+		},
+		[&](DepointerNode const & deptr_node)
+		{
+			return join(
+				indent(indentation_level), "depointer<", to_string(deptr_node.return_type, program), ">\n",
+				pretty_print_rec(*deptr_node.operand, program, indentation_level + 1)
+			);
+		},
 		[&](LocalVariableNode const & var_node) 
 		{
 			return join(indent(indentation_level), "local<", to_string(var_node.variable_type, program), ">: ", var_node.variable_offset, '\n');
@@ -82,7 +97,7 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 		},
 		[&](MemberVariableNode const & var_node)
 		{
-			Struct const & s = program.structs[type_with_id(program, expression_type_id(*var_node.owner, program)).struct_index];
+			Struct const & s = *struct_for_type(program, expression_type_id(*var_node.owner, program));
 			auto const found_var = std::find_if(s.member_variables.begin(), s.member_variables.end(), 
 				[&](Variable const & var) { return var.offset == var_node.variable_offset; });
 

@@ -54,6 +54,7 @@ namespace expr
 			case Operator::xor_:				return "xor";
 			case Operator::not:					return "not";
 			case Operator::assign:				return "=";
+			case Operator::addressof:			return "&";
 		}
 		declare_unreachable();
 	}
@@ -75,6 +76,8 @@ namespace expr
 			[](Literal<float>) { return TypeId::float_; },
 			[](Literal<bool>) { return TypeId::bool_; },
 			[](DereferenceNode const & deref_node) { return deref_node.variable_type; },
+			[](AddressofNode const & addressof_node) { return addressof_node.return_type; },
+			[](DepointerNode const & deptr_node) { return deptr_node.return_type; },
 			[](VariableNode const & var_node) { return make_reference(var_node.variable_type); },
 			[](MemberVariableNode const & var_node) { return var_node.variable_type; },
 			[](FunctionNode const &) { return TypeId::function; },

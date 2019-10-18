@@ -1154,9 +1154,23 @@ TEST_CASE("Operator overloading")
 	REQUIRE(parse_and_run(src) == 8);
 }
 
+TEST_CASE("Pointers")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			int mut i = 5;
+			int mut * pi = &i;
+			*pi = 6;
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 6);
+}
+
 /*****************************************************************
 Backlog
-- operator overloading
 - pointers
 - templates
 - arrays (depends on pointers)

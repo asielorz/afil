@@ -25,7 +25,7 @@ namespace lex
 	{
 		return
 			(c == '+') || (c == '-') || (c == '*') || (c == '/') || (c == '%') ||
-			(c == '<') || (c == '>') || (c == '=') || (c == '!');
+			(c == '<') || (c == '>') || (c == '=') || (c == '!') || (c == '&');
 	}
 
 	auto is_operator(std::string_view src, int index) noexcept -> bool

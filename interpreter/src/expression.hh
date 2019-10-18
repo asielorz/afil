@@ -23,7 +23,11 @@ namespace expr
 		add, subtract, multiply, divide, modulo,
 		equal, not_equal, less, less_equal, greater, greater_equal, three_way_compare,
 		and_, or_, xor_, not,
-		assign
+		assign,
+		addressof,
+
+		// Aliases
+		dereference = multiply
 	};
 	auto precedence(Operator op) noexcept -> int;
 	auto operator_function_name(Operator op) noexcept->std::string_view;
@@ -52,6 +56,18 @@ namespace expr
 	{
 		TypeId variable_type;
 		value_ptr<ExpressionTree> expression;
+	};
+
+	struct AddressofNode
+	{
+		TypeId return_type;
+		value_ptr<ExpressionTree> operand;
+	};
+
+	struct DepointerNode
+	{
+		TypeId return_type;
+		value_ptr<ExpressionTree> operand;
 	};
 
 	struct FunctionNode
@@ -96,7 +112,7 @@ namespace expr
 	{
 		using ExpressionTreeBase = std::variant<
 			Literal<int>, Literal<float>, Literal<bool>,
-			DereferenceNode,
+			DereferenceNode, AddressofNode, DepointerNode,
 			LocalVariableNode, GlobalVariableNode, MemberVariableNode,
 			FunctionNode, FunctionCallNode, RelationalOperatorCallNode,
 			IfNode, StatementBlockNode,

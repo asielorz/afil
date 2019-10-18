@@ -52,6 +52,12 @@ auto make_mutable(TypeId type) noexcept -> TypeId
 	return type;
 }
 
+auto remove_reference(TypeId type) noexcept -> TypeId
+{
+	type.is_reference = false;
+	return type;
+}
+
 auto decay(TypeId type) noexcept -> TypeId
 {
 	type.is_mutable = false;

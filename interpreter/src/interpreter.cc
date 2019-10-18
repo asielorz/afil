@@ -188,6 +188,14 @@ namespace interpreter
 				auto const pointer = read<void const *>(stack, pointer_address);
 				memcpy(pointer_at_address(stack, return_address), pointer, type_size(program, deref_node.variable_type));
 			},
+			[&](expr::AddressofNode const & addressof_node)
+			{
+				eval_expression_tree(*addressof_node.operand, stack, program, return_address);
+			},
+			[&](expr::DepointerNode const & deptr_node)
+			{
+				eval_expression_tree(*deptr_node.operand, stack, program, return_address);
+			},
 			[&](expr::FunctionNode const & func_node) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
 			{
 				write(stack, return_address, func_node.function_id);
@@ -251,7 +259,7 @@ namespace interpreter
 			},
 			[&](expr::StructConstructorNode const & ctor_node)
 			{
-				Struct const & struct_data = program.structs[type_with_id(program, ctor_node.constructed_type).struct_index];
+				Struct const & struct_data = *struct_for_type(program, ctor_node.constructed_type);
 				for (size_t i = 0; i < struct_data.member_variables.size(); ++i)
 					eval_expression_tree(ctor_node.parameters[i], stack, program, return_address + struct_data.member_variables[i].offset);
 			}

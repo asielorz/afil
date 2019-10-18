@@ -2,6 +2,7 @@
 #include "lexer.hh"
 #include "parser.hh"
 #include "function_ptr.hh"
+#include "variant.hh"
 #include <algorithm>
 #include <cassert>
 
@@ -10,10 +11,10 @@ using namespace std::literals;
 auto built_in_types() noexcept -> std::vector<std::pair<std::string_view, Type>>
 {
 	return {
-		{"void",  {0, 1, -1}},
-		{"int",   {4, 4, -1}},
-		{"float", {4, 4, -1}},
-		{"bool",  {1, 1, -1}},
+		{"void",  {0, 1}},
+		{"int",   {4, 4}},
+		{"float", {4, 4}},
+		{"bool",  {1, 1}},
 	};
 }
 
@@ -131,7 +132,20 @@ auto resolve_function_overloading(span<FunctionId const> overload_set, span<Type
 
 auto is_struct(Type const & type) noexcept -> bool
 {
-	return type.struct_index != -1;
+	return has_type<StructType>(type.extra_data);
+}
+
+auto struct_for_type(Program const & program, Type const & type) noexcept -> Struct const *
+{
+	if (auto const s = try_get<StructType>(type.extra_data))
+		return &program.structs[s->struct_index];
+	else
+		return nullptr;
+}
+
+auto struct_for_type(Program const & program, TypeId type) noexcept -> Struct const *
+{
+	return struct_for_type(program, type_with_id(program, type));
 }
 
 auto find_member_variable(Struct const & type, std::string_view member_name, span<char const> string_pool) noexcept -> int
@@ -141,6 +155,36 @@ auto find_member_variable(Struct const & type, std::string_view member_name, spa
 		return -1;
 	else
 		return static_cast<int>(it - type.member_variables.begin());
+}
+
+auto is_pointer(Type const & type) noexcept -> bool
+{
+	return has_type<PointerType>(type.extra_data);
+}
+
+auto pointer_type_for(TypeId pointee_type, Program & program) noexcept -> TypeId
+{
+	assert(!pointee_type.is_reference); // A pointer can't point at a reference.
+
+	// If a pointer type for this type has already been created, return that.
+	for (Type const & type : program.types)
+		if (auto const pointer = try_get<PointerType>(type.extra_data))
+			if (pointer->value_type == pointee_type)
+				return TypeId::with_index(static_cast<unsigned>(&type - program.types.data()));
+
+	// Otherwise create one.
+	Type new_type;
+	new_type.size = sizeof(void *);
+	new_type.alignment = alignof(void *);
+	new_type.extra_data = PointerType{pointee_type};
+	return add_type(program, std::move(new_type));
+}
+
+auto add_type(Program & program, Type new_type) noexcept -> TypeId
+{
+	unsigned const type_index = static_cast<unsigned>(program.types.size());
+	program.types.push_back(std::move(new_type));
+	return TypeId::with_index(type_index);
 }
 
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &

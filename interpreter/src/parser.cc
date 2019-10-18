@@ -55,6 +55,7 @@ namespace parser
 			case '<': return Operator::less;
 			case '>': return Operator::greater;
 			case '=': return Operator::assign;
+			case '&': return Operator::addressof;
 		}
 		declare_unreachable();
 	}
@@ -63,7 +64,9 @@ namespace parser
 	auto is_unary_operator(lex::Token const & token) noexcept -> bool
 	{
 		return token.type == TokenType::operator_ &&
-			token.source == "-"sv || 
+			token.source == "-"sv ||
+			token.source == "&"sv ||
+			token.source == "*"sv ||
 			token.source == "not"sv;
 	}
 
@@ -233,22 +236,37 @@ namespace parser
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::optional<stmt::Statement>;
 
-	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program const & program) noexcept -> TypeId
+	auto parse_mutable_and_pointer(span<lex::Token const> tokens, size_t & index, TypeId type, Program & program) noexcept -> TypeId
+	{
+		// Look for mutable qualifier.
+		if (tokens[index].source == "mut"sv)
+		{
+			type.is_mutable = true;
+			index++;
+		}
+
+		// Look for pointer type
+		if (tokens[index].source == "*"sv)
+		{
+			TypeId const pointer_type = pointer_type_for(type, program);
+			index++;
+			return parse_mutable_and_pointer(tokens, index, pointer_type, program);
+		}
+		else
+			return type;
+	}
+
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> TypeId
 	{
 		// Lookup type name.
 		TypeId type_found = lookup_type_name(scope_stack, tokens[index].source, program.string_pool);
 		index++;
 		assert(type_found != TypeId::none);
 
-		// Look for mutable qualifier.
-		if (tokens[index].source == "mut")
-		{
-			type_found.is_mutable = true;
-			index++;
-		}
+		type_found = parse_mutable_and_pointer(tokens, index, type_found, program);
 
 		// Look for reference qualifier.
-		if (tokens[index].source == "&")
+		if (tokens[index].source == "&"sv)
 		{
 			type_found.is_reference = true;
 			index++;
@@ -447,7 +465,7 @@ namespace parser
 	{
 		Type const & type = type_with_id(p.program, type_id);
 		assert(is_struct(type)); // Type must be a struct (by now).
-		Struct const & struct_data = p.program.structs[type.struct_index];
+		Struct const & struct_data = *struct_for_type(p.program, type);
 		auto const struct_member_types = map(struct_data.member_variables, &Variable::type);
 
 		expr::StructConstructorNode node;
@@ -566,32 +584,54 @@ namespace parser
 		return node;
 	}
 
-	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::FunctionCallNode
+	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree
 	{
-		std::string_view function_name = operator_function_name(parse_operator(tokens[index].source));
+		Operator const op = parse_operator(tokens[index].source);
 		index++;
 
 		auto operand = parse_expression_and_trailing_subexpressions(tokens, index, p);
+		TypeId const operand_type = expression_type_id(operand, p.program);
 
-		auto const visitor = overload(
-			[](auto) -> expr::FunctionCallNode { declare_unreachable(); },
-			[&](lookup_result::OverloadSet const & overload_set) -> expr::FunctionCallNode
-			{
-				TypeId const operand_type = expression_type_id(operand, p.program);
-				auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set.function_ids, {&operand, 1}, {&operand_type, 1}, p.program);
-				if (function_id != invalid_function_id)
+		// Addressof is a particular case that cannot be overloaded and is implemented by the compiler.
+		if (op == Operator::addressof)
+		{
+			assert(operand_type.is_reference);
+			expr::AddressofNode node;
+			node.return_type = pointer_type_for(remove_reference(operand_type), p.program);
+			node.operand = std::make_unique<ExpressionTree>(std::move(operand));
+			return node;
+		}
+		// Built in dereference
+		else if (op == Operator::dereference && is_pointer(type_with_id(p.program, operand_type)))
+		{
+			expr::DepointerNode node;
+			node.operand = std::make_unique<ExpressionTree>(std::move(operand));
+			node.return_type = make_reference(std::get<PointerType>(type_with_id(p.program, operand_type).extra_data).value_type);
+			return node;
+		}
+		else
+		{
+			auto const visitor = overload(
+				[](auto) -> expr::FunctionCallNode { declare_unreachable(); },
+				[&](lookup_result::OverloadSet const & overload_set) -> expr::FunctionCallNode
 				{
-					expr::FunctionCallNode func_node;
-					func_node.function_id = function_id;
-					func_node.parameters.push_back(std::move(operand));
-					return func_node;
+					TypeId const operand_type = expression_type_id(operand, p.program);
+					auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set.function_ids, { &operand, 1 }, { &operand_type, 1 }, p.program);
+					if (function_id != invalid_function_id)
+					{
+						expr::FunctionCallNode func_node;
+						func_node.function_id = function_id;
+						func_node.parameters.push_back(std::move(operand));
+						return func_node;
+					}
+					else declare_unreachable();
 				}
-				else declare_unreachable();
-			}
-		);
+			);
 
-		auto const lookup = lookup_name(p.scope_stack, function_name, p.program.string_pool);
-		return std::visit(visitor, lookup);
+			std::string_view const function_name = operator_function_name(op);
+			auto const lookup = lookup_name(p.scope_stack, function_name, p.program.string_pool);
+			return std::visit(visitor, lookup);
+		}
 	}
 
 	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree
@@ -690,7 +730,7 @@ namespace parser
 				TypeId const last_operand_type_id = expression_type_id(tree, p.program);
 				Type const & last_operand_type = type_with_id(p.program, last_operand_type_id);
 				assert(is_struct(last_operand_type));
-				Struct const & last_operand_struct = p.program.structs[last_operand_type.struct_index];
+				Struct const & last_operand_struct = *struct_for_type(p.program, last_operand_type);
 
 				assert(tokens[index].type == TokenType::identifier);
 				std::string_view const member_name = tokens[index].source;
@@ -1130,9 +1170,9 @@ namespace parser
 			{
 				// If the type is default constructible synthesize an initializer expression from the default constructor.
 				Type const & type_data = type_with_id(p.program, type);
-				if (type_data.struct_index != -1)
+				if (is_struct(type_data))
 				{
-					Struct const & struct_data = p.program.structs[type_data.struct_index];
+					Struct const & struct_data = *struct_for_type(p.program, type_data);
 
 					if (std::all_of(struct_data.member_variables.begin(), struct_data.member_variables.end(),
 						[](MemberVariable const & var) { return var.initializer_expression.has_value(); }))
@@ -1156,11 +1196,10 @@ namespace parser
 		assert(tokens[index].type == TokenType::close_brace);
 		index++;
 
-		new_type.struct_index = static_cast<int>(p.program.structs.size());
-		int const type_index = static_cast<int>(p.program.types.size());
+		new_type.extra_data = StructType{static_cast<int>(p.program.structs.size())};
+		TypeId const new_type_id = add_type(p.program, std::move(new_type));
 		p.program.structs.push_back(std::move(str));
-		p.program.types.push_back(std::move(new_type));
-		top(p.scope_stack).types.push_back({type_name, TypeId::with_index(type_index)});
+		top(p.scope_stack).types.push_back({type_name, new_type_id});
 
 		return std::nullopt;
 	}

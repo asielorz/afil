@@ -9,11 +9,26 @@
 
 namespace stmt { struct Statement; }
 
+struct BuiltInType{};
+struct PointerType
+{
+	TypeId value_type;
+};
+struct ArrayType
+{
+	TypeId value_type;
+	int size;
+};
+struct StructType
+{
+	int struct_index;
+};
+
 struct Type
 {
 	int size;
 	int alignment;
-	int struct_index;
+	std::variant<BuiltInType, PointerType, ArrayType, StructType> extra_data;
 };
 
 struct Function : Scope
@@ -61,10 +76,18 @@ struct Program
 // Returns id of function found or invalid_function_id on failure.
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
 
-auto is_struct(Type const & type) noexcept -> bool;
-auto find_member_variable(Struct const & type, std::string_view member_name, span<char const> string_pool) noexcept -> int;
+auto add_type(Program & program, Type new_type) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
 auto type_size(Program const & program, TypeId id) noexcept -> int;
+
+auto is_struct(Type const & type) noexcept -> bool;
+auto struct_for_type(Program const & program, Type const & type) noexcept -> Struct const *;
+auto struct_for_type(Program const & program, TypeId type) noexcept -> Struct const *;
+auto find_member_variable(Struct const & type, std::string_view member_name, span<char const> string_pool) noexcept -> int;
+
+auto is_pointer(Type const & type) noexcept -> bool;
+auto pointer_type_for(TypeId pointee_type, Program & program) noexcept->TypeId;
+
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 
