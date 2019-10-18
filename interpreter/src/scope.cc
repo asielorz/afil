@@ -1,6 +1,7 @@
 #include "scope.hh"
 #include "overload.hh"
-#include "name_equal.hh"
+#include "statement.hh"
+#include "program.hh"
 #include <algorithm>
 
 TypeId const TypeId::void_ = {false, false, false, 0};
@@ -72,7 +73,7 @@ auto common_type(TypeId a, TypeId b) noexcept -> TypeId
 	return TypeId::none;
 }
 
-auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
+auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char const> string_pool) noexcept
 	-> std::variant<
 		lookup_result::Nothing, 
 		lookup_result::Variable,
@@ -96,25 +97,25 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		{
 			if (scope_stack[i].type == ScopeType::global)
 			{
-				auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), name_equal(name));
+				auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), pooled_name_equal(string_pool, name));
 				if (var != scope.variables.end())
 					return lookup_result::GlobalVariable{var->type, var->offset};
 			}
 			else if (!stop_looking_for_variables)
 			{
-				auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), name_equal(name));
+				auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), pooled_name_equal(string_pool, name));
 				if (var != scope.variables.end())
 					return lookup_result::Variable{var->type, var->offset};
 			}
 			
-			auto const type = std::find_if(scope.types.begin(), scope.types.end(), name_equal(name));
+			auto const type = std::find_if(scope.types.begin(), scope.types.end(), pooled_name_equal(string_pool, name));
 			if (type != scope.types.end())
 				return lookup_result::Type{type->id};
 		}
 
 		// Functions.
 		for (FunctionName const & fn : scope.functions)
-			if (fn.name == name)
+			if (get(string_pool, fn.name) == name)
 				overload_set.function_ids.push_back(fn.id);
 
 		// After we leave a function, stop looking for variables.
@@ -128,13 +129,13 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		return overload_set;
 }
 
-auto lookup_type_name(ScopeStackView scope_stack, std::string_view name) noexcept -> TypeId
+auto lookup_type_name(ScopeStackView scope_stack, std::string_view name, span<char const> string_pool) noexcept -> TypeId
 {
 	auto const visitor = overload(
 		[](auto const &) { return TypeId::none; },
 		[](lookup_result::Type type) { return type.type_id; }
 	);
-	return std::visit(visitor, lookup_name(scope_stack, name));
+	return std::visit(visitor, lookup_name(scope_stack, name, string_pool));
 }
 
 auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int

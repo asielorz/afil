@@ -45,14 +45,13 @@ auto eval_expression(std::string_view src)
 	return eval_expression<T>(src, stack, program);
 }
 
-auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Scope & scope) noexcept -> void
+auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Program & program, Scope & scope) noexcept -> void
 {
-	Program program;
 	ScopeStack scope_stack;
 	scope_stack.push_back({ &program.global_scope, ScopeType::global });
 	scope_stack.push_back({ &scope, ScopeType::function });
 	TypeId type = TypeId::none;
-	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), {program, scope_stack, type}), stack, program, 0);
+	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), { program, scope_stack, type }), stack, program, 0);
 }
 
 auto pretty_print_expr(std::string_view source, Program & program)
@@ -105,13 +104,14 @@ TEST_CASE("A statement declares a variable and assigns it an expression, then en
 {
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
+	Program program;
 	Function function;
-	run_statement("int i = 5;", stack, function);
-	run_statement("int foo = 5 + 6 - 3 * 2 + 8 / 3;", stack, function);
+	run_statement("int i = 5;", stack, program, function);
+	run_statement("int foo = 5 + 6 - 3 * 2 + 8 / 3;", stack, program, function);
 
 	REQUIRE(function.variables.size() == 2);
-	REQUIRE(function.variables[0].name == "i");
-	REQUIRE(function.variables[1].name == "foo");
+	REQUIRE(get(program, function.variables[0].name) == "i");
+	REQUIRE(get(program, function.variables[1].name) == "foo");
 	REQUIRE(read_word(stack, stack.base_pointer + function.variables[0].offset) == 5);
 	REQUIRE(read_word(stack, stack.base_pointer + function.variables[1].offset) == 5 + 6 - 3 * 2 + 8 / 3);
 }
@@ -121,7 +121,7 @@ TEST_CASE("A variable can be accessed from expressions after it is declared")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
 	Program program;
-	run_statement("int i = 30;", stack, program.global_scope);
+	run_statement("int i = 30;", stack, program, program.global_scope);
 	int const i = 30;
 	REQUIRE(eval_expression<int>("i", stack, program) == i);
 	REQUIRE(eval_expression<int>("i * i - 4 + i / 6 - 3 * i", stack, program) == i * i - 4 + i / 6 - 3 * i);
@@ -157,10 +157,10 @@ TEST_CASE("Use let to name a function")
 	REQUIRE(program.functions.size() == 1);
 	ScopeStack scope_stack;
 	scope_stack.push_back({&program.global_scope, ScopeType::global});
-	REQUIRE(std::get<lookup_result::OverloadSet>(lookup_name(scope_stack, "id")).function_ids.size() == 1);
+	REQUIRE(std::get<lookup_result::OverloadSet>(lookup_name(scope_stack, "id", program.string_pool)).function_ids.size() == 1);
 	REQUIRE(program.functions[0].variables.size() == 1);
 	REQUIRE(program.functions[0].parameter_count == 1);
-	REQUIRE(program.functions[0].variables[0].name == "x");
+	REQUIRE(get(program, program.functions[0].variables[0].name) == "x");
 }
 
 TEST_CASE("Call a function")
@@ -236,10 +236,10 @@ TEST_CASE("Floating point variable declaration")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
 	Program program;
-	run_statement("float f = 5.0;", stack, program.global_scope);
+	run_statement("float f = 5.0;", stack, program, program.global_scope);
 
 	REQUIRE(program.global_scope.variables.size() == 1);
-	REQUIRE(program.global_scope.variables[0].name == "f");
+	REQUIRE(get(program, program.global_scope.variables[0].name) == "f");
 	REQUIRE(interpreter::read<float>(stack, stack.base_pointer + program.global_scope.variables[0].offset) == 5.0f);
 	REQUIRE(eval_expression<float>("f", stack, program) == 5.0f);
 }
@@ -269,7 +269,7 @@ TEST_CASE("Hacking extern functions as a proof of concept")
 		callc::c_function_caller(add_fn),
 		add_fn
 	});
-	program.global_scope.functions.push_back(FunctionName{"add", FunctionId{1, 0}});
+	program.global_scope.functions.push_back(FunctionName{pool_string(program, "add"), FunctionId{1, 0}});
 
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
@@ -296,8 +296,8 @@ TEST_CASE("Declare variable of boolean type")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
 	Program program;
-	run_statement("bool t = true;", stack, program.global_scope);
-	run_statement("bool f = false;", stack, program.global_scope);
+	run_statement("bool t = true;", stack, program, program.global_scope);
+	run_statement("bool f = false;", stack, program, program.global_scope);
 
 	REQUIRE(eval_expression<bool>("t", stack, program) == true);
 	REQUIRE(eval_expression<bool>("f", stack, program) == false);
@@ -433,8 +433,8 @@ TEST_CASE("Declaring variables with let")
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 128);
 	Program program;
-	run_statement("let i = 7 * 6 / 2 - 50;", stack, program.global_scope);
-	run_statement("let f = 3.141592;", stack, program.global_scope);
+	run_statement("let i = 7 * 6 / 2 - 50;", stack, program, program.global_scope);
+	run_statement("let f = 3.141592;", stack, program, program.global_scope);
 
 	REQUIRE(eval_expression<int>("i", stack, program) == 7 * 6 / 2 - 50);
 	REQUIRE(eval_expression<float>("f", stack, program) == 3.141592f);
@@ -1130,7 +1130,30 @@ TEST_CASE("Structs with default constructor do not need a default value for the 
 
 	REQUIRE(parse_and_run(src) == 0);
 }
+/*
+TEST_CASE("Operator overloading")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+		let operator + = fn(ivec2 a, ivec2 b)
+		{
+			return ivec2(a.x + b.x, a.y + b.y);
+		};
 
+		let main = fn() -> int
+		{
+			let v = ivec2(4, 5) + ivec2(-1, 3);
+			return v.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 8);
+}
+*/
 /*****************************************************************
 Backlog
 - operator overloading

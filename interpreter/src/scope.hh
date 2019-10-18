@@ -42,22 +42,30 @@ auto make_mutable(TypeId type) noexcept -> TypeId;
 auto decay(TypeId type) noexcept -> TypeId;
 auto common_type(TypeId a, TypeId b) noexcept -> TypeId; // Returns TypeID::none if there is no common type.
 
+struct Program;
+
+struct PooledString
+{
+	size_t first;
+	size_t size;
+};
+
 struct Variable
 {
-	std::string_view name;
+	PooledString name;
 	TypeId type;
 	int offset;
 };
 
 struct FunctionName
 {
-	std::string_view name;
+	PooledString name;
 	FunctionId id;
 };
 
 struct TypeName
 {
-	std::string_view name;
+	PooledString name;
 	TypeId id;
 };
 
@@ -87,7 +95,7 @@ namespace lookup_result
 	struct OverloadSet { std::vector<FunctionId> function_ids; };
 	struct Type { TypeId type_id; };
 }
-auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
+auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char const> string_pool) noexcept
 	-> std::variant<
 		lookup_result::Nothing, 
 		lookup_result::Variable,
@@ -95,6 +103,6 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		lookup_result::OverloadSet,
 		lookup_result::Type
 	>;
-auto lookup_type_name(ScopeStackView program, std::string_view name) noexcept -> TypeId;
+auto lookup_type_name(ScopeStackView program, std::string_view name, span<char const> string_pool) noexcept -> TypeId;
 
 auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int;

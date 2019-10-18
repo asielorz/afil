@@ -53,6 +53,7 @@ struct Program
 	std::vector<Function> functions;
 	std::vector<ExternFunction> extern_functions;
 	std::vector<stmt::Statement> global_initialization_statements;
+	std::vector<char> string_pool;
 	Scope global_scope;
 	FunctionId main_function = invalid_function_id;
 };
@@ -61,8 +62,26 @@ struct Program
 auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
 
 auto is_struct(Type const & type) noexcept -> bool;
-auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> int;
+auto find_member_variable(Struct const & type, std::string_view member_name, span<char const> string_pool) noexcept -> int;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
 auto type_size(Program const & program, TypeId id) noexcept -> int;
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
+
+auto pool_string(Program & program, std::string_view string) noexcept -> PooledString;
+auto get(Program const & program, PooledString string) noexcept -> std::string_view;
+auto get(span<char const> pool, PooledString string) noexcept -> std::string_view;
+
+struct pooled_name_equal
+{
+	constexpr pooled_name_equal(span<char const> pool_, std::string_view name_) noexcept : pool(pool_), name(name_) {}
+
+	template <typename T>
+	constexpr auto operator () (T const & t) const noexcept
+	{
+		return get(pool, t.name) == name;
+	}
+
+	span<char const> pool;
+	std::string_view name;
+};

@@ -19,7 +19,7 @@ auto to_string(TypeId id, Program const & program) noexcept -> std::string
 	if (found_type == program.global_scope.types.end())
 		type_name = "<type>";
 	else
-		type_name = std::string(found_type->name);
+		type_name = std::string(get(program, found_type->name));
 
 	if (id.is_mutable)
 		type_name += " mut";
@@ -43,7 +43,7 @@ auto pretty_print_function_node(FunctionId function_id, Program const & program)
 	if (found_fn == program.global_scope.functions.end())
 		str = "<function>(";
 	else
-		str = std::string(found_fn->name) + '(';
+		str = std::string(get(program, found_fn->name)) + '(';
 
 	auto const param_types = parameter_types(program, function_id);
 	for (TypeId const & id : param_types)
@@ -78,7 +78,7 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 			auto const found_var = std::find_if(program.global_scope.variables.begin(), program.global_scope.variables.end(),
 				[var_node](Variable const & var) { return var.offset == var_node.variable_offset; });
 
-			return join(indent(indentation_level), "global<", to_string(var_node.variable_type, program), ">: ", found_var->name, '\n');
+			return join(indent(indentation_level), "global<", to_string(var_node.variable_type, program), ">: ", get(program, found_var->name), '\n');
 		},
 		[&](MemberVariableNode const & var_node)
 		{
@@ -87,7 +87,7 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 				[&](Variable const & var) { return var.offset == var_node.variable_offset; });
 
 			return join(
-				indent(indentation_level), "member<", to_string(decay(var_node.variable_type), program), ">: ", found_var->name, '\n',
+				indent(indentation_level), "member<", to_string(decay(var_node.variable_type), program), ">: ", get(program, found_var->name), '\n',
 				pretty_print_rec(*var_node.owner, program, indentation_level + 1));
 		},
 		[&](FunctionNode const & func_node) 

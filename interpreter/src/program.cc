@@ -2,7 +2,6 @@
 #include "lexer.hh"
 #include "parser.hh"
 #include "function_ptr.hh"
-#include "name_equal.hh"
 #include <algorithm>
 #include <cassert>
 
@@ -97,7 +96,7 @@ Program::Program()
 
 	for (auto const type : built_in_types_to_add)
 	{
-		global_scope.types.push_back({type.first, {false, false, false, static_cast<unsigned>(types.size())}});
+		global_scope.types.push_back({pool_string(*this, type.first), {false, false, false, static_cast<unsigned>(types.size())}});
 		types.push_back(type.second);
 	}
 
@@ -110,7 +109,7 @@ Program::Program()
 
 	for (auto const fn : extern_functions_to_add)
 	{
-		global_scope.functions.push_back({fn.first, {true, static_cast<unsigned>(extern_functions.size())}});
+		global_scope.functions.push_back({pool_string(*this, fn.first), {true, static_cast<unsigned>(extern_functions.size())}});
 		extern_functions.push_back(fn.second);
 	}
 }
@@ -135,9 +134,9 @@ auto is_struct(Type const & type) noexcept -> bool
 	return type.struct_index != -1;
 }
 
-auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> int
+auto find_member_variable(Struct const & type, std::string_view member_name, span<char const> string_pool) noexcept -> int
 {
-	auto const it = std::find_if(type.member_variables.begin(), type.member_variables.end(), name_equal(member_name));
+	auto const it = std::find_if(type.member_variables.begin(), type.member_variables.end(), pooled_name_equal(string_pool, member_name));
 	if (it == type.member_variables.end())
 		return -1;
 	else
@@ -180,4 +179,21 @@ auto return_type(Program const & program, FunctionId id) noexcept -> TypeId
 		return program.extern_functions[id.index].return_type;
 	else
 		return program.functions[id.index].return_type;
+}
+
+auto pool_string(Program & program, std::string_view string) noexcept -> PooledString
+{
+	size_t const prev_size = program.string_pool.size();
+	program.string_pool.insert(program.string_pool.end(), string.begin(), string.end());
+	return PooledString{prev_size, string.size()};
+}
+
+auto get(Program const & program, PooledString string) noexcept -> std::string_view
+{
+	return get(program.string_pool, string);
+}
+
+auto get(span<char const> pool, PooledString string) noexcept -> std::string_view
+{
+	return std::string_view(pool.data() + string.first, string.size);
 }
