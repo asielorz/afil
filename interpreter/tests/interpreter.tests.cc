@@ -1130,7 +1130,7 @@ TEST_CASE("Structs with default constructor do not need a default value for the 
 
 	REQUIRE(parse_and_run(src) == 0);
 }
-/*
+
 TEST_CASE("Operator overloading")
 {
 	auto const src = R"(
@@ -1139,7 +1139,7 @@ TEST_CASE("Operator overloading")
 			int x = 0;
 			int y = 0;
 		}
-		let operator + = fn(ivec2 a, ivec2 b)
+		let (+) = fn(ivec2 a, ivec2 b)
 		{
 			return ivec2(a.x + b.x, a.y + b.y);
 		};
@@ -1153,7 +1153,7 @@ TEST_CASE("Operator overloading")
 
 	REQUIRE(parse_and_run(src) == 8);
 }
-*/
+
 /*****************************************************************
 Backlog
 - operator overloading

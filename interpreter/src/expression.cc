@@ -37,23 +37,23 @@ namespace expr
 	{
 		switch (op)
 		{
-			case Operator::add:					return "operator+";
-			case Operator::subtract:			return "operator-";
-			case Operator::multiply:			return "operator*";
-			case Operator::divide:				return "operator/";
-			case Operator::modulo:				return "operator%";
-			case Operator::equal:				return "operator==";
-			case Operator::not_equal:			return "operator==";
-			case Operator::less:				return "operator<=>";
-			case Operator::less_equal:			return "operator<=>";
-			case Operator::greater:				return "operator<=>";
-			case Operator::greater_equal:		return "operator<=>";
-			case Operator::three_way_compare:	return "operator<=>";
-			case Operator::and_:				return "operator and";
-			case Operator::or_:					return "operator or";
-			case Operator::xor_:				return "operator xor";
-			case Operator::not:					return "operator not";
-			case Operator::assign:				return "operator=";
+			case Operator::add:					return "+";
+			case Operator::subtract:			return "-";
+			case Operator::multiply:			return "*";
+			case Operator::divide:				return "/";
+			case Operator::modulo:				return "%";
+			case Operator::equal:				return "==";
+			case Operator::not_equal:			return "==";
+			case Operator::less:				return "<=>";
+			case Operator::less_equal:			return "<=>";
+			case Operator::greater:				return "<=>";
+			case Operator::greater_equal:		return "<=>";
+			case Operator::three_way_compare:	return "<=>";
+			case Operator::and_:				return "and";
+			case Operator::or_:					return "or";
+			case Operator::xor_:				return "xor";
+			case Operator::not:					return "not";
+			case Operator::assign:				return "=";
 		}
 		declare_unreachable();
 	}

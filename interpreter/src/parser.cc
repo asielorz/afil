@@ -868,9 +868,27 @@ namespace parser
 				index++;
 			}
 
-			lex::Token const id_token = tokens[index];
-			assert(id_token.type == TokenType::identifier);
-			index++;
+			std::string_view name;
+			bool is_operator = false;
+
+			// Parsing an operator function
+			if (tokens[index].type == TokenType::open_parenthesis)
+			{
+				index++;
+				assert(tokens[index].type == TokenType::operator_);
+				name = tokens[index].source;
+				index++;
+				assert(tokens[index].type == TokenType::close_parenthesis);
+				index++;
+
+				is_operator = true;
+			}
+			else
+			{
+				assert(tokens[index].type == TokenType::identifier);
+				name = tokens[index].source;
+				index++;
+			}
 
 			assert(tokens[index].source == "=");
 			index++;
@@ -883,15 +901,16 @@ namespace parser
 			{
 				assert(!is_mutable); // A function cannot be mutable.
 				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
-				bind_function_name(id_token.source, function_id, p.program, top(p.scope_stack));
+				bind_function_name(name, function_id, p.program, top(p.scope_stack));
 				return std::nullopt;
 			}
 			else
 			{
 				assert(is_data_type(expr_type));
+				assert(!is_operator);
 				TypeId const var_type = is_mutable ? make_mutable(decay(expr_type)) : decay(expr_type);
 				stmt::VariableDeclarationStatement node;
-				node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, id_token.source), var_type, local_variable_offset(p.scope_stack), p.program);
+				node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, name), var_type, local_variable_offset(p.scope_stack), p.program);
 				if (var_type == expr_type)
 					node.assigned_expression = std::move(expression);
 				else
