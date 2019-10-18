@@ -12,15 +12,23 @@ auto to_string(TypeId id, Program const & program) noexcept -> std::string
 {
 	TypeId const decayed_id = decay(id);
 
-	// TODO: Maybe a more exhaustive search? Same for functions.
-	auto const found_type = std::find_if(program.global_scope.types.begin(), program.global_scope.types.end(),
-		[decayed_id](TypeName const & type_name) { return type_name.id == decayed_id; });
-
 	std::string type_name;
-	if (found_type == program.global_scope.types.end())
-		type_name = "<type>";
+	if (is_pointer(type_with_id(program, decayed_id)))
+	{
+		type_name = to_string(std::get<PointerType>(type_with_id(program, decayed_id).extra_data).value_type, program);
+		type_name += " *";
+	}
 	else
-		type_name = std::string(get(program, found_type->name));
+	{
+		// TODO: Maybe a more exhaustive search? Same for functions.
+		auto const found_type = std::find_if(program.global_scope.types.begin(), program.global_scope.types.end(),
+			[decayed_id](TypeName const & type_name) { return type_name.id == decayed_id; });
+
+		if (found_type == program.global_scope.types.end())
+			type_name = "<type>";
+		else
+			type_name = std::string(get(program, found_type->name));
+	}
 
 	if (id.is_mutable)
 		type_name += " mut";
@@ -41,7 +49,9 @@ auto pretty_print_function_node(FunctionId function_id, Program const & program)
 	
 	std::string str;
 
-	if (found_fn == program.global_scope.functions.end())
+	if (function_id == program.main_function)
+		str = "main(";
+	else if (found_fn == program.global_scope.functions.end())
 		str = "<function>(";
 	else
 		str = std::string(get(program, found_fn->name)) + '(';
