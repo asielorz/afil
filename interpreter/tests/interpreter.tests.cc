@@ -1134,8 +1134,6 @@ TEST_CASE("Structs with default constructor do not need a default value for the 
 /*****************************************************************
 Backlog
 - operator overloading
-- designated initializers
-- default values for struct members
 - pointers
 - templates
 - arrays (depends on pointers)
