@@ -605,8 +605,9 @@ namespace parser
 		else if (op == Operator::dereference && is_pointer(type_with_id(p.program, operand_type)))
 		{
 			expr::DepointerNode node;
-			node.operand = std::make_unique<ExpressionTree>(std::move(operand));
 			node.return_type = make_reference(std::get<PointerType>(type_with_id(p.program, operand_type).extra_data).value_type);
+			node.operand = std::make_unique<ExpressionTree>(insert_conversion_node(std::move(operand), operand_type, remove_reference(operand_type)));
+
 			return node;
 		}
 		else
