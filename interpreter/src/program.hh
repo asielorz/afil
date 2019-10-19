@@ -86,7 +86,9 @@ auto struct_for_type(Program const & program, TypeId type) noexcept -> Struct co
 auto find_member_variable(Struct const & type, std::string_view member_name, span<char const> string_pool) noexcept -> int;
 
 auto is_pointer(Type const & type) noexcept -> bool;
-auto pointer_type_for(TypeId pointee_type, Program & program) noexcept->TypeId;
+auto pointer_type_for(TypeId pointee_type, Program & program) noexcept -> TypeId;
+auto pointee_type(Type const & pointer_type) noexcept -> TypeId;
+auto pointee_type(TypeId pointer_type_id, Program const & program) noexcept -> TypeId;
 
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;

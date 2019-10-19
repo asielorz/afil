@@ -121,7 +121,7 @@ auto resolve_function_overloading(span<FunctionId const> overload_set, span<Type
 	for (FunctionId function_id : overload_set)
 	{
 		auto const param_types = parameter_types(program, function_id);
-		if (std::equal(parameters.begin(), parameters.end(), param_types.begin(), param_types.end(), is_convertible))
+		if (std::equal(parameters.begin(), parameters.end(), param_types.begin(), param_types.end(), [&](TypeId from, TypeId to) { return is_convertible(from, to, program); }))
 		{
 			return function_id;
 		}
@@ -178,6 +178,17 @@ auto pointer_type_for(TypeId pointee_type, Program & program) noexcept -> TypeId
 	new_type.alignment = alignof(void *);
 	new_type.extra_data = PointerType{pointee_type};
 	return add_type(program, std::move(new_type));
+}
+
+auto pointee_type(Type const & pointer_type) noexcept->TypeId
+{
+	assert(is_pointer(pointer_type));
+	return try_get<PointerType>(pointer_type.extra_data)->value_type;
+}
+
+auto pointee_type(TypeId pointer_type_id, Program const & program) noexcept -> TypeId
+{
+	return pointee_type(type_with_id(program, pointer_type_id));
 }
 
 auto add_type(Program & program, Type new_type) noexcept -> TypeId

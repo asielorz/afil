@@ -5,6 +5,8 @@
 #include <string_view>
 #include <variant>
 
+struct Program;
+
 struct TypeId
 {
 	#pragma warning (disable : 4201)
@@ -36,12 +38,12 @@ constexpr auto operator == (TypeId a, TypeId b) noexcept -> bool { return a.flat
 constexpr auto operator != (TypeId a, TypeId b) noexcept -> bool { return !(a == b); };
 
 auto is_data_type(TypeId id) noexcept -> bool;
-auto is_convertible(TypeId from, TypeId to) noexcept -> bool;
+auto is_convertible(TypeId from, TypeId to, Program const & program) noexcept -> bool;
 auto make_reference(TypeId type) noexcept -> TypeId;
 auto make_mutable(TypeId type) noexcept -> TypeId;
 auto remove_reference(TypeId type) noexcept -> TypeId;
 auto decay(TypeId type) noexcept -> TypeId;
-auto common_type(TypeId a, TypeId b) noexcept -> TypeId; // Returns TypeID::none if there is no common type.
+auto common_type(TypeId a, TypeId b, Program const & program) noexcept -> TypeId; // Returns TypeID::none if there is no common type.
 
 struct Program;
 

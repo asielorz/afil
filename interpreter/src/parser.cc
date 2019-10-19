@@ -70,7 +70,7 @@ namespace parser
 			token.source == "not"sv;
 	}
 
-	auto insert_conversion_node(ExpressionTree tree, TypeId from, TypeId to) noexcept -> ExpressionTree
+	auto insert_conversion_node(ExpressionTree tree, TypeId from, TypeId to, Program const & program) noexcept -> ExpressionTree
 	{
 		if (from.index == to.index)
 		{
@@ -83,16 +83,19 @@ namespace parser
 			deref_node.variable_type = to;
 			return deref_node;
 		}
-		// TODO: Conversions between types.
+		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
+		{
+			return std::move(tree);
+		}
 		declare_unreachable();
 	}
 
-	auto insert_conversions(span<ExpressionTree> parameters, span<TypeId const> parsed_parameter_types, span<TypeId const> target_parameter_types)
+	auto insert_conversions(span<ExpressionTree> parameters, span<TypeId const> parsed_parameter_types, span<TypeId const> target_parameter_types, Program const & program)
 	{
 		for (size_t i = 0; i < target_parameter_types.size(); ++i)
 		{
 			if (parsed_parameter_types[i] != target_parameter_types[i])
-				parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i]);
+				parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program);
 		}
 	}
 
@@ -107,7 +110,7 @@ namespace parser
 
 		// If any conversion is needed in order to call the function, perform the conversion.
 		auto const target_parameter_types = parameter_types(program, function_id);
-		insert_conversions(parameters, parsed_parameter_types, target_parameter_types);
+		insert_conversions(parameters, parsed_parameter_types, target_parameter_types, program);
 
 		return function_id;
 	}
@@ -495,8 +498,8 @@ namespace parser
 		for (size_t i = 0; i < node.parameters.size(); ++i)
 		{
 			TypeId const parsed_type = expression_type_id(node.parameters[i], p.program);
-			assert(is_convertible(parsed_type, struct_member_types[i]));
-			node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, struct_member_types[i]);
+			assert(is_convertible(parsed_type, struct_member_types[i], p.program));
+			node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, struct_member_types[i], p.program);
 		}
 
 		return node;
@@ -529,12 +532,12 @@ namespace parser
 		// Ensure that both branches return the same type.
 		TypeId const then_type = expression_type_id(*if_node.then_case, p.program);
 		TypeId const else_type = expression_type_id(*if_node.else_case, p.program);
-		TypeId const common = common_type(then_type, else_type);
+		TypeId const common = common_type(then_type, else_type, p.program);
 		assert(common != TypeId::none);
 		if (then_type != common)
-			*if_node.then_case = insert_conversion_node(std::move(*if_node.then_case), then_type, common);
+			*if_node.then_case = insert_conversion_node(std::move(*if_node.then_case), then_type, common, p.program);
 		if (else_type != common)
-			*if_node.else_case = insert_conversion_node(std::move(*if_node.else_case), else_type, common);
+			*if_node.else_case = insert_conversion_node(std::move(*if_node.else_case), else_type, common, p.program);
 
 		return if_node;
 	}
@@ -606,7 +609,7 @@ namespace parser
 		{
 			expr::DepointerNode node;
 			node.return_type = make_reference(std::get<PointerType>(type_with_id(p.program, operand_type).extra_data).value_type);
-			node.operand = std::make_unique<ExpressionTree>(insert_conversion_node(std::move(operand), operand_type, remove_reference(operand_type)));
+			node.operand = std::make_unique<ExpressionTree>(insert_conversion_node(std::move(operand), operand_type, remove_reference(operand_type), p.program));
 
 			return node;
 		}
@@ -812,9 +815,9 @@ namespace parser
 		node.assigned_expression = parse_subexpression(tokens, index, p);
 		TypeId const assigned_type = expression_type_id(node.assigned_expression, p.program);
 		// Require that the expression assigned to the variable is convertible to the type of the variable.
-		assert(is_convertible(assigned_type, type_found));
+		assert(is_convertible(assigned_type, type_found, p.program));
 		if (assigned_type != type_found)
-			node.assigned_expression = insert_conversion_node(std::move(node.assigned_expression), assigned_type, type_found);
+			node.assigned_expression = insert_conversion_node(std::move(node.assigned_expression), assigned_type, type_found, p.program);
 
 		return node;
 	}
@@ -955,7 +958,7 @@ namespace parser
 				if (var_type == expr_type)
 					node.assigned_expression = std::move(expression);
 				else
-					node.assigned_expression = insert_conversion_node(std::move(expression), expr_type, var_type);
+					node.assigned_expression = insert_conversion_node(std::move(expression), expr_type, var_type, p.program);
 				return node;
 			}
 		}
@@ -983,7 +986,7 @@ namespace parser
 			p.current_return_type = decay(return_expr_type);
 
 		if (return_expr_type != p.current_return_type)
-			return_expr = insert_conversion_node(std::move(return_expr), return_expr_type, p.current_return_type);
+			return_expr = insert_conversion_node(std::move(return_expr), return_expr_type, p.current_return_type, p.program);
 
 		stmt::ReturnStatement node;
 		node.returned_expression = std::move(return_expr);

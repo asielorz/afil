@@ -989,23 +989,24 @@ TEST_CASE("Mutating a member")
 
 TEST_CASE("Conversions between reference types of different mutability")
 {
+	Program program;
 	TypeId const int_ = TypeId::int_;
 	TypeId const int_ref = make_reference(int_);
 	TypeId const int_mut_ref = make_mutable(int_ref);
 
 	// Conversion to itself.
-	REQUIRE(is_convertible(int_, int_));
-	REQUIRE(is_convertible(int_ref, int_ref));
-	REQUIRE(is_convertible(int_mut_ref, int_mut_ref));
+	REQUIRE(is_convertible(int_, int_, program));
+	REQUIRE(is_convertible(int_ref, int_ref, program));
+	REQUIRE(is_convertible(int_mut_ref, int_mut_ref, program));
 
 	// Reference to T.
-	REQUIRE(is_convertible(int_ref, int_));
-	REQUIRE(is_convertible(int_mut_ref, int_));
+	REQUIRE(is_convertible(int_ref, int_, program));
+	REQUIRE(is_convertible(int_mut_ref, int_, program));
 
 	// Mutable reference to reference
-	REQUIRE(is_convertible(int_mut_ref, int_ref));
-	REQUIRE(!is_convertible(int_ref, int_mut_ref));
-	REQUIRE(!is_convertible(int_, int_mut_ref));
+	REQUIRE(is_convertible(int_mut_ref, int_ref, program));
+	REQUIRE(!is_convertible(int_ref, int_mut_ref, program));
+	REQUIRE(!is_convertible(int_, int_mut_ref, program));
 }
 
 TEST_CASE("Member access to an rvalue")
@@ -1169,7 +1170,22 @@ TEST_CASE("Pointers")
 	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 6);
 }
- 
+
+TEST_CASE("Conversion from immutable pointer to mutable pointer")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			int mut i = 5;
+			int * pi = &i;
+			return *pi;
+		};
+	)"sv;
+
+	parse_and_print(src);
+	REQUIRE(parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - pointers
