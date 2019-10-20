@@ -26,3 +26,23 @@ constexpr auto try_get(std::variant<Ts...> const & var) noexcept -> T const *
 	else
 		return nullptr;
 }
+
+namespace detail
+{
+	template <typename ... Ts, typename ... Us>
+	auto variant_union_impl(std::variant<Ts...> && v1, std::variant<Us...> && v2) noexcept -> std::variant<Ts..., Us...>;
+}
+
+template <typename Var1, typename Var2>
+using variant_union = decltype(detail::variant_union_impl(std::declval<Var1>(), std::declval<Var2>()));
+
+template <typename SupersetVariant, typename ... Ts>
+auto upcast(std::variant<Ts...> v) noexcept -> SupersetVariant
+{
+	auto const visitor = [](auto & t)
+	{
+		return SupersetVariant(std::move(t));
+	};
+
+	return std::visit(visitor, v);
+}
