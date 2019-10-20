@@ -42,6 +42,8 @@ auto indent(int indentation_level) noexcept -> std::string
 	return std::string(indentation_level, '\t');
 }
 
+namespace lex { auto is_operator(std::string_view src, int index) noexcept -> bool; }
+
 auto pretty_print_function_node(FunctionId function_id, Program const & program) noexcept -> std::string
 {
 	auto const found_fn = std::find_if(program.global_scope.functions.begin(), program.global_scope.functions.end(),
@@ -54,7 +56,14 @@ auto pretty_print_function_node(FunctionId function_id, Program const & program)
 	else if (found_fn == program.global_scope.functions.end())
 		str = "<function>(";
 	else
-		str = std::string(get(program, found_fn->name)) + '(';
+	{
+		std::string_view const function_name = get(program, found_fn->name);
+		
+		if (lex::is_operator(function_name, 0))
+			str += "operator ";
+
+		str += std::string(function_name) + '(';
+	}
 
 	auto const param_types = parameter_types(program, function_id);
 	for (TypeId const & id : param_types)

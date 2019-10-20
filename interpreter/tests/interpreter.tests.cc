@@ -1182,13 +1182,28 @@ TEST_CASE("Conversion from immutable pointer to mutable pointer")
 		};
 	)"sv;
 
-	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 5);
 }
+/*
+TEST_CASE("A function template lets the user define generic functions")
+{
+	auto const src = R"(
+		let add = fn<T>(T a, T b) 
+		{ 
+			return a + b; 
+		};
 
+		let main = fn() -> int
+		{
+			return add(-3, 4);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 1);
+}
+*/
 /*****************************************************************
 Backlog
-- pointers
 - templates
 - arrays (depends on pointers)
 - strings (depends on arrays)
