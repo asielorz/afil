@@ -128,6 +128,10 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 		{ 
 			return join(indent(indentation_level), pretty_print_function_node(func_node.function_id, program));
 		},
+		[&](FunctionTemplateNode const & func_template_node)
+		{
+			return join(indent(indentation_level), "function template ", func_template_node.function_template_id.index);
+		},
 		[&](FunctionCallNode const & func_call_node)
 		{
 			std::string str = join(indent(indentation_level), pretty_print_function_node(func_call_node.function_id, program));

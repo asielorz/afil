@@ -4,8 +4,10 @@
 #include "scope.hh"
 #include "span.hh"
 #include "callc.hh"
+#include "lexer.hh"
 #include <variant>
 #include <optional>
+#include <map>
 
 namespace stmt { struct Statement; }
 
@@ -59,6 +61,29 @@ struct Struct
 	std::vector<MemberVariable> member_variables;
 };
 
+struct TemplateParameter
+{
+	PooledString name;
+};
+
+struct FunctionTemplate
+{
+	std::vector<TemplateParameter> parameters;
+	span<lex::Token const> tokens; // TODO: A parsed AST instead of tokens.
+
+	struct MemcmpRanges
+	{
+		using is_transparent = std::true_type;
+
+		template <typename T>
+		[[nodiscard]] constexpr bool operator () (span<T> a, span<T> b) const noexcept
+		{
+			return memcmp(a.data(), b.data(), a.size() * sizeof(T)) < 0;
+		}
+	};
+	std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
+};
+
 struct Program
 {
 	Program();
@@ -66,6 +91,7 @@ struct Program
 	std::vector<Type> types;
 	std::vector<Struct> structs;
 	std::vector<Function> functions;
+	std::vector<FunctionTemplate> function_templates;
 	std::vector<ExternFunction> extern_functions;
 	std::vector<stmt::Statement> global_initialization_statements;
 	std::vector<char> string_pool;
@@ -74,7 +100,18 @@ struct Program
 };
 
 // Returns id of function found or invalid_function_id on failure.
-auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
+struct OverloadSet
+{
+	constexpr OverloadSet() noexcept = default;
+	OverloadSet(lookup_result::OverloadSet const & lookup_overload_set) noexcept
+		: function_ids(lookup_overload_set.function_ids)
+		, function_template_ids(lookup_overload_set.function_template_ids)
+	{}
+
+	span<FunctionId const> function_ids;
+	span<FunctionTemplateId const> function_template_ids;
+};
+auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
 
 auto add_type(Program & program, Type new_type) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;

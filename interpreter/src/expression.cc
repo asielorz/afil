@@ -81,6 +81,7 @@ namespace expr
 			[](VariableNode const & var_node) { return make_reference(var_node.variable_type); },
 			[](MemberVariableNode const & var_node) { return var_node.variable_type; },
 			[](FunctionNode const &) { return TypeId::function; },
+			[](FunctionTemplateNode const &) { return TypeId::function; },
 			[&](FunctionCallNode const & func_call_node) { return return_type(program, func_call_node.function_id); },
 			[](RelationalOperatorCallNode const &) { return TypeId::bool_; },
 			[&](IfNode const & if_node) { return expression_type_id(*if_node.then_case, program); },

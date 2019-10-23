@@ -100,7 +100,7 @@ namespace parser
 	}
 
 	auto resolve_function_overloading_and_insert_conversions(
-		span<FunctionId const> overload_set,
+		OverloadSet overload_set,
 		span<ExpressionTree> parameters,
 		span<TypeId const> parsed_parameter_types,
 		Program const & program) noexcept -> FunctionId
@@ -176,7 +176,7 @@ namespace parser
 				[&](lookup_result::OverloadSet const & overload_set) -> ExpressionTree
 				{
 					TypeId const operand_types[] = {expression_type_id(left, program), expression_type_id(right, program)};
-					auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set.function_ids, operands, operand_types, program);
+					auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set, operands, operand_types, program);
 					if (function_id != invalid_function_id)
 					{
 						if (op == Operator::not_equal || op == Operator::less || op == Operator::greater ||
@@ -340,10 +340,68 @@ namespace parser
 		index++;
 	}
 
-	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::FunctionNode
+	auto parse_function_template_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::FunctionTemplateNode
+	{
+		// Skip < token
+		index++;
+
+		FunctionTemplate fn_template;
+
+		// Parse template parameters
+		for (;;)
+		{
+			assert(tokens[index].type == TokenType::identifier);
+			TemplateParameter param;
+			param.name = pool_string(p.program, tokens[index].source);
+			fn_template.parameters.push_back(param);
+			index++;
+			
+			if (tokens[index].source == ">")
+			{
+				index++;
+				break;
+			}
+			assert(tokens[index].type == TokenType::comma);
+			index++;
+		}
+
+		size_t template_tokens_start = index;
+		// Look for opening {
+		while (tokens[index].type != TokenType::open_brace)
+			index++;
+		index++;
+		int scope_depth = 1;
+
+		for (;;)
+		{
+			if (tokens[index].type == TokenType::open_brace)
+				scope_depth++;
+			else if (tokens[index].type == TokenType::close_brace)
+				scope_depth--;
+
+			index++;
+
+			if (scope_depth == 0)
+				break;
+		}
+
+		fn_template.tokens = tokens.subspan(template_tokens_start, index - template_tokens_start);
+
+		expr::FunctionTemplateNode node;
+		node.function_template_id.index = static_cast<unsigned>(p.program.function_templates.size());
+		p.program.function_templates.push_back(std::move(fn_template));
+		return node;
+	}
+
+	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::variant<expr::FunctionNode, expr::FunctionTemplateNode>
 	{
 		// Skip fn token.
 		index++;
+
+		if (tokens[index].source == "<"sv)
+		{
+			return parse_function_template_expression(tokens, index, p);
+		}
 
 		Function function;
 
@@ -394,7 +452,7 @@ namespace parser
 		return parsed_expressions;
 	}
 
-	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, span<FunctionId const> overload_set) noexcept -> expr::FunctionCallNode
+	auto parse_function_call_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, OverloadSet overload_set) noexcept -> expr::FunctionCallNode
 	{
 		expr::FunctionCallNode node;
 		node.parameters = parse_comma_separated_expression_list(tokens, index, p);
@@ -620,7 +678,7 @@ namespace parser
 				[&](lookup_result::OverloadSet const & overload_set) -> expr::FunctionCallNode
 				{
 					TypeId const operand_type = expression_type_id(operand, p.program);
-					auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set.function_ids, { &operand, 1 }, { &operand_type, 1 }, p.program);
+					auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set, { &operand, 1 }, { &operand_type, 1 }, p.program);
 					if (function_id != invalid_function_id)
 					{
 						expr::FunctionCallNode func_node;
@@ -642,12 +700,19 @@ namespace parser
 	{
 		if (tokens[index].source == "fn")
 		{
-			auto const func_node = parse_function_expression(tokens, index, p);
+			auto const node = parse_function_expression(tokens, index, p);
 			// Opening parenthesis after a function means a function call.
 			if (tokens[index].type == TokenType::open_parenthesis)
-				return parse_function_call_expression(tokens, index, p, span<FunctionId const>(&func_node.function_id, 1));
+			{
+				OverloadSet overload_set;
+				std::visit(overload(
+					[&](expr::FunctionNode const & fn_node) { overload_set.function_ids = span<FunctionId const>(&fn_node.function_id, 1); },
+					[&](expr::FunctionTemplateNode const & fn_template_node) { overload_set.function_template_ids = span<FunctionTemplateId const>(&fn_template_node.function_template_id, 1); }
+				), node);
+				return parse_function_call_expression(tokens, index, p, overload_set);
+			}
 			else
-				return func_node;
+				return upcast<ExpressionTree>(node);
 		}
 		else if (tokens[index].source == "if")
 		{
@@ -689,7 +754,7 @@ namespace parser
 				[&](lookup_result::OverloadSet result) -> ExpressionTree
 				{
 					if (tokens[index].type == TokenType::open_parenthesis)
-						return parse_function_call_expression(tokens, index, p, result.function_ids);
+						return parse_function_call_expression(tokens, index, p, result);
 					else
 						return expr::FunctionNode{result.function_ids[0]}; // TODO: Overload set node?
 				},
@@ -869,25 +934,34 @@ namespace parser
 		// Skip the fn.
 		index++;
 
-		// Adding the function to the program before parsing the body allows the body of the function to find itself and be recursive.
+		// It's a template
+		if (tokens[index].source == "<")
+		{
+			expr::FunctionTemplateNode template_node = parse_function_template_expression(tokens, index, p);
+			top(p.scope_stack).function_templates.push_back({pool_string(p.program, id_token.source), template_node.function_template_id});
+		}
+		else
+		{
+			// Adding the function to the program before parsing the body allows the body of the function to find itself and be recursive.
 
-		// Add a new function to the program.
-		Function & function = p.program.functions.emplace_back();
-		// Add the function name to the scope.
-		auto const function_id = FunctionId{0, static_cast<unsigned>(p.program.functions.size() - 1)};
-		parse_function_prototype(tokens, index, p, function);
-		bind_function_name(id_token.source, function_id, p.program, top(p.scope_stack));
+			// Add a new function to the program.
+			Function & function = p.program.functions.emplace_back();
+			// Add the function name to the scope.
+			auto const function_id = FunctionId{ 0, static_cast<unsigned>(p.program.functions.size() - 1) };
+			parse_function_prototype(tokens, index, p, function);
+			bind_function_name(id_token.source, function_id, p.program, top(p.scope_stack));
 
-		// Operate on a local temporary to avoid invalidation of the reference on reallocation.
-		Function temp;
-		temp.parameter_count = function.parameter_count;
-		temp.parameter_size = function.parameter_size;
-		temp.stack_frame_size = function.stack_frame_size;
-		temp.stack_frame_alignment = function.stack_frame_alignment;
-		temp.return_type = function.return_type;
-		temp.variables = function.variables;
-		parse_function_body(tokens, index, p, temp);
-		p.program.functions[function_id.index] = std::move(temp);
+			// Operate on a local temporary to avoid invalidation of the reference on reallocation.
+			Function temp;
+			temp.parameter_count = function.parameter_count;
+			temp.parameter_size = function.parameter_size;
+			temp.stack_frame_size = function.stack_frame_size;
+			temp.stack_frame_alignment = function.stack_frame_alignment;
+			temp.return_type = function.return_type;
+			temp.variables = function.variables;
+			parse_function_body(tokens, index, p, temp);
+			p.program.functions[function_id.index] = std::move(temp);
+		}
 
 		return std::nullopt;
 	}

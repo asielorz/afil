@@ -47,6 +47,11 @@ auto common_type(TypeId a, TypeId b, Program const & program) noexcept -> TypeId
 
 struct Program;
 
+struct FunctionTemplateId
+{
+	unsigned index;
+};
+
 struct PooledString
 {
 	size_t first;
@@ -72,6 +77,12 @@ struct TypeName
 	TypeId id;
 };
 
+struct FunctionTemplateName
+{
+	PooledString name;
+	FunctionTemplateId id;
+};
+
 struct Scope
 {
 	int stack_frame_size = 0;
@@ -79,6 +90,7 @@ struct Scope
 	std::vector<Variable> variables;
 	std::vector<FunctionName> functions;
 	std::vector<TypeName> types;
+	std::vector<FunctionTemplateName> function_templates;
 };
 enum struct ScopeType { global, function, block };
 
@@ -95,7 +107,7 @@ namespace lookup_result
 	struct Nothing {};
 	struct Variable { TypeId variable_type; int variable_offset; };
 	struct GlobalVariable { TypeId variable_type; int variable_offset; };
-	struct OverloadSet { std::vector<FunctionId> function_ids; };
+	struct OverloadSet { std::vector<FunctionId> function_ids; std::vector<FunctionTemplateId> function_template_ids; };
 	struct Type { TypeId type_id; };
 }
 auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char const> string_pool) noexcept

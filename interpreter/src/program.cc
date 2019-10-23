@@ -115,10 +115,10 @@ Program::Program()
 	}
 }
 
-auto resolve_function_overloading(span<FunctionId const> overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId
+auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId
 {
 	// TODO: This finds first valid candidate. It should find best match.
-	for (FunctionId function_id : overload_set)
+	for (FunctionId function_id : overload_set.function_ids)
 	{
 		auto const param_types = parameter_types(program, function_id);
 		if (std::equal(parameters.begin(), parameters.end(), param_types.begin(), param_types.end(), [&](TypeId from, TypeId to) { return is_convertible(from, to, program); }))

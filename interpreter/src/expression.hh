@@ -75,6 +75,11 @@ namespace expr
 		FunctionId function_id;
 	};
 
+	struct FunctionTemplateNode
+	{
+		FunctionTemplateId function_template_id;
+	};
+
 	struct FunctionCallNode
 	{
 		FunctionId function_id;
@@ -114,7 +119,7 @@ namespace expr
 			Literal<int>, Literal<float>, Literal<bool>,
 			DereferenceNode, AddressofNode, DepointerNode,
 			LocalVariableNode, GlobalVariableNode, MemberVariableNode,
-			FunctionNode, FunctionCallNode, RelationalOperatorCallNode,
+			FunctionNode, FunctionTemplateNode, FunctionCallNode, RelationalOperatorCallNode,
 			IfNode, StatementBlockNode,
 			StructConstructorNode
 		>;

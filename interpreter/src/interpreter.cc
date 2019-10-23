@@ -200,6 +200,10 @@ namespace interpreter
 			{
 				write(stack, return_address, func_node.function_id);
 			},
+			[&](expr::FunctionTemplateNode const & func_template_node) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
+			{
+				write(stack, return_address, func_template_node.function_template_id);
+			},
 			[&](expr::FunctionCallNode const & func_call_node)
 			{
 				call_function(func_call_node.function_id, func_call_node.parameters, stack, program, return_address);
