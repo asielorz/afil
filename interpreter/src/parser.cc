@@ -78,10 +78,21 @@ namespace parser
 			if (from.is_reference == to.is_reference)
 				return tree;
 
-			expr::DereferenceNode deref_node;
-			deref_node.expression = std::make_unique<ExpressionTree>(std::move(tree));
-			deref_node.variable_type = to;
-			return deref_node;
+			if (from.is_reference && !to.is_reference)
+			{
+				expr::DereferenceNode deref_node;
+				deref_node.expression = std::make_unique<ExpressionTree>(std::move(tree));
+				deref_node.variable_type = to;
+				return deref_node;
+			}
+			else
+			{
+				assert(!to.is_mutable); // Can't bind a temporary to a mutable reference.
+				expr::AddressOfTemporaryNode addressof_node;
+				addressof_node.expression = std::make_unique<ExpressionTree>(std::move(tree));
+				addressof_node.return_type = to;
+				return addressof_node;
+			}
 		}
 		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
 		{
@@ -103,7 +114,7 @@ namespace parser
 		OverloadSet overload_set,
 		span<ExpressionTree> parameters,
 		span<TypeId const> parsed_parameter_types,
-		Program const & program) noexcept -> FunctionId
+		Program & program) noexcept -> FunctionId
 	{
 		FunctionId const function_id = resolve_function_overloading(overload_set, parsed_parameter_types, program);
 		assert(function_id != invalid_function_id);
@@ -158,7 +169,7 @@ namespace parser
 		return root;
 	}
 
-	auto resolve_operator_overloading(OperatorTree tree, Program const & program, ScopeStack const & scope_stack) noexcept -> ExpressionTree
+	auto resolve_operator_overloading(OperatorTree tree, Program & program, ScopeStack const & scope_stack) noexcept -> ExpressionTree
 	{
 		if (is_operator_node(tree))
 		{
@@ -263,8 +274,11 @@ namespace parser
 	{
 		// Lookup type name.
 		TypeId type_found = lookup_type_name(scope_stack, tokens[index].source, program.string_pool);
+
+		if (type_found == TypeId::none)
+			return TypeId::none;
+
 		index++;
-		assert(type_found != TypeId::none);
 
 		type_found = parse_mutable_and_pointer(tokens, index, type_found, program);
 
@@ -353,7 +367,7 @@ namespace parser
 			assert(tokens[index].type == TokenType::identifier);
 			TemplateParameter param;
 			param.name = pool_string(p.program, tokens[index].source);
-			fn_template.parameters.push_back(param);
+			fn_template.template_parameters.push_back(param);
 			index++;
 			
 			if (tokens[index].source == ">")
@@ -366,6 +380,67 @@ namespace parser
 		}
 
 		size_t template_tokens_start = index;
+
+		// Parse parameters.
+		{
+			// Parameters must be between parenthesis.
+			assert(tokens[index].type == TokenType::open_parenthesis);
+			index++;
+
+			// Parse arguments.
+			while (tokens[index].type == TokenType::identifier)
+			{
+				TypeId const arg_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+				if (arg_type != TypeId::none)
+				{
+					fn_template.parameters.push_back(arg_type);
+				}
+				else
+				{
+					// Check if the argument is a dependent type.
+					std::string_view const type_name = tokens[index].source;
+					index++;
+
+					auto const it = std::find_if(fn_template.template_parameters.begin(), fn_template.template_parameters.end(), [&](TemplateParameter const & param)
+					{
+						return get(p.program, param.name) == type_name;
+					});
+					assert(it != fn_template.template_parameters.end());
+
+					DependentType dependent_arg_type;
+					dependent_arg_type.flat_value = 0;
+					dependent_arg_type.index = static_cast<unsigned>(it - fn_template.template_parameters.begin());
+
+					// Look for mutable qualifier.
+					if (tokens[index].source == "mut"sv)
+					{
+						dependent_arg_type.is_mutable = true;
+						index++;
+					}
+
+					// Look for reference qualifier.
+					if (tokens[index].source == "&"sv)
+					{
+						dependent_arg_type.is_reference = true;
+						index++;
+					}
+
+					// By now it won't support pointers.
+
+					fn_template.parameters.push_back(dependent_arg_type);
+				}
+
+				// Skip parameter name token.
+				index++;
+
+				if (tokens[index].type == TokenType::close_parenthesis)
+					break;
+
+				assert(tokens[index].type == TokenType::comma);
+				index++;
+			}
+		}
+
 		// Look for opening {
 		while (tokens[index].type != TokenType::open_brace)
 			index++;

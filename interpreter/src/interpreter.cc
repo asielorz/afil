@@ -188,6 +188,11 @@ namespace interpreter
 				auto const pointer = read<void const *>(stack, pointer_address);
 				memcpy(pointer_at_address(stack, return_address), pointer, type_size(program, deref_node.variable_type));
 			},
+			[&](expr::AddressOfTemporaryNode const & addressof_node)
+			{
+				int const address_of_temporary = eval_expression_tree(*addressof_node.expression, stack, program);
+				write(stack, return_address, pointer_at_address(stack, address_of_temporary));
+			},
 			[&](expr::AddressofNode const & addressof_node)
 			{
 				eval_expression_tree(*addressof_node.operand, stack, program, return_address);

@@ -141,12 +141,17 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 			if (get(string_pool, fn.name) == name)
 				overload_set.function_ids.push_back(fn.id);
 
+		// Function templates.
+		for (FunctionTemplateName const & fn : scope.function_templates)
+			if (get(string_pool, fn.name) == name)
+				overload_set.function_template_ids.push_back(fn.id);
+
 		// After we leave a function, stop looking for variables.
 		if (i < start && scope_stack[i].type == ScopeType::function)
 			stop_looking_for_variables = true;
 	}
 
-	if (overload_set.function_ids.empty())
+	if (overload_set.function_ids.empty() && overload_set.function_template_ids.empty())
 		return lookup_result::Nothing();
 	else
 		return overload_set;

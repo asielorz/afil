@@ -66,19 +66,35 @@ struct TemplateParameter
 	PooledString name;
 };
 
+struct DependentType
+{
+	union
+	{
+		struct
+		{
+			unsigned is_mutable : 1;
+			unsigned is_reference : 1;
+			unsigned index : 30;
+		};
+		unsigned flat_value;
+	};
+};
+using FunctionTemplateParameter = std::variant<TypeId, DependentType>;
+
 struct FunctionTemplate
 {
-	std::vector<TemplateParameter> parameters;
+	std::vector<TemplateParameter> template_parameters;
+	std::vector<FunctionTemplateParameter> parameters;
 	span<lex::Token const> tokens; // TODO: A parsed AST instead of tokens.
 
 	struct MemcmpRanges
 	{
 		using is_transparent = std::true_type;
 
-		template <typename T>
-		[[nodiscard]] constexpr bool operator () (span<T> a, span<T> b) const noexcept
+		template <typename T, typename U>
+		[[nodiscard]] constexpr auto operator () (T const & a, U const & b) const noexcept -> bool
 		{
-			return memcmp(a.data(), b.data(), a.size() * sizeof(T)) < 0;
+			return memcmp(a.data(), b.data(), a.size() * sizeof(*a.data())) < 0;
 		}
 	};
 	std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
@@ -111,7 +127,7 @@ struct OverloadSet
 	span<FunctionId const> function_ids;
 	span<FunctionTemplateId const> function_template_ids;
 };
-auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId;
+auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
 
 auto add_type(Program & program, Type new_type) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
@@ -129,6 +145,8 @@ auto pointee_type(TypeId pointer_type_id, Program const & program) noexcept -> T
 
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
+
+auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId;
 
 auto pool_string(Program & program, std::string_view string) noexcept -> PooledString;
 auto get(Program const & program, PooledString string) noexcept -> std::string_view;

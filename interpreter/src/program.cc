@@ -3,6 +3,8 @@
 #include "parser.hh"
 #include "function_ptr.hh"
 #include "variant.hh"
+#include "parser.hh"
+#include <queue>
 #include <algorithm>
 #include <cassert>
 
@@ -115,19 +117,158 @@ Program::Program()
 	}
 }
 
-auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> parameters, Program const & program) noexcept -> FunctionId
+auto check_type(TypeId param_type, TypeId parsed_type, Program const & program, int & conversions) noexcept -> bool
 {
-	// TODO: This finds first valid candidate. It should find best match.
+	if (param_type == parsed_type)
+		return true;
+
+	if (is_convertible(parsed_type, param_type, program))
+	{
+		conversions++;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId
+{
+	struct Candidate
+	{
+		int conversions;
+		FunctionId function_id;
+	};
+	Candidate candidates[64];
+	int candidate_count = 0;
+
+	struct TemplateCandidate
+	{
+		int conversions;
+		FunctionTemplateId id;
+	};
+	TemplateCandidate template_candidates[64];
+	int template_candidate_count = 0;
+
 	for (FunctionId function_id : overload_set.function_ids)
 	{
 		auto const param_types = parameter_types(program, function_id);
-		if (std::equal(parameters.begin(), parameters.end(), param_types.begin(), param_types.end(), [&](TypeId from, TypeId to) { return is_convertible(from, to, program); }))
+		if (param_types.size() == parameters.size())
 		{
-			return function_id;
+			int conversions = 0;
+			bool discard = false;
+			for (size_t i = 0; i < param_types.size(); ++i)
+			{
+				if (!check_type(param_types[i], parameters[i], program, conversions))
+				{
+					discard = true;
+					break;
+				}
+			}
+
+			if (!discard)
+			{
+				candidates[candidate_count++] = Candidate{conversions, function_id};
+			}
 		}
 	}
 
-	return invalid_function_id;
+	TypeId resolved_dependent_types[32];
+	size_t dependent_type_count = 0;
+
+	for (FunctionTemplateId template_id : overload_set.function_template_ids)
+	{
+		span<FunctionTemplateParameter const> template_params = program.function_templates[template_id.index].parameters;
+		if (template_params.size() == parameters.size())
+		{
+			dependent_type_count = program.function_templates[template_id.index].template_parameters.size();
+			std::fill(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none);
+
+			int conversions = 0;
+			bool discard = false;
+			for (size_t i = 0; i < template_params.size(); ++i)
+			{
+				if (has_type<TypeId>(template_params[i]))
+				{
+					if (!check_type(std::get<TypeId>(template_params[i]), parameters[i], program, conversions))
+					{
+						discard = true;
+						break;
+					}
+				}
+				else
+				{
+					DependentType const dependent_type = std::get<DependentType>(template_params[i]);
+					if (resolved_dependent_types[dependent_type.index] != TypeId::none)
+					{
+						if (!check_type(resolved_dependent_types[dependent_type.index], parameters[i], program, conversions))
+						{
+							discard = true;
+							break;
+						}
+					}
+					else
+					{
+						// TODO: Patterns with dependent types.
+						TypeId resolved_type;
+						resolved_type.index = parameters[i].index;
+						resolved_type.is_reference = dependent_type.is_reference;
+						resolved_type.is_mutable = dependent_type.is_mutable;
+
+						if (check_type(resolved_type, parameters[i], program, conversions))
+						{
+							resolved_dependent_types[dependent_type.index] = decay(resolved_type);
+						}
+						else
+						{
+							discard = true;
+							break;
+						}
+					}
+				}
+			}
+
+			if (!discard)
+			{
+				template_candidates[template_candidate_count++] = TemplateCandidate{conversions, template_id};
+			}
+		}
+	}
+
+	if (candidate_count == 0 && template_candidate_count == 0)
+	{
+		return invalid_function_id;
+	}
+	else
+	{
+		Candidate best_candidate;
+		TemplateCandidate best_template_candidate;
+
+		if (candidate_count > 1)
+		{
+			std::partial_sort(candidates, candidates + 2, candidates + candidate_count, [](Candidate a, Candidate b) { return a.conversions < b.conversions; });
+			assert(candidates[0].conversions < candidates[1].conversions); // Ambiguous call.
+		}
+		best_candidate = candidates[0];
+
+		if (template_candidate_count > 1)
+		{
+			std::partial_sort(template_candidates, template_candidates + 2, template_candidates + template_candidate_count, 
+				[](TemplateCandidate a, TemplateCandidate b) { return a.conversions < b.conversions; });
+			assert(template_candidates[0].conversions < template_candidates[1].conversions); // Ambiguous call.
+		}
+		best_template_candidate = template_candidates[0];
+
+		if (template_candidate_count == 0 || candidate_count > 0 && best_candidate.conversions < best_template_candidate.conversions)
+			return best_candidate.function_id;
+		else
+		{
+			// Ensure that all template parameters have been resolved.
+			assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
+			return instantiate_function_template(program, best_template_candidate.id, {resolved_dependent_types, dependent_type_count});
+		}
+	}
 }
 
 auto is_struct(Type const & type) noexcept -> bool
@@ -234,6 +375,44 @@ auto return_type(Program const & program, FunctionId id) noexcept -> TypeId
 		return program.extern_functions[id.index].return_type;
 	else
 		return program.functions[id.index].return_type;
+}
+
+namespace parser
+{
+	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void;
+	auto parse_function_body(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void;
+}
+
+auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId
+{
+	FunctionTemplate & fn_template = program.function_templates[template_id.index];
+
+	auto const it = fn_template.cached_instantiations.find(parameters);
+	if (it != fn_template.cached_instantiations.end())
+		return it->second;
+
+	// Everything below is a hack. Instead of keeping the tokens and parsing them for each instantiation,
+	// we should find a way to represent template expressions.
+
+	ScopeStack stack;
+	stack.push_back({&program.global_scope, ScopeType::global});
+	Scope template_parameter_scope;
+	for (size_t i = 0; i < parameters.size(); ++i)
+		template_parameter_scope.types.push_back({fn_template.template_parameters[i].name, parameters[i]});
+
+	stack.push_back({&template_parameter_scope, ScopeType::global});
+
+	Function function;
+	size_t index = 0;
+	TypeId dummy;
+	parser::parse_function_prototype(fn_template.tokens, index, {program, stack, dummy}, function);
+	parser::parse_function_body(fn_template.tokens, index, {program, stack, dummy}, function);
+	
+	FunctionId instantiation_id;
+	instantiation_id.is_extern = false;
+	instantiation_id.index = static_cast<size_t>(program.functions.size());
+	program.functions.push_back(std::move(function));
+	return instantiation_id;
 }
 
 auto pool_string(Program & program, std::string_view string) noexcept -> PooledString

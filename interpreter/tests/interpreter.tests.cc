@@ -48,8 +48,9 @@ auto eval_expression(std::string_view src)
 auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Program & program, Scope & scope) noexcept -> void
 {
 	ScopeStack scope_stack;
-	scope_stack.push_back({ &program.global_scope, ScopeType::global });
-	scope_stack.push_back({ &scope, ScopeType::function });
+	scope_stack.push_back({&program.global_scope, ScopeType::global});
+	if (&scope != &program.global_scope)
+		scope_stack.push_back({&scope, ScopeType::function});
 	TypeId type = TypeId::none;
 	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), { program, scope_stack, type }), stack, program, 0);
 }
@@ -1167,7 +1168,6 @@ TEST_CASE("Pointers")
 		};
 	)"sv;
 
-	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 6);
 }
 
@@ -1200,6 +1200,42 @@ TEST_CASE("A function template lets the user define generic functions")
 	)"sv;
 
 	REQUIRE(parse_and_run(src) == 1);
+}
+
+TEST_CASE("A template parameter may have be a reference or mutable")
+{
+	auto const src = R"(
+		let assign = fn<T>(T mut & a, T b) 
+		{ 
+			a = b; 
+		};
+
+		let main = fn() -> int
+		{
+			int mut i = 5;
+			assign(i, -225);
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -225);
+}
+
+TEST_CASE("A temporary may be bound to a constant reference")
+{
+	auto const src = R"(
+		let add = fn<T>(T & a, T & b) 
+		{ 
+			return a + b; 
+		};
+
+		let main = fn() -> int
+		{
+			return add(2, 9);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 2 + 9);
 }
 
 /*****************************************************************
