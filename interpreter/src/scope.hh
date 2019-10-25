@@ -47,10 +47,8 @@ auto common_type(TypeId a, TypeId b, Program const & program) noexcept -> TypeId
 
 struct Program;
 
-struct FunctionTemplateId
-{
-	unsigned index;
-};
+struct FunctionTemplateId { unsigned index; };
+struct StructTemplateId { unsigned index; };
 
 struct PooledString
 {
@@ -83,6 +81,12 @@ struct FunctionTemplateName
 	FunctionTemplateId id;
 };
 
+struct StructTemplateName
+{
+	PooledString name;
+	StructTemplateId id;
+};
+
 struct Scope
 {
 	int stack_frame_size = 0;
@@ -91,6 +95,7 @@ struct Scope
 	std::vector<FunctionName> functions;
 	std::vector<TypeName> types;
 	std::vector<FunctionTemplateName> function_templates;
+	std::vector<StructTemplateName> struct_templates;
 };
 enum struct ScopeType { global, function, block };
 

@@ -290,6 +290,33 @@ namespace parser
 		return type_found;
 	}
 
+	auto parse_template_parameter_list(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> std::vector<TemplateParameter>
+	{
+		// Skip < token.
+		index++;
+
+		std::vector<TemplateParameter> parsed_parameters;
+
+		for (;;)
+		{
+			assert(tokens[index].type == TokenType::identifier);
+			TemplateParameter param;
+			param.name = pool_string(program, tokens[index].source);
+			parsed_parameters.push_back(param);
+			index++;
+
+			if (tokens[index].source == ">")
+			{
+				index++;
+				break;
+			}
+			assert(tokens[index].type == TokenType::comma);
+			index++;
+		}
+
+		return parsed_parameters;
+	}
+
 	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void
 	{
 		// Parameters must be between parenthesis.
@@ -354,28 +381,8 @@ namespace parser
 
 	auto parse_function_template_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::FunctionTemplateNode
 	{
-		// Skip < token
-		index++;
-
 		FunctionTemplate fn_template;
-
-		// Parse template parameters
-		for (;;)
-		{
-			assert(tokens[index].type == TokenType::identifier);
-			TemplateParameter param;
-			param.name = pool_string(p.program, tokens[index].source);
-			fn_template.template_parameters.push_back(param);
-			index++;
-			
-			if (tokens[index].source == ">")
-			{
-				index++;
-				break;
-			}
-			assert(tokens[index].type == TokenType::comma);
-			index++;
-		}
+		fn_template.template_parameters = parse_template_parameter_list(tokens, index, p.program);
 
 		size_t template_tokens_start = index;
 
@@ -1271,7 +1278,7 @@ namespace parser
 	}
 
 	template <typename Stmt>
-	auto parse_break_or_continue_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) -> Stmt
+	auto parse_break_or_continue_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> Stmt
 	{
 		// Should check if parsing a loop and otherwise give an error.
 
@@ -1280,10 +1287,98 @@ namespace parser
 		return Stmt();
 	}
 
-	auto parse_struct_declaration(span<lex::Token const> tokens, size_t & index, ParseParams p) -> std::nullopt_t
+	auto parse_template_struct_declaration(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::nullopt_t
+	{
+		StructTemplate new_struct_template;
+		new_struct_template.template_parameters = parse_template_parameter_list(tokens, index, p.program);
+
+		// Parse name
+		assert(tokens[index].type == TokenType::identifier);
+		PooledString const new_template_name = pool_string(p.program, tokens[index].source);
+		index++;
+
+		// Skip { token.
+		assert(tokens[index].type == TokenType::open_brace);
+		index++;
+
+		// Parse member variables.
+		while (tokens[index].type != TokenType::close_brace)
+		{
+			MemberVariableTemplate member;
+
+			TypeId const member_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+			if (member_type != TypeId::none)
+			{
+				assert(is_data_type(member_type));
+				assert(!member_type.is_reference);
+				assert(!member_type.is_mutable);
+
+				member.type = member_type;
+				member.is_dependent = false;
+			}
+			else
+			{
+				std::string_view const member_type_name = tokens[index].source;
+				index++;
+				auto const it = std::find_if(new_struct_template.template_parameters.begin(), new_struct_template.template_parameters.end(), [&](TemplateParameter const & param)
+				{
+					return get(p.program, param.name) == member_type_name;
+				});
+				assert(it != new_struct_template.template_parameters.end());
+
+				TypeId dependent_member_type;
+				dependent_member_type.flat_value = 0;
+				dependent_member_type.index = static_cast<unsigned>(it - new_struct_template.template_parameters.begin());
+
+				// Look for mutable qualifier.
+				if (tokens[index].source == "mut"sv)
+				{
+					dependent_member_type.is_mutable = true;
+					index++;
+				}
+
+				// Look for reference qualifier.
+				if (tokens[index].source == "&"sv)
+				{
+					dependent_member_type.is_reference = true;
+					index++;
+				}
+
+				member.type = dependent_member_type;
+				member.is_dependent = true;
+			}
+			
+			assert(tokens[index].type == TokenType::identifier);
+			member.name = pool_string(p.program, tokens[index].source);
+
+			// TODO: Initializer expression.
+
+			new_struct_template.member_variables.push_back(member);
+			index++;
+
+			assert(tokens[index].type == TokenType::semicolon);
+			index++;
+		}
+
+		// Skip } token.
+		assert(tokens[index].type == TokenType::close_brace);
+		index++;
+
+		StructTemplateId new_template_id;
+		new_template_id.index = static_cast<unsigned>(p.program.struct_templates.size());
+		p.program.struct_templates.push_back(std::move(new_struct_template));
+		top(p.scope_stack).struct_templates.push_back(StructTemplateName{new_template_name, new_template_id});
+
+		return std::nullopt;
+	}
+
+	auto parse_struct_declaration(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::nullopt_t
 	{
 		// Skip struct token.
 		index++;
+
+		if (tokens[index].source == "<"sv)
+			return parse_template_struct_declaration(tokens, index, p);
 
 		// Parse name
 		assert(tokens[index].type == TokenType::identifier);
@@ -1302,13 +1397,14 @@ namespace parser
 		// Parse member variables.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			TypeId const type = parse_type_name(tokens, index, p.scope_stack, p.program);
-			assert(is_data_type(type));
-			assert(!type.is_reference);
+			TypeId const member_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+			assert(is_data_type(member_type));
+			assert(!member_type.is_reference);
+			assert(!member_type.is_mutable);
 			
 			assert(tokens[index].type == TokenType::identifier);
 			PooledString const name = pool_string(p.program, tokens[index].source);
-			add_variable_to_scope(str.member_variables, new_type.size, new_type.alignment, name, type, 0, p.program);
+			add_variable_to_scope(str.member_variables, new_type.size, new_type.alignment, name, member_type, 0, p.program);
 			index++;
 
 			// Initialization expression.
@@ -1320,7 +1416,7 @@ namespace parser
 			else
 			{
 				// If the type is default constructible synthesize an initializer expression from the default constructor.
-				Type const & type_data = type_with_id(p.program, type);
+				Type const & type_data = type_with_id(p.program, member_type);
 				if (is_struct(type_data))
 				{
 					Struct const & struct_data = *struct_for_type(p.program, type_data);
@@ -1329,7 +1425,7 @@ namespace parser
 						[](MemberVariable const & var) { return var.initializer_expression.has_value(); }))
 					{
 						expr::StructConstructorNode default_constructor_node;
-						default_constructor_node.constructed_type = type;
+						default_constructor_node.constructed_type = member_type;
 						default_constructor_node.parameters.reserve(struct_data.member_variables.size());
 						for (MemberVariable const & var : struct_data.member_variables)
 							default_constructor_node.parameters.push_back(*var.initializer_expression);

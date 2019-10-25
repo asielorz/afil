@@ -1202,7 +1202,7 @@ TEST_CASE("A function template lets the user define generic functions")
 	REQUIRE(parse_and_run(src) == 1);
 }
 
-TEST_CASE("A template parameter may have be a reference or mutable")
+TEST_CASE("A template parameter may be a reference or mutable")
 {
 	auto const src = R"(
 		let assign = fn<T>(T mut & a, T b) 
@@ -1219,6 +1219,25 @@ TEST_CASE("A template parameter may have be a reference or mutable")
 	)"sv;
 
 	REQUIRE(parse_and_run(src) == -225);
+}
+
+TEST_CASE("A structure template lets the user define generic structures")
+{
+	auto const src = R"(
+		struct<T, U> pair
+		{
+			T first;
+			U second;
+		}
+		
+		let main = fn() -> int
+		{
+			let p = pair<int, int>(3, 4);
+			return p.first + p.second;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 + 4);
 }
 
 /*****************************************************************

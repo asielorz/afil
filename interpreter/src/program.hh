@@ -100,12 +100,26 @@ struct FunctionTemplate
 	std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
 };
 
+struct MemberVariableTemplate
+{
+	PooledString name;
+	bool is_dependent;
+	TypeId type;
+};
+
+struct StructTemplate
+{
+	std::vector<TemplateParameter> template_parameters;
+	std::vector<MemberVariableTemplate> member_variables;
+};
+
 struct Program
 {
 	Program();
 
 	std::vector<Type> types;
 	std::vector<Struct> structs;
+	std::vector<StructTemplate> struct_templates;
 	std::vector<Function> functions;
 	std::vector<FunctionTemplate> function_templates;
 	std::vector<ExternFunction> extern_functions;
