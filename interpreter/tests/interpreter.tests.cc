@@ -1221,23 +1221,6 @@ TEST_CASE("A template parameter may have be a reference or mutable")
 	REQUIRE(parse_and_run(src) == -225);
 }
 
-TEST_CASE("A temporary may be bound to a constant reference")
-{
-	auto const src = R"(
-		let add = fn<T>(T & a, T & b) 
-		{ 
-			return a + b; 
-		};
-
-		let main = fn() -> int
-		{
-			return add(2, 9);
-		};
-	)"sv;
-
-	REQUIRE(parse_and_run(src) == 2 + 9);
-}
-
 /*****************************************************************
 Backlog
 - templates

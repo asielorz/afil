@@ -58,12 +58,6 @@ namespace expr
 		value_ptr<ExpressionTree> expression;
 	};
 
-	struct AddressOfTemporaryNode
-	{
-		TypeId return_type;
-		value_ptr<ExpressionTree> expression;
-	};
-
 	struct AddressofNode
 	{
 		TypeId return_type;
@@ -123,7 +117,7 @@ namespace expr
 	{
 		using ExpressionTreeBase = std::variant<
 			Literal<int>, Literal<float>, Literal<bool>,
-			DereferenceNode, AddressOfTemporaryNode, AddressofNode, DepointerNode,
+			DereferenceNode, AddressofNode, DepointerNode,
 			LocalVariableNode, GlobalVariableNode, MemberVariableNode,
 			FunctionNode, FunctionTemplateNode, FunctionCallNode, RelationalOperatorCallNode,
 			IfNode, StatementBlockNode,

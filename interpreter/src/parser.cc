@@ -88,10 +88,8 @@ namespace parser
 			else
 			{
 				assert(!to.is_mutable); // Can't bind a temporary to a mutable reference.
-				expr::AddressOfTemporaryNode addressof_node;
-				addressof_node.expression = std::make_unique<ExpressionTree>(std::move(tree));
-				addressof_node.return_type = to;
-				return addressof_node;
+				// TODO: Address of temporaries.
+				declare_unreachable();
 			}
 		}
 		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)

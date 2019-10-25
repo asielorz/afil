@@ -89,13 +89,6 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 				indent(indentation_level), "dereference<", to_string(deref_node.variable_type, program), ">\n",
 				pretty_print_rec(*deref_node.expression, program, indentation_level + 1));
 		},
-		[&](AddressOfTemporaryNode const & addressof_node)
-		{
-			return join(
-				indent(indentation_level), "address of temporary<", to_string(addressof_node.return_type, program), ">\n",
-				pretty_print_rec(*addressof_node.expression, program, indentation_level + 1)
-			);
-		},
 		[&](AddressofNode const & addressof_node)
 		{
 			return join(
