@@ -387,8 +387,8 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 {
 	FunctionTemplate & fn_template = program.function_templates[template_id.index];
 
-	auto const it = fn_template.cached_instantiations.find(parameters);
-	if (it != fn_template.cached_instantiations.end())
+	if (auto const it = fn_template.cached_instantiations.find(parameters);
+		it != fn_template.cached_instantiations.end())
 		return it->second;
 
 	// Everything below is a hack. Instead of keeping the tokens and parsing them for each instantiation,
@@ -412,7 +412,39 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 	instantiation_id.is_extern = false;
 	instantiation_id.index = static_cast<size_t>(program.functions.size());
 	program.functions.push_back(std::move(function));
+	fn_template.cached_instantiations.emplace(std::vector<TypeId>(parameters.begin(), parameters.end()), instantiation_id);
 	return instantiation_id;
+}
+
+auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> TypeId
+{
+	StructTemplate & struct_template = program.struct_templates[template_id.index];
+
+	if (auto const it = struct_template.cached_instantiations.find(parameters);
+		it != struct_template.cached_instantiations.end())
+		return it->second;
+
+	Type new_type;
+	new_type.size = 0;
+	new_type.alignment = 1;
+	Struct new_struct;
+
+	// Magic
+	for (MemberVariableTemplate const & var_template : struct_template.member_variables)
+	{
+		TypeId var_type = var_template.type;
+		if (var_template.is_dependent)
+			var_type.index = parameters[var_template.type.index].index;
+		
+		add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, var_template.name, var_type, 0, program);
+	}
+
+	new_type.extra_data = StructType{static_cast<int>(program.structs.size())};
+	program.structs.push_back(std::move(new_struct));
+	TypeId const new_type_id = TypeId::with_index(static_cast<unsigned>(program.types.size()));
+	program.types.push_back(std::move(new_type));
+	struct_template.cached_instantiations.emplace(std::vector<TypeId>(parameters.begin(), parameters.end()), new_type_id);
+	return new_type_id;
 }
 
 auto pool_string(Program & program, std::string_view string) noexcept -> PooledString

@@ -81,22 +81,22 @@ struct DependentType
 };
 using FunctionTemplateParameter = std::variant<TypeId, DependentType>;
 
+struct MemcmpRanges
+{
+	using is_transparent = std::true_type;
+
+	template <typename T, typename U>
+	[[nodiscard]] constexpr auto operator () (T const & a, U const & b) const noexcept -> bool
+	{
+		return memcmp(a.data(), b.data(), a.size() * sizeof(*a.data())) < 0;
+	}
+};
+
 struct FunctionTemplate
 {
 	std::vector<TemplateParameter> template_parameters;
 	std::vector<FunctionTemplateParameter> parameters;
 	span<lex::Token const> tokens; // TODO: A parsed AST instead of tokens.
-
-	struct MemcmpRanges
-	{
-		using is_transparent = std::true_type;
-
-		template <typename T, typename U>
-		[[nodiscard]] constexpr auto operator () (T const & a, U const & b) const noexcept -> bool
-		{
-			return memcmp(a.data(), b.data(), a.size() * sizeof(*a.data())) < 0;
-		}
-	};
 	std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
 };
 
@@ -111,6 +111,7 @@ struct StructTemplate
 {
 	std::vector<TemplateParameter> template_parameters;
 	std::vector<MemberVariableTemplate> member_variables;
+	std::map<std::vector<TypeId>, TypeId, MemcmpRanges> cached_instantiations;
 };
 
 struct Program
@@ -161,6 +162,7 @@ auto parameter_types(Program const & program, FunctionId id) noexcept -> std::ve
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 
 auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId;
+auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> TypeId;
 
 auto pool_string(Program & program, std::string_view string) noexcept -> PooledString;
 auto get(Program const & program, PooledString string) noexcept -> std::string_view;

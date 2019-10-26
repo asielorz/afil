@@ -1240,6 +1240,31 @@ TEST_CASE("A structure template lets the user define generic structures")
 	REQUIRE(parse_and_run(src) == 3 + 4);
 }
 
+TEST_CASE("A structure may contain a variable of a template type")
+{
+	auto const src = R"(
+		struct<T> tvec2
+		{
+			T x;
+			T y;
+		}
+		
+		struct aabb
+		{
+			tvec2<int> min = tvec2<int>(0, 0);
+			tvec2<int> max = tvec2<int>(0, 0);
+		}
+		
+		let main = fn() -> int
+		{
+			let box = aabb();
+			return box.min.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+
 /*****************************************************************
 Backlog
 - templates

@@ -2,6 +2,7 @@
 
 #include "function_id.hh"
 #include "span.hh"
+#include "utils.hh"
 #include <string_view>
 #include <variant>
 
@@ -23,6 +24,7 @@ struct TypeId
 	};
 
 	static constexpr auto with_index(unsigned index) noexcept -> TypeId { return TypeId{false, false, false, index}; }
+	static constexpr auto zero_initialized() noexcept -> TypeId { return with_index(0); }
 
 	static TypeId const void_; // TODO: Maybe void can be confusing so think of another name?
 	static TypeId const int_;
@@ -114,6 +116,7 @@ namespace lookup_result
 	struct GlobalVariable { TypeId variable_type; int variable_offset; };
 	struct OverloadSet { std::vector<FunctionId> function_ids; std::vector<FunctionTemplateId> function_template_ids; };
 	struct Type { TypeId type_id; };
+	struct StructTemplate { StructTemplateId template_id; };
 }
 auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char const> string_pool) noexcept
 	-> std::variant<
@@ -121,8 +124,30 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 		lookup_result::Variable,
 		lookup_result::GlobalVariable,
 		lookup_result::OverloadSet,
-		lookup_result::Type
+		lookup_result::Type,
+		lookup_result::StructTemplate
 	>;
 auto lookup_type_name(ScopeStackView program, std::string_view name, span<char const> string_pool) noexcept -> TypeId;
 
 auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int;
+
+template <typename T>
+auto add_variable_to_scope(
+	std::vector<T> & variables, int & scope_size, int & scope_alignment,
+	PooledString name, TypeId type_id, int scope_offset, Program const & program) -> int
+{
+	Type const & type = type_with_id(program, type_id);
+	int const size = type_id.is_reference ? sizeof(void *) : type.size;
+	int const alignment = type_id.is_reference ? alignof(void *) : type.alignment;
+
+	T var;
+	var.name = name;
+	var.type = type_id;
+	var.offset = scope_offset + align(scope_size, alignment);
+	scope_size = var.offset + size;
+	scope_alignment = std::max(scope_alignment, alignment);
+	variables.push_back(std::move(var));
+	return var.offset;
+}
+
+auto add_variable_to_scope(Scope & scope, PooledString name, TypeId type_id, int scope_offset, Program const & program) -> int;

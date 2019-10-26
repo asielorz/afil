@@ -220,30 +220,6 @@ namespace parser
 			return std::move(std::get<ExpressionTree>(tree));
 	}
 
-	template <typename T>
-	auto add_variable_to_scope(
-		std::vector<T> & variables, int & scope_size, int & scope_alignment, 
-		PooledString name, TypeId type_id, int scope_offset, Program const & program) -> int
-	{
-		Type const & type = type_with_id(program, type_id);
-		int const size = type_id.is_reference ? sizeof(void *) : type.size;
-		int const alignment = type_id.is_reference ? alignof(void *) : type.alignment;
-
-		T var;
-		var.name = name;
-		var.type = type_id;
-		var.offset = scope_offset + align(scope_size, alignment);
-		scope_size = var.offset + size;
-		scope_alignment = std::max(scope_alignment, alignment);
-		variables.push_back(std::move(var));
-		return var.offset;
-	}
-
-	auto add_variable_to_scope(Scope & scope, PooledString name, TypeId type_id, int scope_offset, Program const & program) -> int
-	{
-		return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
-	}
-
 	auto parse_subexpression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::optional<stmt::Statement>;
@@ -268,15 +244,46 @@ namespace parser
 			return type;
 	}
 
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> TypeId;
+
+	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program, StructTemplateId template_id) noexcept -> TypeId
+	{
+		assert(tokens[index].source == "<");
+		index++;
+
+		StructTemplate const struct_template = program.struct_templates[template_id.index];
+		size_t const template_parameter_count = struct_template.template_parameters.size();
+		
+		std::vector<TypeId> parameters(template_parameter_count);
+		for (size_t i = 0; i < template_parameter_count; ++i)
+		{
+			parameters[i] = parse_type_name(tokens, index, scope_stack, program);
+			if (i < template_parameter_count - 1)
+			{
+				assert(tokens[index].type == TokenType::comma);
+				index++;
+			}
+		}
+
+		assert(tokens[index].source == ">");
+		index++;
+
+		return instantiate_struct_template(program, template_id, parameters);
+	}
+
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> TypeId
 	{
 		// Lookup type name.
-		TypeId type_found = lookup_type_name(scope_stack, tokens[index].source, program.string_pool);
+		auto const visitor = overload(
+			[](auto const &) { return TypeId::none; },
+			[&](lookup_result::Type type) { index++;  return type.type_id; },
+			[&](lookup_result::StructTemplate struct_template) { index++; return parse_template_instantiation_parameter_list(tokens, index, scope_stack, program, struct_template.template_id); }
+		);
+		std::string_view const type_name = tokens[index].source;
+		TypeId type_found = std::visit(visitor, lookup_name(scope_stack, type_name, program.string_pool));
 
 		if (type_found == TypeId::none)
 			return TypeId::none;
-
-		index++;
 
 		type_found = parse_mutable_and_pointer(tokens, index, type_found, program);
 
@@ -841,6 +848,11 @@ namespace parser
 				[&](lookup_result::Type result) -> ExpressionTree 
 				{
 					return parse_struct_constructor_expression(tokens, index, p, result.type_id);
+				},
+				[&](lookup_result::StructTemplate result) -> ExpressionTree
+				{
+					TypeId const template_instantiation = parse_template_instantiation_parameter_list(tokens, index, p.scope_stack, p.program, result.template_id);
+					return parse_struct_constructor_expression(tokens, index, p, template_instantiation);
 				},
 				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); }
 			);

@@ -102,7 +102,8 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 		lookup_result::Variable,
 		lookup_result::GlobalVariable,
 		lookup_result::OverloadSet,
-		lookup_result::Type
+		lookup_result::Type,
+		lookup_result::StructTemplate
 	>
 {
 	lookup_result::OverloadSet overload_set;
@@ -134,6 +135,10 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 			auto const type = std::find_if(scope.types.begin(), scope.types.end(), pooled_name_equal(string_pool, name));
 			if (type != scope.types.end())
 				return lookup_result::Type{type->id};
+
+			auto const struct_template = std::find_if(scope.struct_templates.begin(), scope.struct_templates.end(), pooled_name_equal(string_pool, name));
+			if (struct_template != scope.struct_templates.end())
+				return lookup_result::StructTemplate{struct_template->id};
 		}
 
 		// Functions.
@@ -181,4 +186,9 @@ auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int
 	}
 
 	return size;
+}
+
+auto add_variable_to_scope(Scope & scope, PooledString name, TypeId type_id, int scope_offset, Program const & program) -> int
+{
+	return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
 }
