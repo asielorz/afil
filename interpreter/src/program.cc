@@ -353,6 +353,23 @@ auto type_size(Program const & program, TypeId id) noexcept -> int
 		return type_with_id(program, id).size;
 }
 
+auto is_default_constructible(Struct const & type) noexcept -> bool
+{
+	return std::all_of(type.member_variables.begin(), type.member_variables.end(),
+		[](MemberVariable const & var) { return var.initializer_expression.has_value(); });
+}
+
+auto is_default_constructible(TypeId type_id, Program const & program) noexcept -> bool
+{
+	if (type_id.is_language_reseved)
+		return false;
+
+	if (Struct const * const struct_data = struct_for_type(program, type_id))
+		return is_default_constructible(*struct_data);
+	else
+		return false;
+}
+
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
 {
 	if (id.is_extern)

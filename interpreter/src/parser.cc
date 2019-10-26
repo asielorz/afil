@@ -949,6 +949,16 @@ namespace parser
 		return tree;
 	}
 
+	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data)
+	{
+		expr::StructConstructorNode default_constructor_node;
+		default_constructor_node.constructed_type = type_id;
+		default_constructor_node.parameters.reserve(struct_data.member_variables.size());
+		for (MemberVariable const & var : struct_data.member_variables)
+			default_constructor_node.parameters.push_back(*var.initializer_expression);
+		return default_constructor_node;
+	}
+
 	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::VariableDeclarationStatement
 	{
 		// A variable declaration statement has the following form:
@@ -963,6 +973,13 @@ namespace parser
 		assert(tokens[index].type == TokenType::identifier);
 		node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, tokens[index].source), type_found, local_variable_offset(p.scope_stack), p.program);
 		index++;
+
+		if (tokens[index].type == TokenType::semicolon)
+		{
+			assert(is_default_constructible(type_found, p.program));
+			node.assigned_expression = synthesize_default_constructor(type_found, *struct_for_type(p.program, type_found));
+			return node;
+		}
 
 		// The third token is a '='.
 		assert(tokens[index].source == "=");
@@ -1433,17 +1450,8 @@ namespace parser
 				{
 					Struct const & struct_data = *struct_for_type(p.program, type_data);
 
-					if (std::all_of(struct_data.member_variables.begin(), struct_data.member_variables.end(),
-						[](MemberVariable const & var) { return var.initializer_expression.has_value(); }))
-					{
-						expr::StructConstructorNode default_constructor_node;
-						default_constructor_node.constructed_type = member_type;
-						default_constructor_node.parameters.reserve(struct_data.member_variables.size());
-						for (MemberVariable const & var : struct_data.member_variables)
-							default_constructor_node.parameters.push_back(*var.initializer_expression);
-
-						str.member_variables.back().initializer_expression = std::move(default_constructor_node);
-					}
+					if (is_default_constructible(struct_data))
+						str.member_variables.back().initializer_expression = synthesize_default_constructor(member_type, struct_data);
 				}
 			}
 

@@ -1257,7 +1257,7 @@ TEST_CASE("A structure may contain a variable of a template type")
 		
 		let main = fn() -> int
 		{
-			let box = aabb();
+			aabb box;
 			return box.min.y;
 		};
 	)"sv;

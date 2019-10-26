@@ -147,6 +147,8 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 auto add_type(Program & program, Type new_type) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
 auto type_size(Program const & program, TypeId id) noexcept -> int;
+auto is_default_constructible(Struct const & type) noexcept -> bool;
+auto is_default_constructible(TypeId type, Program const & program) noexcept -> bool;
 
 auto is_struct(Type const & type) noexcept -> bool;
 auto struct_for_type(Program const & program, Type const & type) noexcept -> Struct const *;
