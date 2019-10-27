@@ -1265,6 +1265,28 @@ TEST_CASE("A structure may contain a variable of a template type")
 	REQUIRE(parse_and_run(src) == 0);
 }
 
+TEST_CASE("Statement block in the default value of a member variable")
+{
+	auto const src = R"(
+		struct test
+		{
+			int x = {
+				int i = 3;
+				int j = 4;
+				return i * i + j * j;
+			};
+		}
+		
+		let main = fn() -> int
+		{
+			test t;
+			return t.x;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 * 3 + 4 * 4);
+}
+
 /*****************************************************************
 Backlog
 - templates
