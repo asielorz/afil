@@ -4,6 +4,7 @@
 #include "out.hh"
 #include "span.hh"
 #include "unreachable.hh"
+#include "syntax_error.hh"
 #include "overload.hh"
 #include "multicomparison.hh"
 #include "utils.hh"
@@ -87,16 +88,15 @@ namespace parser
 			}
 			else
 			{
-				assert(!to.is_mutable); // Can't bind a temporary to a mutable reference.
-				// TODO: Address of temporaries.
-				declare_unreachable();
+				raise_syntax_error_if_not(!to.is_mutable, "Can't bind a temporary to a mutable reference.");
+				mark_as_to_do("Address of temporaries");
 			}
 		}
 		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
 		{
 			return std::move(tree);
 		}
-		declare_unreachable();
+		raise_syntax_error("Conversion between types does not exist.");
 	}
 
 	auto insert_conversions(span<ExpressionTree> parameters, span<TypeId const> parsed_parameter_types, span<TypeId const> target_parameter_types, Program const & program)
@@ -115,7 +115,7 @@ namespace parser
 		Program & program) noexcept -> FunctionId
 	{
 		FunctionId const function_id = resolve_function_overloading(overload_set, parsed_parameter_types, program);
-		assert(function_id != invalid_function_id);
+		raise_syntax_error_if_not(function_id != invalid_function_id, "Function overload not found.");
 
 		// If any conversion is needed in order to call the function, perform the conversion.
 		auto const target_parameter_types = parameter_types(program, function_id);
@@ -181,7 +181,7 @@ namespace parser
 			Operator const op = node.op;
 
 			auto const visitor = overload(
-				[](auto) -> ExpressionTree { declare_unreachable(); },
+				[](auto) -> ExpressionTree { raise_syntax_error("Looked up name does not name an overload set."); },
 				[&](lookup_result::OverloadSet const & overload_set) -> ExpressionTree
 				{
 					TypeId const operand_types[] = {expression_type_id(left, program), expression_type_id(right, program)};
@@ -209,7 +209,7 @@ namespace parser
 							return func_node;
 						}
 					}
-					else declare_unreachable();
+					else raise_syntax_error("Operator overload not found.");
 				}
 			);
 
@@ -248,7 +248,7 @@ namespace parser
 
 	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program, StructTemplateId template_id) noexcept -> TypeId
 	{
-		assert(tokens[index].source == "<");
+		raise_syntax_error_if_not(tokens[index].source == "<", "Expected '<' after template name.");
 		index++;
 
 		StructTemplate const struct_template = program.struct_templates[template_id.index];
@@ -260,12 +260,12 @@ namespace parser
 			parameters[i] = parse_type_name(tokens, index, scope_stack, program);
 			if (i < template_parameter_count - 1)
 			{
-				assert(tokens[index].type == TokenType::comma);
+				raise_syntax_error_if_not(tokens[index].type == TokenType::comma, "Expected comma ',' after template parameter.");
 				index++;
 			}
 		}
 
-		assert(tokens[index].source == ">");
+		raise_syntax_error_if_not(tokens[index].source == ">", "Expected comma '>' at the end of template parameter list.");
 		index++;
 
 		return instantiate_struct_template(program, template_id, parameters);
@@ -306,7 +306,8 @@ namespace parser
 
 		for (;;)
 		{
-			assert(tokens[index].type == TokenType::identifier);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier.");
+
 			TemplateParameter param;
 			param.name = pool_string(program, tokens[index].source);
 			parsed_parameters.push_back(param);
@@ -317,7 +318,7 @@ namespace parser
 				index++;
 				break;
 			}
-			assert(tokens[index].type == TokenType::comma);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::comma, "Expected '>' or ',' after template parameter.");
 			index++;
 		}
 
@@ -327,15 +328,16 @@ namespace parser
 	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void
 	{
 		// Parameters must be between parenthesis.
-		assert(tokens[index].type == TokenType::open_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after fn.");
 		index++;
 
 		// Parse arguments.
 		while (tokens[index].type == TokenType::identifier)
 		{
 			TypeId const arg_type = parse_type_name(tokens, index, p.scope_stack, p.program);
-			assert(is_data_type(arg_type)); // An argument cannot be void
+			raise_syntax_error_if_not(is_data_type(arg_type), "Cannot use 'void' as a function parameter type.");
 
+			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after function parameter type.");
 			add_variable_to_scope(function, pool_string(p.program, tokens[index].source), arg_type, 0, p.program);
 			function.parameter_count++;
 			function.parameter_size = function.stack_frame_size;
@@ -344,12 +346,12 @@ namespace parser
 			if (tokens[index].type == TokenType::close_parenthesis)
 				break;
 
-			assert(tokens[index].type == TokenType::comma);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::comma, "Expected ',' or ')' after function parameter.");
 			index++;
 		}
 
 		// After parameters close parenthesis.
-		assert(tokens[index].type == TokenType::close_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after function parameter list.");
 		index++;
 
 		// Return type is introduced with an arrow (optional).
@@ -367,7 +369,7 @@ namespace parser
 	auto parse_function_body(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void
 	{
 		// Body of the function is enclosed by braces.
-		assert(tokens[index].type == TokenType::open_brace);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' at start of function body.");
 		index++;
 
 		p.scope_stack.push_back({&function, ScopeType::function });
@@ -396,7 +398,7 @@ namespace parser
 		// Parse parameters.
 		{
 			// Parameters must be between parenthesis.
-			assert(tokens[index].type == TokenType::open_parenthesis);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' at start of function template parameter list.");
 			index++;
 
 			// Parse arguments.
@@ -417,7 +419,7 @@ namespace parser
 					{
 						return get(p.program, param.name) == type_name;
 					});
-					assert(it != fn_template.template_parameters.end());
+					raise_syntax_error_if_not(it != fn_template.template_parameters.end(), "Expected type name in function parameter.");
 
 					DependentType dependent_arg_type;
 					dependent_arg_type.flat_value = 0;
@@ -443,12 +445,13 @@ namespace parser
 				}
 
 				// Skip parameter name token.
+				raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type in function parameter list.");
 				index++;
 
 				if (tokens[index].type == TokenType::close_parenthesis)
 					break;
 
-				assert(tokens[index].type == TokenType::comma);
+				raise_syntax_error_if_not(tokens[index].type == TokenType::comma, "Expected ',' or ')' after parameter.");
 				index++;
 			}
 		}
@@ -506,8 +509,7 @@ namespace parser
 	{
 		std::vector<ExpressionTree> parsed_expressions;
 
-		// Parameter list starts with (
-		assert(tokens[index].type == TokenType::open_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '('.");
 		index++;
 
 		// Check for empty list.
@@ -533,7 +535,7 @@ namespace parser
 				index++;
 			// Anything else we find is wrong.
 			else
-				declare_unreachable();
+				raise_syntax_error("Expected ')' or ',' after expression.");
 		}
 
 		return parsed_expressions;
@@ -555,26 +557,26 @@ namespace parser
 		auto expression_initialized = std::vector<bool>(struct_data.member_variables.size(), false);
 
 		// Parameter list starts with (
-		assert(tokens[index].type == TokenType::open_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after type name in struct constructor.");
 		index++;
 
 		for (;;)
 		{
 			// A member initializer by name starts with a period.
-			assert(tokens[index].type == TokenType::period);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::period, "Expected '.' in designated initializer.");
 			index++;
 
 			// Find the member to initialize.
-			assert(tokens[index].type == TokenType::identifier);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected member name after '.' in designated initializer.");
 			std::string_view const member_name = tokens[index].source;
 			index++;
 
 			int const member_variable_index = find_member_variable(struct_data, member_name, p.program.string_pool);
-			assert(member_variable_index != -1);
-			assert(!expression_initialized[member_variable_index]); // Avoid initializing the same variable twice.
+			raise_syntax_error_if_not(member_variable_index != -1, "Expected member name after '.' in designated initializer.");
+			raise_syntax_error_if_not(!expression_initialized[member_variable_index], "Same member initialized twice in designated initializer.");
 
 			// Next token must be =
-			assert(tokens[index].source == "=");
+			raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' after member name in designated initializer.");
 			index++;
 
 			// Parse a parameter.
@@ -592,7 +594,7 @@ namespace parser
 				index++;
 			// Anything else we find is wrong.
 			else
-				declare_unreachable();
+				raise_syntax_error("Expected ')' or ',' after designated initializer.");
 		}
 
 		// For any value that is not given an initializer, use the default if available or fail to parse.
@@ -601,7 +603,7 @@ namespace parser
 			if (!expression_initialized[i])
 			{
 				MemberVariable const & variable = struct_data.member_variables[i];
-				assert(variable.initializer_expression.has_value());
+				raise_syntax_error_if_not(variable.initializer_expression.has_value(), "Uninitialized member is not default constructible in designated initializer.");
 				parsed_expressions[i] = *variable.initializer_expression;
 			}
 		}
@@ -612,7 +614,7 @@ namespace parser
 	auto parse_struct_constructor_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, TypeId type_id) noexcept -> expr::StructConstructorNode
 	{
 		Type const & type = type_with_id(p.program, type_id);
-		assert(is_struct(type)); // Type must be a struct (by now).
+		raise_syntax_error_if_not(is_struct(type), "Constructor call syntax is only available for structs (for now).");
 		Struct const & struct_data = *struct_for_type(p.program, type);
 		auto const struct_member_types = map(struct_data.member_variables, &Variable::type);
 
@@ -634,16 +636,16 @@ namespace parser
 			node.parameters.reserve(struct_data.member_variables.size());
 			for (MemberVariable const & var : struct_data.member_variables)
 			{
-				assert(var.initializer_expression.has_value());
+				raise_syntax_error_if_not(var.initializer_expression.has_value(), "Attempted to default construct a struct with a member that is not default constructible.");
 				node.parameters.push_back(*var.initializer_expression);
 			}
 		}
 
-		assert(struct_member_types.size() == node.parameters.size());
+		raise_syntax_error_if_not(struct_member_types.size() == node.parameters.size(), "Number of parameters to constructor call does not match number of member variables.");
 		for (size_t i = 0; i < node.parameters.size(); ++i)
 		{
 			TypeId const parsed_type = expression_type_id(node.parameters[i], p.program);
-			assert(is_convertible(parsed_type, struct_member_types[i], p.program));
+			raise_syntax_error_if_not(is_convertible(parsed_type, struct_member_types[i], p.program), "Expression is not convertible to member type in constructor.");
 			node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, struct_member_types[i], p.program);
 		}
 
@@ -656,20 +658,20 @@ namespace parser
 		index++;
 
 		// Condition goes between parenthesis.
-		assert(tokens[index].type == TokenType::open_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after if.");
 		index++;
 
 		expr::IfNode if_node;
 		if_node.condition = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, p));
-		assert(expression_type_id(*if_node.condition, p.program) == TypeId::bool_);
+		raise_syntax_error_if_not(expression_type_id(*if_node.condition, p.program) == TypeId::bool_, "Condition expression of if must return bool.");
 
-		assert(tokens[index].type == TokenType::close_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after if condition.");
 		index++;
 
 		if_node.then_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, p));
 
 		// Expect keyword else to separate then and else cases.
-		assert(tokens[index].source == "else");
+		raise_syntax_error_if_not(tokens[index].source == "else", "Expected keyword \"else\" after if expression body.");
 		index++;
 
 		if_node.else_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, p));
@@ -678,7 +680,7 @@ namespace parser
 		TypeId const then_type = expression_type_id(*if_node.then_case, p.program);
 		TypeId const else_type = expression_type_id(*if_node.else_case, p.program);
 		TypeId const common = common_type(then_type, else_type, p.program);
-		assert(common != TypeId::none);
+		raise_syntax_error_if_not(common != TypeId::none, "Could not find common type for return types of then and else branches in if expression.");
 		if (then_type != common)
 			*if_node.then_case = insert_conversion_node(std::move(*if_node.then_case), then_type, common, p.program);
 		if (else_type != common)
@@ -724,9 +726,10 @@ namespace parser
 		}
 
 		// Ensure that all branches return.
-		assert(all_branches_return(node.statements.back(), p.program));
+		raise_syntax_error_if_not(all_branches_return(node.statements.back(), p.program), "Not all branches of statement block expression return.");
 
 		// Skip closing brace.
+		raise_syntax_error_if_not(tokens[index].type == TokenType::close_brace, "Expected '}' at the end of statement block expression.");
 		index++;
 
 		return node;
@@ -743,7 +746,7 @@ namespace parser
 		// Addressof is a particular case that cannot be overloaded and is implemented by the compiler.
 		if (op == Operator::addressof)
 		{
-			assert(operand_type.is_reference);
+			raise_syntax_error_if_not(operand_type.is_reference, "Cannot take the address of a temporary.");
 			expr::AddressofNode node;
 			node.return_type = pointer_type_for(remove_reference(operand_type), p.program);
 			node.operand = std::make_unique<ExpressionTree>(std::move(operand));
@@ -761,7 +764,7 @@ namespace parser
 		else
 		{
 			auto const visitor = overload(
-				[](auto) -> expr::FunctionCallNode { declare_unreachable(); },
+				[](auto) -> expr::FunctionCallNode { raise_syntax_error("Name does not name an operator overload set."); },
 				[&](lookup_result::OverloadSet const & overload_set) -> expr::FunctionCallNode
 				{
 					TypeId const operand_type = expression_type_id(operand, p.program);
@@ -773,7 +776,7 @@ namespace parser
 						func_node.parameters.push_back(std::move(operand));
 						return func_node;
 					}
-					else declare_unreachable();
+					else raise_syntax_error("Overload not found.");
 				}
 			);
 
@@ -854,7 +857,7 @@ namespace parser
 					TypeId const template_instantiation = parse_template_instantiation_parameter_list(tokens, index, p.scope_stack, p.program, result.template_id);
 					return parse_struct_constructor_expression(tokens, index, p, template_instantiation);
 				},
-				[](lookup_result::Nothing) -> ExpressionTree { declare_unreachable(); }
+				[](lookup_result::Nothing) -> ExpressionTree { raise_syntax_error("Name lookup failed."); }
 			);
 			auto const lookup = lookup_name(p.scope_stack, tokens[index].source, p.program.string_pool);
 			index++;
@@ -866,7 +869,7 @@ namespace parser
 			auto expr = parse_subexpression(tokens, index, p);
 
 			// Next token must be close parenthesis.
-			assert(tokens[index].type == TokenType::close_parenthesis);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after parenthesized expression.");
 			index++;
 
 			return expr;
@@ -875,7 +878,7 @@ namespace parser
 		{
 			return parse_unary_operator(tokens, index, p);
 		}
-		else declare_unreachable(); // TODO: Actual error handling.
+		else raise_syntax_error("Unrecognized token. Expected expression."); // TODO: Actual error handling.
 	}
 
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree
@@ -890,13 +893,13 @@ namespace parser
 				index++;
 				TypeId const last_operand_type_id = expression_type_id(tree, p.program);
 				Type const & last_operand_type = type_with_id(p.program, last_operand_type_id);
-				assert(is_struct(last_operand_type));
+				raise_syntax_error_if_not(is_struct(last_operand_type), "Member access only allowed for struct types.");
 				Struct const & last_operand_struct = *struct_for_type(p.program, last_operand_type);
 
-				assert(tokens[index].type == TokenType::identifier);
+				raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected member name after '.'.");
 				std::string_view const member_name = tokens[index].source;
 				int const member_variable_index = find_member_variable(last_operand_struct, member_name, p.program.string_pool);
-				assert(member_variable_index != -1);
+				raise_syntax_error_if_not(member_variable_index != -1, "Expected member name after '.'.");
 				index++;
 				Variable const & member_variable = last_operand_struct.member_variables[member_variable_index];
 
@@ -970,26 +973,26 @@ namespace parser
 		TypeId const type_found = parse_type_name(tokens, index, p.scope_stack, p.program);
 
 		// The second token of the statement is the variable name.
-		assert(tokens[index].type == TokenType::identifier);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
 		node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, tokens[index].source), type_found, local_variable_offset(p.scope_stack), p.program);
 		index++;
 
 		if (tokens[index].type == TokenType::semicolon)
 		{
-			assert(is_default_constructible(type_found, p.program));
+			raise_syntax_error_if_not(is_default_constructible(type_found, p.program), "Attempted to default construct a type that is not default constructible.");
 			node.assigned_expression = synthesize_default_constructor(type_found, *struct_for_type(p.program, type_found));
 			return node;
 		}
 
 		// The third token is a '='.
-		assert(tokens[index].source == "=");
+		raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' or ';' after variable name in declaration.");
 		index++;
 
 		// The rest is the expression assigned to the variable.
 		node.assigned_expression = parse_subexpression(tokens, index, p);
 		TypeId const assigned_type = expression_type_id(node.assigned_expression, p.program);
 		// Require that the expression assigned to the variable is convertible to the type of the variable.
-		assert(is_convertible(assigned_type, type_found, p.program));
+		raise_syntax_error_if_not(is_convertible(assigned_type, type_found, p.program), "Cannot convert initializer expression type to declared variable type.");
 		if (assigned_type != type_found)
 			node.assigned_expression = insert_conversion_node(std::move(node.assigned_expression), assigned_type, type_found, p.program);
 
@@ -1001,19 +1004,16 @@ namespace parser
 		// Special rules for the main function.
 		if (function_name == "main")
 		{
-			// Main function must be in the global scope.
-			assert(&scope == &program.global_scope);
-
-			// Main cannot be a extern function.
-			assert(!function_id.is_extern);
+			raise_syntax_error_if_not(&scope == &program.global_scope, "Main function must be in the global scope.");
+			raise_syntax_error_if_not(!function_id.is_extern, "Main cannot be a extern function.");
 
 			// Main must not take parameters and return int.
 			Function const & main_function = program.functions[function_id.index];
-			assert(main_function.return_type == TypeId::int_);
-			assert(main_function.parameter_count == 0);
+			raise_syntax_error_if_not(main_function.return_type == TypeId::int_, "Main must return int.");
+			raise_syntax_error_if_not(main_function.parameter_count == 0, "Main cannot take parameters.");
 
 			// There can only be one main function.
-			assert(program.main_function == invalid_function_id);
+			raise_syntax_error_if_not(program.main_function == invalid_function_id, "Redefinition of main function. There can only be one main function.");
 
 			// Bind the function as the program's main function.
 			program.main_function = function_id;
@@ -1035,9 +1035,9 @@ namespace parser
 		index++;
 
 		lex::Token const id_token = tokens[index];
-		assert(id_token.type == TokenType::identifier);
+		raise_syntax_error_if_not(id_token.type == TokenType::identifier, "Expected identifier after let.");
 		index++;
-		assert(tokens[index].source == "=");
+		raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' after identifier in function declaration.");
 		index++;
 
 		// Skip the fn.
@@ -1102,22 +1102,22 @@ namespace parser
 			if (tokens[index].type == TokenType::open_parenthesis)
 			{
 				index++;
-				assert(tokens[index].type == TokenType::operator_);
+				raise_syntax_error_if_not(tokens[index].type == TokenType::operator_, "Expected operator after '(' in function declaration.");
 				name = tokens[index].source;
 				index++;
-				assert(tokens[index].type == TokenType::close_parenthesis);
+				raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after operator in function declaration.");
 				index++;
 
 				is_operator = true;
 			}
 			else
 			{
-				assert(tokens[index].type == TokenType::identifier);
+				raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after let.");
 				name = tokens[index].source;
 				index++;
 			}
 
-			assert(tokens[index].source == "=");
+			raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' after identifier in let declaration.");
 			index++;
 
 			// If the expression returns a function, bind it to its name and return a noop.
@@ -1126,15 +1126,15 @@ namespace parser
 			
 			if (expr_type == TypeId::function)
 			{
-				assert(!is_mutable); // A function cannot be mutable.
+				raise_syntax_error_if_not(!is_mutable, "A function cannot be mutable.");
 				FunctionId const function_id = std::get<expr::FunctionNode>(expression).function_id;
 				bind_function_name(name, function_id, p.program, top(p.scope_stack));
 				return std::nullopt;
 			}
 			else
 			{
-				assert(is_data_type(expr_type));
-				assert(!is_operator);
+				raise_syntax_error_if_not(is_data_type(expr_type), "Cannot declare a variable of type void.");
+				raise_syntax_error_if_not(!is_operator, "An operator name can only be bound to a function.");
 				TypeId const var_type = is_mutable ? make_mutable(decay(expr_type)) : decay(expr_type);
 				stmt::VariableDeclarationStatement node;
 				node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, name), var_type, local_variable_offset(p.scope_stack), p.program);
@@ -1156,7 +1156,7 @@ namespace parser
 
 	auto parse_return_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::ReturnStatement
 	{
-		assert(p.current_return_type != TypeId::none);
+		raise_syntax_error_if_not(p.current_return_type != TypeId::none, "A return statement cannot appear in the global scope.");
 
 		// Skip return token.
 		index++;
@@ -1175,7 +1175,7 @@ namespace parser
 		node.returned_expression = std::move(return_expr);
 
 		// Cannot return special types that do not represent data types.
-		assert(is_data_type(expression_type_id(node.returned_expression, p.program)));
+		raise_syntax_error_if_not(is_data_type(expression_type_id(node.returned_expression, p.program)), "Cannot return special types that do not represent data types.");
 
 		return node;
 	}
@@ -1185,18 +1185,18 @@ namespace parser
 		// Skip the if
 		index++;
 
-		assert(tokens[index].type == TokenType::open_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after if.");
 		index++;
 
 		stmt::IfStatement node;
 		node.condition = parse_subexpression(tokens, index, p);
-		assert(expression_type_id(node.condition, p.program) == TypeId::bool_);
+		raise_syntax_error_if_not(expression_type_id(node.condition, p.program) == TypeId::bool_, "Condition of an if statement must return bool.");
 
-		assert(tokens[index].type == TokenType::close_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after condition in if statement.");
 		index++;
 
 		auto then_case = parse_substatement(tokens, index, p);
-		assert(then_case.has_value()); // Do not allow no-ops as cases of ifs.
+		raise_syntax_error_if_not(then_case.has_value(), "No-op statement not allowed as body of if statement branch.");
 		node.then_case = std::make_unique<stmt::Statement>(*std::move(then_case));
 
 		// For if statement else is optional.
@@ -1205,7 +1205,7 @@ namespace parser
 			// Skip else token.
 			index++;
 			auto else_case = parse_substatement(tokens, index, p);
-			assert(else_case.has_value());  // Do not allow no-ops as cases of ifs.
+			raise_syntax_error_if_not(else_case.has_value(), "No-op statement not allowed as body of if statement branch.");
 			node.else_case = std::make_unique<stmt::Statement>(*std::move(else_case));
 		}
 
@@ -1241,21 +1241,21 @@ namespace parser
 		index++;
 
 		// Condition goes inside parenthesis.
-		assert(tokens[index].type == TokenType::open_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after while.");
 		index++;
 
 		stmt::WhileStatement node;
 
 		// Parse condition. Must return bool.
 		node.condition = parse_subexpression(tokens, index, p);
-		assert(expression_type_id(node.condition, p.program) == TypeId::bool_);
+		raise_syntax_error_if_not(expression_type_id(node.condition, p.program) == TypeId::bool_, "Condition of while statement must return bool.");
 
-		assert(tokens[index].type == TokenType::close_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after condition in while statement.");
 		index++;
 
 		// Parse body
 		auto body = parse_substatement(tokens, index, p);
-		assert(body.has_value()); // Do not allow no-ops as bodies of whiles.
+		raise_syntax_error_if_not(body.has_value(), "No-op statement not allowed as body of while statement.");
 		node.body = std::make_unique<stmt::Statement>(std::move(*body));
 
 		return node;
@@ -1271,7 +1271,7 @@ namespace parser
 		index++;
 
 		// Condition goes inside parenthesis.
-		assert(tokens[index].type == TokenType::open_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after for.");
 		index++;
 
 		stmt::ForStatement for_node;
@@ -1279,26 +1279,28 @@ namespace parser
 
 		// Parse init statement. Must be an expression or a declaration.
 		auto init_statement = parse_substatement(tokens, index, p);
-		assert(init_statement.has_value() && (has_type<stmt::VariableDeclarationStatement>(*init_statement) || has_type<stmt::ExpressionStatement>(*init_statement)));
+		raise_syntax_error_if_not(
+			init_statement.has_value() && (has_type<stmt::VariableDeclarationStatement>(*init_statement) || has_type<stmt::ExpressionStatement>(*init_statement)),
+			"init-statement of a for statement must be a variable declaration or an expression.");
 		for_node.init_statement = std::make_unique<stmt::Statement>(std::move(*init_statement));
 
 		// Parse condition. Must return bool.
 		for_node.condition = parse_subexpression(tokens, index, p);
-		assert(expression_type_id(for_node.condition, p.program) == TypeId::bool_);
+		raise_syntax_error_if_not(expression_type_id(for_node.condition, p.program) == TypeId::bool_, "Condition of for statement must return bool.");
 
 		// Parse ; after condition.
-		assert(tokens[index].type == TokenType::semicolon);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after for statement condition.");
 		index++;
 
 		// Parse end expression.
 		for_node.end_expression = parse_subexpression(tokens, index, p);
 
-		assert(tokens[index].type == TokenType::close_parenthesis);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after for statement end expression.");
 		index++;
 
 		// Parse body
 		auto body = parse_substatement(tokens, index, p);
-		assert(body.has_value()); // Do not allow no-ops as bodies of whiles.
+		raise_syntax_error_if_not(body.has_value(), "No-op statement not allowed as body of for statement.");
 		for_node.body = std::make_unique<stmt::Statement>(std::move(*body));
 
 		p.scope_stack.pop_back();
@@ -1322,12 +1324,12 @@ namespace parser
 		new_struct_template.template_parameters = parse_template_parameter_list(tokens, index, p.program);
 
 		// Parse name
-		assert(tokens[index].type == TokenType::identifier);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after struct.");
 		PooledString const new_template_name = pool_string(p.program, tokens[index].source);
 		index++;
 
 		// Skip { token.
-		assert(tokens[index].type == TokenType::open_brace);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' after struct name.");
 		index++;
 
 		// Parse member variables.
@@ -1338,9 +1340,9 @@ namespace parser
 			TypeId const member_type = parse_type_name(tokens, index, p.scope_stack, p.program);
 			if (member_type != TypeId::none)
 			{
-				assert(is_data_type(member_type));
-				assert(!member_type.is_reference);
-				assert(!member_type.is_mutable);
+				raise_syntax_error_if_not(is_data_type(member_type), "Member variable cannot be void.");
+				raise_syntax_error_if_not(!member_type.is_reference, "Member variable cannot be reference.");
+				raise_syntax_error_if_not(!member_type.is_mutable, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
 
 				member.type = member_type;
 				member.is_dependent = false;
@@ -1353,44 +1355,31 @@ namespace parser
 				{
 					return get(p.program, param.name) == member_type_name;
 				});
-				assert(it != new_struct_template.template_parameters.end());
+				raise_syntax_error_if_not(it != new_struct_template.template_parameters.end(), "Expected type name in member variable declaration.");
 
 				TypeId dependent_member_type;
 				dependent_member_type.flat_value = 0;
 				dependent_member_type.index = static_cast<unsigned>(it - new_struct_template.template_parameters.begin());
 
-				// Look for mutable qualifier.
-				if (tokens[index].source == "mut"sv)
-				{
-					dependent_member_type.is_mutable = true;
-					index++;
-				}
-
-				// Look for reference qualifier.
-				if (tokens[index].source == "&"sv)
-				{
-					dependent_member_type.is_reference = true;
-					index++;
-				}
-
 				member.type = dependent_member_type;
 				member.is_dependent = true;
 			}
 			
-			assert(tokens[index].type == TokenType::identifier);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
 			member.name = pool_string(p.program, tokens[index].source);
-
-			// TODO: Initializer expression.
-
-			new_struct_template.member_variables.push_back(member);
 			index++;
 
-			assert(tokens[index].type == TokenType::semicolon);
+			// TODO: Initializer expression.
+			if (tokens[index].source == "=")
+				mark_as_to_do("Member default initializer expressions for struct templates");
+
+			new_struct_template.member_variables.push_back(member);
+
+			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after member name.");
 			index++;
 		}
 
 		// Skip } token.
-		assert(tokens[index].type == TokenType::close_brace);
 		index++;
 
 		StructTemplateId new_template_id;
@@ -1410,7 +1399,7 @@ namespace parser
 			return parse_template_struct_declaration(tokens, index, p);
 
 		// Parse name
-		assert(tokens[index].type == TokenType::identifier);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after struct.");
 		PooledString const type_name = pool_string(p.program, tokens[index].source);
 		index++;
 
@@ -1419,7 +1408,7 @@ namespace parser
 		new_type.alignment = 1;
 
 		// Skip { token.
-		assert(tokens[index].type == TokenType::open_brace);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' after struct name.");
 		index++;
 
 		Struct str;
@@ -1427,11 +1416,11 @@ namespace parser
 		while (tokens[index].type != TokenType::close_brace)
 		{
 			TypeId const member_type = parse_type_name(tokens, index, p.scope_stack, p.program);
-			assert(is_data_type(member_type));
-			assert(!member_type.is_reference);
-			assert(!member_type.is_mutable);
-			
-			assert(tokens[index].type == TokenType::identifier);
+			raise_syntax_error_if_not(is_data_type(member_type), "Member variable cannot be void.");
+			raise_syntax_error_if_not(!member_type.is_reference, "Member variable cannot be reference.");
+			raise_syntax_error_if_not(!member_type.is_mutable, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
+
+			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name in member variable declaration.");
 			PooledString const name = pool_string(p.program, tokens[index].source);
 			add_variable_to_scope(str.member_variables, new_type.size, new_type.alignment, name, member_type, 0, p.program);
 			index++;
@@ -1455,12 +1444,11 @@ namespace parser
 				}
 			}
 
-			assert(tokens[index].type == TokenType::semicolon);
+			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "");
 			index++;
 		}
 
 		// Skip } token.
-		assert(tokens[index].type == TokenType::close_brace);
 		index++;
 
 		new_type.extra_data = StructType{static_cast<int>(p.program.structs.size())};
@@ -1500,7 +1488,7 @@ namespace parser
 			result = parse_expression_statement(tokens, index, p);
 
 		// A statement must end with a semicolon.
-		assert(tokens[index].type == TokenType::semicolon);
+		raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after statement.");
 		index++;
 
 		return result;
@@ -1527,7 +1515,7 @@ namespace parser
 			auto statement = parse_substatement(tokens, index, {program, scope_stack, global_return_type});
 			if (statement)
 			{
-				assert(!has_type<stmt::ExpressionStatement>(*statement)); // An expression statement is not allowed at the global scope.
+				raise_syntax_error_if_not(!has_type<stmt::ExpressionStatement>(*statement), "An expression statement is not allowed at the global scope.");
 				program.global_initialization_statements.push_back(std::move(*statement));
 			}
 		}

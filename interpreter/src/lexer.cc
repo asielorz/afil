@@ -1,5 +1,6 @@
 #include "lexer.hh"
 #include "unreachable.hh"
+#include "syntax_error.hh"
 #include "multicomparison.hh"
 #include <cassert>
 
@@ -99,7 +100,7 @@ namespace lex
 		else if (starts_with(src, index, "/*"sv))
 		{
 			size_t const comment_end = src.find("*/"sv, index);
-			assert(comment_end != std::string_view::npos); // A C comment must be closed.
+			raise_syntax_error_if_not(comment_end != std::string_view::npos, "A C comment must be closed."); 
 			return static_cast<int>(comment_end + 2) - index;
 		}
 		else
@@ -153,7 +154,7 @@ namespace lex
 			else if (is_valid_after_literal(src[end]))
 				break;
 			else
-				declare_unreachable();
+				raise_syntax_error("Unrecognized char in number literal.");
 		}
 
 		return { 
@@ -218,7 +219,7 @@ namespace lex
 			if (token.type == any_of(Token::Type::literal_int, Token::Type::literal_float) || 
 				token.source == any_of("and"sv, "or"sv, "xor"sv))
 			{
-				assert(end_reached(src, index) || is_valid_after_literal(src[index]));
+				raise_syntax_error_if_not(end_reached(src, index) || is_valid_after_literal(src[index]), "Expected whitespace, operator or delimiter after literal.");
 			}
 
 			index += skip_whitespace_and_comments(src, index);

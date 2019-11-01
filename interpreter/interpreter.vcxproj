@@ -36,6 +36,7 @@
     <ClCompile Include="src\parser.cc" />
     <ClCompile Include="src\scope.cc" />
     <ClCompile Include="src\lexer.cc" />
+    <ClCompile Include="src\syntax_error.cc" />
     <ClCompile Include="src\unreachable.cc" />
     <ClCompile Include="src\utils.cc" />
     <ClCompile Include="tests\callc.tests.cc" />
@@ -63,6 +64,7 @@
     <ClInclude Include="src\lexer.hh" />
     <ClInclude Include="src\statement.hh" />
     <ClInclude Include="src\string.hh" />
+    <ClInclude Include="src\syntax_error.hh" />
     <ClInclude Include="src\unreachable.hh" />
     <ClInclude Include="src\utils.hh" />
     <ClInclude Include="src\value_ptr.hh" />
