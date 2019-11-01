@@ -26,6 +26,41 @@ using namespace std::literals;
 namespace parser
 {
 
+	constexpr std::string_view keywords[] = {
+		// Control flow
+		"if",
+		"else",
+		"for",
+		"while",
+		"break",
+		"continue",
+
+		// Built in types
+		"void",
+		"int",
+		"float",
+		"bool",
+
+		// Declarations
+		"fn",
+		"main",
+		"struct",
+		"let",
+		"mut",
+
+		// Operators
+		"and",
+		"or",
+		"not",
+		"xor",
+	};
+
+	auto is_keyword(std::string_view name) noexcept -> bool
+	{
+		// TODO: Binary search
+		return std::find(keywords, std::end(keywords), name) != std::end(keywords);
+	}
+
 	template <typename T>
 	auto parse_number_literal(std::string_view token_source) noexcept -> T
 	{
@@ -309,6 +344,7 @@ namespace parser
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier.");
 
 			TemplateParameter param;
+			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as template parameter name.");
 			param.name = pool_string(program, tokens[index].source);
 			parsed_parameters.push_back(param);
 			index++;
@@ -338,6 +374,7 @@ namespace parser
 			raise_syntax_error_if_not(is_data_type(arg_type), "Cannot use 'void' as a function parameter type.");
 
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after function parameter type.");
+			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as function parameter name.");
 			add_variable_to_scope(function, pool_string(p.program, tokens[index].source), arg_type, 0, p.program);
 			function.parameter_count++;
 			function.parameter_size = function.stack_frame_size;
@@ -974,6 +1011,7 @@ namespace parser
 
 		// The second token of the statement is the variable name.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
+		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as variable name.");
 		node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, tokens[index].source), type_found, local_variable_offset(p.scope_stack), p.program);
 		index++;
 
@@ -1022,6 +1060,7 @@ namespace parser
 		}
 		else
 		{
+			raise_syntax_error_if_not(!is_keyword(function_name), "Cannot use a keyword as function name.");
 			scope.functions.push_back({pool_string(program, function_name), function_id});
 		}
 	}
@@ -1047,6 +1086,7 @@ namespace parser
 		if (tokens[index].source == "<")
 		{
 			expr::FunctionTemplateNode template_node = parse_function_template_expression(tokens, index, p);
+			raise_syntax_error_if_not(!is_keyword(id_token.source), "Cannot use a keyword as function template name.");
 			top(p.scope_stack).function_templates.push_back({pool_string(p.program, id_token.source), template_node.function_template_id});
 		}
 		else
@@ -1137,6 +1177,7 @@ namespace parser
 				raise_syntax_error_if_not(!is_operator, "An operator name can only be bound to a function.");
 				TypeId const var_type = is_mutable ? make_mutable(decay(expr_type)) : decay(expr_type);
 				stmt::VariableDeclarationStatement node;
+				raise_syntax_error_if_not(!is_keyword(name), "Cannot use a keyword as variable name.");
 				node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, name), var_type, local_variable_offset(p.scope_stack), p.program);
 				if (var_type == expr_type)
 					node.assigned_expression = std::move(expression);
@@ -1325,6 +1366,7 @@ namespace parser
 
 		// Parse name
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after struct.");
+		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as struct name.");
 		PooledString const new_template_name = pool_string(p.program, tokens[index].source);
 		index++;
 
@@ -1366,6 +1408,7 @@ namespace parser
 			}
 			
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
+			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as member variable name.");
 			member.name = pool_string(p.program, tokens[index].source);
 			index++;
 
@@ -1400,6 +1443,7 @@ namespace parser
 
 		// Parse name
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after struct.");
+		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as struct name.");
 		PooledString const type_name = pool_string(p.program, tokens[index].source);
 		index++;
 
@@ -1421,6 +1465,7 @@ namespace parser
 			raise_syntax_error_if_not(!member_type.is_mutable, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
 
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name in member variable declaration.");
+			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as member variable name.");
 			PooledString const name = pool_string(p.program, tokens[index].source);
 			add_variable_to_scope(str.member_variables, new_type.size, new_type.alignment, name, member_type, 0, p.program);
 			index++;

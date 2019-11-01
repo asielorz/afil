@@ -1287,6 +1287,39 @@ TEST_CASE("Statement block in the default value of a member variable")
 	REQUIRE(parse_and_run(src) == 3 * 3 + 4 * 4);
 }
 
+TEST_CASE("Things that should break")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			// Keywords
+			//int float = 0;
+			//int main = 0;
+			//int for = 0;
+			//int while = 0;
+			//int struct = 0;
+			
+			//struct struct
+			//{
+			//	int int;
+			//	bool bool;
+			//}
+			
+			// Redefinitions
+			int i = 0;
+			int i = 0;
+			
+			let f = fn(int x) { return x; };
+			let f = fn(int x) { return x + 1; };
+			
+			struct s {}
+			struct s { int a; }
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+
 /*****************************************************************
 Backlog
 - templates
