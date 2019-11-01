@@ -62,7 +62,7 @@ namespace parser
 	}
 
 	template <typename C>
-	auto is_name_taken(std::string_view name_to_test, C const & registered_names, Program const & program) noexcept -> bool
+	auto is_name_locally_taken(std::string_view name_to_test, C const & registered_names, Program const & program) noexcept -> bool
 	{
 		for (auto const & n : registered_names)
 			if (name_to_test == get(program, n.name))
@@ -70,24 +70,25 @@ namespace parser
 		return false;
 	}
 
-	auto is_name_taken(std::string_view name_to_test, Scope const & current_scope, Program const & program) noexcept -> bool
+	auto is_name_taken(std::string_view name_to_test, ScopeStackView scope_stack, Program const & program) noexcept -> bool
 	{
-		return is_name_taken(name_to_test, current_scope.variables, program)
-			|| is_name_taken(name_to_test, current_scope.functions, program)
-			|| is_name_taken(name_to_test, current_scope.function_templates, program)
-			|| is_name_taken(name_to_test, current_scope.types, program)
-			|| is_name_taken(name_to_test, current_scope.struct_templates, program)
-			;
+		auto const visitor = overload(
+			[](lookup_result::Nothing) { return false; },
+			[](auto const &) { return true; }
+		);
+		auto const lookup = lookup_name(scope_stack, name_to_test, program.string_pool);
+		return std::visit(visitor, lookup);
 	}
 
-	auto is_function_name_taken(std::string_view name_to_test, Scope const & current_scope, Program const & program) noexcept -> bool
+	auto is_function_name_taken(std::string_view name_to_test, ScopeStackView scope_stack, Program const & program) noexcept -> bool
 	{
-		// Functions don't test against functions because they can overload.
-		// TODO: Disable function redefinition if overload is ambiguous.
-		return is_name_taken(name_to_test, current_scope.variables, program)
-			|| is_name_taken(name_to_test, current_scope.types, program)
-			|| is_name_taken(name_to_test, current_scope.struct_templates, program)
-			;
+		auto const visitor = overload(
+			[](lookup_result::Nothing) { return false; },
+			[](lookup_result::OverloadSet const &) { return false; },
+			[](auto const &) { return true; }
+		);
+		auto const lookup = lookup_name(scope_stack, name_to_test, program.string_pool);
+		return std::visit(visitor, lookup);
 	}
 
 	template <typename T>
@@ -404,7 +405,8 @@ namespace parser
 
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after function parameter type.");
 			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as function parameter name.");
-			raise_syntax_error_if_not(!is_name_taken(tokens[index].source, function.variables, p.program), "More than one function parameter with the same name.");
+			raise_syntax_error_if_not(!is_name_locally_taken(tokens[index].source, function.variables, p.program), "More than one function parameter with the same name.");
+			//raise_syntax_error_if_not(!is_name_taken(tokens[index].source, p.scope_stack, p.program), "Function parameter shadows other name.");
 			add_variable_to_scope(function, pool_string(p.program, tokens[index].source), arg_type, 0, p.program);
 			function.parameter_count++;
 			function.parameter_size = function.stack_frame_size;
@@ -1042,7 +1044,7 @@ namespace parser
 		// The second token of the statement is the variable name.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
 		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as variable name.");
-		raise_syntax_error_if_not(!is_name_taken(tokens[index].source, top(p.scope_stack), p.program), "More than one local variable with the same name.");
+		raise_syntax_error_if_not(!is_name_taken(tokens[index].source, p.scope_stack, p.program), "More than one local variable with the same name.");
 		node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, tokens[index].source), type_found, local_variable_offset(p.scope_stack), p.program);
 		index++;
 
@@ -1118,7 +1120,7 @@ namespace parser
 		{
 			expr::FunctionTemplateNode template_node = parse_function_template_expression(tokens, index, p);
 			raise_syntax_error_if_not(!is_keyword(id_token.source), "Cannot use a keyword as function template name.");
-			raise_syntax_error_if_not(!is_function_name_taken(id_token.source, top(p.scope_stack), p.program), "More than one function template with the same name.");
+			raise_syntax_error_if_not(!is_function_name_taken(id_token.source, p.scope_stack, p.program), "More than one function template with the same name.");
 			top(p.scope_stack).function_templates.push_back({pool_string(p.program, id_token.source), template_node.function_template_id});
 		}
 		else
@@ -1210,7 +1212,7 @@ namespace parser
 				TypeId const var_type = is_mutable ? make_mutable(decay(expr_type)) : decay(expr_type);
 				stmt::VariableDeclarationStatement node;
 				raise_syntax_error_if_not(!is_keyword(name), "Cannot use a keyword as variable name.");
-				raise_syntax_error_if_not(!is_name_taken(name, top(p.scope_stack), p.program), "More than one local variable with the same name.");
+				raise_syntax_error_if_not(!is_name_taken(name, p.scope_stack, p.program), "More than one local variable with the same name.");
 				node.variable_offset = add_variable_to_scope(top(p.scope_stack), pool_string(p.program, name), var_type, local_variable_offset(p.scope_stack), p.program);
 				if (var_type == expr_type)
 					node.assigned_expression = std::move(expression);
@@ -1400,7 +1402,7 @@ namespace parser
 		// Parse name
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after struct.");
 		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as struct name.");
-		raise_syntax_error_if_not(!is_name_taken(tokens[index].source, top(p.scope_stack), p.program), "More than one struct template with the same name.");
+		raise_syntax_error_if_not(!is_name_taken(tokens[index].source, p.scope_stack, p.program), "More than one struct template with the same name.");
 		PooledString const new_template_name = pool_string(p.program, tokens[index].source);
 		index++;
 
@@ -1444,7 +1446,7 @@ namespace parser
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
 			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as member variable name.");
 			raise_syntax_error_if_not(
-				!is_name_taken(tokens[index].source, new_struct_template.member_variables, p.program),
+				!is_name_locally_taken(tokens[index].source, new_struct_template.member_variables, p.program),
 				"More than one member variable with the same name.");
 			member.name = pool_string(p.program, tokens[index].source);
 			index++;
@@ -1482,7 +1484,7 @@ namespace parser
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after struct.");
 		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as struct name.");
 		raise_syntax_error_if_not(
-			!is_name_taken(tokens[index].source, top(p.scope_stack), p.program),
+			!is_name_taken(tokens[index].source, p.scope_stack, p.program),
 			"More than one struct with the same name.");
 		PooledString const type_name = pool_string(p.program, tokens[index].source);
 		index++;
@@ -1506,7 +1508,7 @@ namespace parser
 
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name in member variable declaration.");
 			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as member variable name.");
-			raise_syntax_error_if_not(!is_name_taken(tokens[index].source, str.member_variables, p.program), "More than one member variable with the same name.");
+			raise_syntax_error_if_not(!is_name_locally_taken(tokens[index].source, str.member_variables, p.program), "More than one member variable with the same name.");
 			PooledString const name = pool_string(p.program, tokens[index].source);
 			add_variable_to_scope(str.member_variables, new_type.size, new_type.alignment, name, member_type, 0, p.program);
 			index++;

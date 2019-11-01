@@ -1296,5 +1296,4 @@ Backlog
 - importing functions in C
 - contracts
 - errors
-- avoiding name collisions with keywords or declared symbols (int int = 5; // Should be an error)
 *****************************************************************/
