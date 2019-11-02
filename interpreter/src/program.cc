@@ -117,7 +117,7 @@ Program::Program()
 	}
 }
 
-auto check_type(TypeId param_type, TypeId parsed_type, Program const & program, int & conversions) noexcept -> bool
+auto check_type_validness_as_overload_candidate(TypeId param_type, TypeId parsed_type, Program const & program, int & conversions) noexcept -> bool
 {
 	if (param_type == parsed_type)
 		return true;
@@ -160,7 +160,7 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 			bool discard = false;
 			for (size_t i = 0; i < param_types.size(); ++i)
 			{
-				if (!check_type(param_types[i], parameters[i], program, conversions))
+				if (!check_type_validness_as_overload_candidate(param_types[i], parameters[i], program, conversions))
 				{
 					discard = true;
 					break;
@@ -191,7 +191,7 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 			{
 				if (has_type<TypeId>(template_params[i]))
 				{
-					if (!check_type(std::get<TypeId>(template_params[i]), parameters[i], program, conversions))
+					if (!check_type_validness_as_overload_candidate(std::get<TypeId>(template_params[i]), parameters[i], program, conversions))
 					{
 						discard = true;
 						break;
@@ -202,7 +202,7 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 					DependentType const dependent_type = std::get<DependentType>(template_params[i]);
 					if (resolved_dependent_types[dependent_type.index] != TypeId::none)
 					{
-						if (!check_type(resolved_dependent_types[dependent_type.index], parameters[i], program, conversions))
+						if (!check_type_validness_as_overload_candidate(resolved_dependent_types[dependent_type.index], parameters[i], program, conversions))
 						{
 							discard = true;
 							break;
@@ -216,7 +216,7 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 						resolved_type.is_reference = dependent_type.is_reference;
 						resolved_type.is_mutable = dependent_type.is_mutable;
 
-						if (check_type(resolved_type, parameters[i], program, conversions))
+						if (check_type_validness_as_overload_candidate(resolved_type, parameters[i], program, conversions))
 						{
 							resolved_dependent_types[dependent_type.index] = decay(resolved_type);
 						}
