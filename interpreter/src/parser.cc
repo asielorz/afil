@@ -891,7 +891,7 @@ namespace parser
 		}
 		else if (tokens[index].type == TokenType::literal_bool)
 		{
-			return ExpressionTree(Literal<bool>{tokens[index++].source[0] == 't'}); // if it starts with t it must be bool, and otherwise it must be false.
+			return ExpressionTree(Literal<bool>{tokens[index++].source[0] == 't'}); // if it starts with t it must be true, and otherwise it must be false.
 		}
 		else if (tokens[index].type == TokenType::identifier)
 		{
