@@ -441,7 +441,7 @@ namespace parser
 		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' at start of function body.");
 		index++;
 
-		p.scope_stack.push_back({&function, ScopeType::function });
+		p.scope_stack.push_back({&function, ScopeType::function});
 
 		// Parse all statements in the function.
 		while (tokens[index].type != TokenType::close_brace)
