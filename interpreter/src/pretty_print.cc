@@ -179,6 +179,10 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 			for (ExpressionTree const & param : ctor_node.parameters)
 				str += pretty_print_rec(param, program, indentation_level + 1);
 			return str;
+		},
+		[&](tmp::LocalVariableNode const &)
+		{
+			return join(indent(indentation_level), "dependent local", '\n');
 		}
 	);
 	return std::visit(visitor, tree.as_variant());

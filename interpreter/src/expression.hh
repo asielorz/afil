@@ -113,6 +113,23 @@ namespace expr
 		std::vector<ExpressionTree> parameters;
 	};
 
+	// Template nodes.
+	namespace tmp
+	{
+		// Tag type. All dependent nodes inherit from it.
+		struct DependentNode
+		{
+		protected:
+			DependentNode() noexcept = default;
+		};
+
+		struct LocalVariableNode : DependentNode
+		{
+			DependentTypeId type;
+			PooledString name;
+		};
+	}
+
 	namespace detail
 	{
 		using ExpressionTreeBase = std::variant<
@@ -121,7 +138,9 @@ namespace expr
 			LocalVariableNode, GlobalVariableNode, MemberVariableNode,
 			FunctionNode, FunctionTemplateNode, FunctionCallNode, RelationalOperatorCallNode,
 			IfNode, StatementBlockNode,
-			StructConstructorNode
+			StructConstructorNode,
+
+			tmp::LocalVariableNode
 		>;
 	}
 
@@ -157,7 +176,9 @@ namespace expr
 	auto is_operator_node(OperatorTree const & tree) noexcept -> bool;
 	auto expression_type(ExpressionTree const & tree, Program const & program) noexcept -> Type;
 	auto expression_type_id(ExpressionTree const & tree, Program const & program) noexcept -> TypeId;
+	auto maybe_dependent_expression_type_id(ExpressionTree const & tree, Program const & program) noexcept -> std::variant<TypeId, DependentTypeId>;
 	auto expression_type_size(ExpressionTree const & tree, Program const & program) noexcept -> int;
+	auto is_dependent(ExpressionTree const & tree) noexcept -> bool;
 
 	// Version that curries the program reference so that it can be used with map.
 	inline auto expression_type_id(Program const & program) noexcept

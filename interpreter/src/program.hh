@@ -61,26 +61,6 @@ struct Struct
 	std::vector<MemberVariable> member_variables;
 };
 
-struct TemplateParameter
-{
-	PooledString name;
-};
-
-struct DependentType
-{
-	union
-	{
-		struct
-		{
-			unsigned is_mutable : 1;
-			unsigned is_reference : 1;
-			unsigned index : 30;
-		};
-		unsigned flat_value;
-	};
-};
-using FunctionTemplateParameter = std::variant<TypeId, DependentType>;
-
 struct MemcmpRanges
 {
 	using is_transparent = std::true_type;
@@ -94,9 +74,16 @@ struct MemcmpRanges
 
 struct FunctionTemplate
 {
-	std::vector<TemplateParameter> template_parameters;
-	std::vector<FunctionTemplateParameter> parameters;
-	span<lex::Token const> tokens; // TODO: A parsed AST instead of tokens.
+	struct Parameter
+	{
+		unsigned is_dependent : 1;
+		unsigned index : 31;
+	};
+
+	DependentScope scope;
+	int template_parameter_count;
+	std::vector<Parameter> parameters;
+	std::vector<stmt::Statement> statement_templates;
 	std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
 };
 
@@ -109,7 +96,7 @@ struct MemberVariableTemplate
 
 struct StructTemplate
 {
-	std::vector<TemplateParameter> template_parameters;
+	std::vector<DependentType> template_parameters;
 	std::vector<MemberVariableTemplate> member_variables;
 	std::map<std::vector<TypeId>, TypeId, MemcmpRanges> cached_instantiations;
 };

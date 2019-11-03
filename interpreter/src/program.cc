@@ -4,6 +4,9 @@
 #include "function_ptr.hh"
 #include "variant.hh"
 #include "parser.hh"
+#include "unreachable.hh"
+#include "overload.hh"
+#include "syntax_error.hh"
 #include <queue>
 #include <algorithm>
 #include <cassert>
@@ -179,19 +182,20 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 
 	for (FunctionTemplateId template_id : overload_set.function_template_ids)
 	{
-		span<FunctionTemplateParameter const> template_params = program.function_templates[template_id.index].parameters;
+		FunctionTemplate const & fn = program.function_templates[template_id.index];
+		span<FunctionTemplate::Parameter const> template_params = fn.parameters;
 		if (template_params.size() == parameters.size())
 		{
-			dependent_type_count = program.function_templates[template_id.index].template_parameters.size();
+			dependent_type_count = fn.template_parameter_count;
 			std::fill(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none);
 
 			int conversions = 0;
 			bool discard = false;
 			for (size_t i = 0; i < template_params.size(); ++i)
 			{
-				if (has_type<TypeId>(template_params[i]))
+				if (!template_params[i].is_dependent)
 				{
-					if (!check_type_validness_as_overload_candidate(std::get<TypeId>(template_params[i]), parameters[i], program, conversions))
+					if (!check_type_validness_as_overload_candidate(fn.scope.variables[template_params[i].index].type, parameters[i], program, conversions))
 					{
 						discard = true;
 						break;
@@ -199,7 +203,7 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 				}
 				else
 				{
-					DependentType const dependent_type = std::get<DependentType>(template_params[i]);
+					DependentTypeId const dependent_type = fn.scope.dependent_variables[template_params[i].index].type;
 					if (resolved_dependent_types[dependent_type.index] != TypeId::none)
 					{
 						if (!check_type_validness_as_overload_candidate(resolved_dependent_types[dependent_type.index], parameters[i], program, conversions))
@@ -396,35 +400,228 @@ auto return_type(Program const & program, FunctionId id) noexcept -> TypeId
 
 namespace parser
 {
-	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void;
-	auto parse_function_body(span<lex::Token const> tokens, size_t & index, ParseParams p, Function & function) noexcept -> void;
+	auto insert_conversion_node(expr::ExpressionTree tree, TypeId from, TypeId to, Program const & program) noexcept ->expr::ExpressionTree;
+}
+
+auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Function & function, Program & program) noexcept -> expr::ExpressionTree
+{
+	using namespace expr;
+
+	auto const visitor = overload(
+		[](auto const &) -> ExpressionTree { declare_unreachable(); },
+		[&](tmp::LocalVariableNode const & var_node) -> ExpressionTree
+		{
+			// TODO: Index based approach?
+			auto const it = std::find_if(function.variables.begin(), function.variables.end(), [&](Variable const & var)
+			{
+				return var.name.first == var_node.name.first && var.name.size == var_node.name.size;
+			});
+			assert(it != function.variables.end());
+			Variable const & var = *it;
+
+			LocalVariableNode instantiated_node;
+			instantiated_node.variable_type = var.type;
+			instantiated_node.variable_offset = var.offset;
+			return instantiated_node;
+		},
+		[&](DereferenceNode const & deref_node) -> ExpressionTree
+		{
+			DereferenceNode instantiated_node;
+			instantiated_node.expression = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*deref_node.expression, function, program));
+			instantiated_node.variable_type = remove_reference(expression_type_id(*instantiated_node.expression, program));
+			return instantiated_node;
+		},
+		[&](AddressofNode const & addressof_node) -> ExpressionTree
+		{
+			AddressofNode instantiated_node;
+			instantiated_node.operand = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*addressof_node.operand, function, program));
+			instantiated_node.return_type = pointer_type_for(remove_reference(expression_type_id(*instantiated_node.operand, program)), program);
+			return instantiated_node;
+		},
+		[&](DepointerNode const & deptr_node) -> ExpressionTree
+		{
+			DepointerNode instantiated_node;
+			instantiated_node.operand = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*deptr_node.operand, function, program));
+			instantiated_node.return_type = make_reference(std::get<PointerType>(type_with_id(program, expression_type_id(*instantiated_node.operand, program)).extra_data).value_type);
+			return instantiated_node;
+		},
+		[&](IfNode const & if_node) -> ExpressionTree
+		{
+			IfNode instantiated_node;
+			if (is_dependent(*if_node.condition))
+			{
+				instantiated_node.condition = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*if_node.condition, function, program));
+				raise_syntax_error_if_not(expression_type_id(*instantiated_node.condition, program) == TypeId::bool_, "Condition of if expression must return bool.");
+			}
+			else
+				instantiated_node.condition = if_node.condition;
+
+			bool const then_is_dependent = is_dependent(*if_node.then_case);
+			if (then_is_dependent)
+				instantiated_node.then_case = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*if_node.then_case, function, program));
+			else
+				instantiated_node.then_case = if_node.then_case;
+
+			bool const else_is_dependent = is_dependent(*if_node.else_case);
+			if (else_is_dependent)
+				instantiated_node.else_case = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*if_node.else_case, function, program));
+			else
+				instantiated_node.else_case = if_node.else_case;
+
+			// Find the common type to ensure that both branches return the same type.
+			if (then_is_dependent || else_is_dependent)
+			{
+				TypeId const then_type = expression_type_id(*if_node.then_case, program);
+				TypeId const else_type = expression_type_id(*if_node.else_case, program);
+				TypeId const common = common_type(then_type, else_type, program);
+				raise_syntax_error_if_not(common != TypeId::none, "Could not find common type for return types of then and else branches in if expression.");
+				if (then_type != common)
+					*instantiated_node.then_case = parser::insert_conversion_node(std::move(*instantiated_node.then_case), then_type, common, program);
+				if (else_type != common)
+					*instantiated_node.else_case = parser::insert_conversion_node(std::move(*instantiated_node.else_case), else_type, common, program);
+			}
+
+			return instantiated_node;
+		}
+		//[](StatementBlockNode const &) { TODO },
+		//[](StructConstructorNode const & ctor_node) { TODO }
+	);
+
+	if (is_dependent(tree))
+		return tree;
+	else
+		return std::visit(visitor, tree.as_variant());
+}
+
+auto instantiate_dependent_statement(stmt::Statement const & statement, Function & function, Program & program) noexcept -> stmt::Statement
+{
+	using namespace stmt;
+
+	auto const visitor = overload(
+		[&](VariableDeclarationStatement const & var_decl_node) -> Statement
+		{
+			(void)var_decl_node;
+			mark_as_to_do("Dependent for statement");
+		},
+		[&](ExpressionStatement const & expr_node) -> Statement
+		{
+			ExpressionStatement instantiated_node;
+			instantiated_node.expression = instantiate_dependent_expression(expr_node.expression, function, program);
+			return instantiated_node;
+		},
+		[&](ReturnStatement const & return_node) -> Statement
+		{
+			ExpressionStatement instantiated_node;
+			instantiated_node.expression = instantiate_dependent_expression(return_node.returned_expression, function, program);
+			TypeId const returned_expression_type = expression_type_id(instantiated_node.expression, program);
+			if (returned_expression_type != function.return_type)
+				instantiated_node.expression = parser::insert_conversion_node(std::move(instantiated_node.expression), returned_expression_type, function.return_type, program);
+			return instantiated_node;
+		},
+		[&](IfStatement const & if_node) -> Statement
+		{
+			IfStatement instantiated_node;
+			if (is_dependent(if_node.condition))
+			{
+				instantiated_node.condition = instantiate_dependent_expression(if_node.condition, function, program);
+				raise_syntax_error_if_not(expression_type_id(instantiated_node.condition, program) == TypeId::bool_, "Condition of if statement must return bool.");
+			}
+			else
+				instantiated_node.condition = if_node.condition;
+
+			mark_as_to_do("Dependent if statement");
+		},
+		[&](StatementBlock const & block_node) -> Statement
+		{
+			(void)block_node;
+			mark_as_to_do("Dependent statement block");
+		},
+		[&](WhileStatement const & while_node) -> Statement
+		{
+			(void)while_node;
+			mark_as_to_do("Dependent while statement");
+		},
+		[&](ForStatement const & for_node) -> Statement
+		{
+			(void)for_node;
+			mark_as_to_do("Dependent for statement");
+
+		},
+		[&](BreakStatement const & break_stmt) -> Statement
+		{
+			return break_stmt;
+		},
+		[&](ContinueStatement const & continue_stmt) -> Statement
+		{
+			return continue_stmt;
+		}
+	);
+
+	return std::visit(visitor, statement.as_variant());
 }
 
 auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId
 {
 	FunctionTemplate & fn_template = program.function_templates[template_id.index];
 
+	// If the template has already been instantiated, reuse it.
 	if (auto const it = fn_template.cached_instantiations.find(parameters);
 		it != fn_template.cached_instantiations.end())
 		return it->second;
-
-	// Everything below is a hack. Instead of keeping the tokens and parsing them for each instantiation,
-	// we should find a way to represent template expressions.
-
-	ScopeStack stack;
-	stack.push_back({&program.global_scope, ScopeType::global});
-	Scope template_parameter_scope;
-	for (size_t i = 0; i < parameters.size(); ++i)
-		template_parameter_scope.types.push_back({fn_template.template_parameters[i].name, parameters[i]});
-
-	stack.push_back({&template_parameter_scope, ScopeType::global});
-
-	Function function;
-	size_t index = 0;
-	TypeId dummy;
-	parser::parse_function_prototype(fn_template.tokens, index, {program, stack, dummy}, function);
-	parser::parse_function_body(fn_template.tokens, index, {program, stack, dummy}, function);
 	
+	// Instantiate the template.
+	Function function;
+
+	// Copy the scope
+	function.functions = fn_template.scope.functions;
+	function.types = fn_template.scope.types;
+	function.function_templates = fn_template.scope.function_templates;
+	function.struct_templates = fn_template.scope.struct_templates;
+	function.variables.reserve(fn_template.scope.variables.size() + fn_template.scope.dependent_variables.size());
+	int variable_index = 0;
+	int dependent_variable_index = 0;
+	for (FunctionTemplate::Parameter const & param : fn_template.parameters)
+	{
+		if (param.is_dependent)
+		{
+			DependentVariable const & var = fn_template.scope.dependent_variables[param.index];
+			TypeId var_type = parameters[var.type.index];
+			var_type.is_reference = var.type.is_reference;
+			var_type.is_mutable = var.type.is_mutable;
+			add_variable_to_scope(function, var.name, var_type, 0, program);
+			dependent_variable_index = param.index + 1;
+		}
+		else
+		{
+			Variable const & var = fn_template.scope.variables[param.index];
+			add_variable_to_scope(function, var.name, var.type, 0, program);
+			variable_index = param.index + 1;
+		}
+	}
+
+	for (int i = variable_index; i < fn_template.scope.variables.size(); ++i)
+	{
+		Variable const & var = fn_template.scope.variables[i];
+		add_variable_to_scope(function, var.name, var.type, 0, program);
+	}
+	for (int i = dependent_variable_index; i < fn_template.scope.dependent_variables.size(); ++i)
+	{
+		DependentVariable const & var = fn_template.scope.dependent_variables[i];
+		TypeId var_type = parameters[var.type.index];
+		var_type.is_reference = var.type.is_reference;
+		var_type.is_mutable = var.type.is_mutable;
+		add_variable_to_scope(function, var.name, var_type, 0, program);
+	}
+
+	// TODO: Return type.
+	function.return_type = TypeId::int_;
+
+	// Instantiate statement templates.
+	function.statements.reserve(fn_template.statement_templates.size());
+	for (stmt::Statement const & statement_template : fn_template.statement_templates)
+		function.statements.push_back(instantiate_dependent_statement(statement_template, function, program));
+
+	// Add function to program.
 	FunctionId instantiation_id;
 	instantiation_id.is_extern = false;
 	instantiation_id.index = static_cast<size_t>(program.functions.size());

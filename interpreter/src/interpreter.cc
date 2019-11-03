@@ -266,7 +266,9 @@ namespace interpreter
 				Struct const & struct_data = *struct_for_type(program, ctor_node.constructed_type);
 				for (size_t i = 0; i < struct_data.member_variables.size(); ++i)
 					eval_expression_tree(ctor_node.parameters[i], stack, program, return_address + struct_data.member_variables[i].offset);
-			}
+			},
+
+			[](expr::tmp::DependentNode const &) { declare_unreachable(); }
 		);
 		std::visit(visitor, tree.as_variant());
 	}

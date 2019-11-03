@@ -309,7 +309,19 @@ namespace parser
 			return type;
 	}
 
-	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> TypeId;
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> std::variant<lookup_result::Nothing, TypeId, DependentTypeId>;
+
+	// This function should be removed in the end.
+	auto ignore_dependent_type_to_do(std::variant<lookup_result::Nothing, TypeId, DependentTypeId> type_or_dependent_type) -> TypeId
+	{
+		if (has_type<lookup_result::Nothing>(type_or_dependent_type))
+			return TypeId::none;
+
+		if (TypeId const * const type = try_get<TypeId>(type_or_dependent_type))
+			return *type;
+
+		mark_as_to_do("Handling dependent types.");
+	}
 
 	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program, StructTemplateId template_id) noexcept -> TypeId
 	{
@@ -322,7 +334,7 @@ namespace parser
 		std::vector<TypeId> parameters(template_parameter_count);
 		for (size_t i = 0; i < template_parameter_count; ++i)
 		{
-			parameters[i] = parse_type_name(tokens, index, scope_stack, program);
+			parameters[i] = ignore_dependent_type_to_do(parse_type_name(tokens, index, scope_stack, program));
 			if (i < template_parameter_count - 1)
 			{
 				raise_syntax_error_if_not(tokens[index].type == TokenType::comma, "Expected comma ',' after template parameter.");
@@ -336,19 +348,22 @@ namespace parser
 		return instantiate_struct_template(program, template_id, parameters);
 	}
 
-	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> TypeId
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> std::variant<lookup_result::Nothing, TypeId, DependentTypeId>
 	{
+		bool is_dependent_type = false;
+
 		// Lookup type name.
 		auto const visitor = overload(
 			[](auto const &) { return TypeId::none; },
 			[&](lookup_result::Type type) { index++;  return type.type_id; },
-			[&](lookup_result::StructTemplate struct_template) { index++; return parse_template_instantiation_parameter_list(tokens, index, scope_stack, program, struct_template.template_id); }
+			[&](lookup_result::StructTemplate struct_template) { index++; return parse_template_instantiation_parameter_list(tokens, index, scope_stack, program, struct_template.template_id); },
+			[&](lookup_result::DependentType dep_type) { index++; is_dependent_type = true; return TypeId::with_index(dep_type.index); }
 		);
 		std::string_view const type_name = tokens[index].source;
 		TypeId type_found = std::visit(visitor, lookup_name(scope_stack, type_name, program.string_pool));
 
 		if (type_found == TypeId::none)
-			return TypeId::none;
+			return lookup_result::Nothing();
 
 		type_found = parse_mutable_and_pointer(tokens, index, type_found, program);
 
@@ -359,21 +374,30 @@ namespace parser
 			index++;
 		}
 
-		return type_found;
+		if (is_dependent_type)
+		{
+			DependentTypeId dep_type;
+			dep_type.index = type_found.index;
+			dep_type.is_mutable = type_found.is_mutable;
+			dep_type.is_reference = type_found.is_reference;
+			return dep_type;
+		}
+		else
+			return type_found;
 	}
 
-	auto parse_template_parameter_list(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> std::vector<TemplateParameter>
+	auto parse_template_parameter_list(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> std::vector<DependentType>
 	{
 		// Skip < token.
 		index++;
 
-		std::vector<TemplateParameter> parsed_parameters;
+		std::vector<DependentType> parsed_parameters;
 
 		for (;;)
 		{
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier.");
 
-			TemplateParameter param;
+			DependentType param;
 			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as template parameter name.");
 			param.name = pool_string(program, tokens[index].source);
 			parsed_parameters.push_back(param);
@@ -400,7 +424,7 @@ namespace parser
 		// Parse arguments.
 		while (tokens[index].type == TokenType::identifier)
 		{
-			TypeId const arg_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+			TypeId const arg_type = ignore_dependent_type_to_do(parse_type_name(tokens, index, p.scope_stack, p.program));
 			raise_syntax_error_if_not(is_data_type(arg_type), "Cannot use 'void' as a function parameter type.");
 
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after function parameter type.");
@@ -428,8 +452,8 @@ namespace parser
 		{
 			index++;
 
-			// Return type. By now only int supported.
-			function.return_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+			// Return type.
+			function.return_type = ignore_dependent_type_to_do(parse_type_name(tokens, index, p.scope_stack, p.program));
 		}
 		else
 			function.return_type = TypeId::deduce;
@@ -460,9 +484,10 @@ namespace parser
 	auto parse_function_template_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::FunctionTemplateNode
 	{
 		FunctionTemplate fn_template;
-		fn_template.template_parameters = parse_template_parameter_list(tokens, index, p.program);
+		fn_template.scope.dependent_types = parse_template_parameter_list(tokens, index, p.program);
+		fn_template.template_parameter_count = static_cast<int>(fn_template.scope.dependent_types.size());
 
-		size_t template_tokens_start = index;
+		p.scope_stack.push_back({&fn_template.scope, ScopeType::dependent_function});
 
 		// Parse parameters.
 		{
@@ -473,49 +498,30 @@ namespace parser
 			// Parse arguments.
 			while (tokens[index].type == TokenType::identifier)
 			{
-				TypeId const arg_type = parse_type_name(tokens, index, p.scope_stack, p.program);
-				if (arg_type != TypeId::none)
-				{
-					fn_template.parameters.push_back(arg_type);
-				}
-				else
-				{
-					// Check if the argument is a dependent type.
-					std::string_view const type_name = tokens[index].source;
-					index++;
+				auto const arg_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+				if (has_type<lookup_result::Nothing>(arg_type))
+					raise_syntax_error("Expected type name in function parameter.");
 
-					auto const it = std::find_if(fn_template.template_parameters.begin(), fn_template.template_parameters.end(), [&](TemplateParameter const & param)
-					{
-						return get(p.program, param.name) == type_name;
-					});
-					raise_syntax_error_if_not(it != fn_template.template_parameters.end(), "Expected type name in function parameter.");
-
-					DependentType dependent_arg_type;
-					dependent_arg_type.flat_value = 0;
-					dependent_arg_type.index = static_cast<unsigned>(it - fn_template.template_parameters.begin());
-
-					// Look for mutable qualifier.
-					if (tokens[index].source == "mut"sv)
-					{
-						dependent_arg_type.is_mutable = true;
-						index++;
-					}
-
-					// Look for reference qualifier.
-					if (tokens[index].source == "&"sv)
-					{
-						dependent_arg_type.is_reference = true;
-						index++;
-					}
-
-					// By now it won't support pointers.
-
-					fn_template.parameters.push_back(dependent_arg_type);
-				}
-
-				// Skip parameter name token.
 				raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type in function parameter list.");
+				std::string_view const parameter_name = tokens[index].source;
 				index++;
+
+				if (auto const * const type_id = try_get<TypeId>(arg_type))
+				{
+					add_variable_to_scope(fn_template.scope, pool_string(p.program, parameter_name), *type_id, 0, p.program);
+					FunctionTemplate::Parameter parameter;
+					parameter.is_dependent = false;
+					parameter.index = static_cast<unsigned>(fn_template.scope.variables.size() - 1);
+					fn_template.parameters.push_back(parameter);
+				}
+				else if (auto const * const dep_type_id = try_get<DependentTypeId>(arg_type))
+				{
+					fn_template.scope.dependent_variables.push_back({pool_string(p.program, parameter_name), *dep_type_id});
+					FunctionTemplate::Parameter parameter;
+					parameter.is_dependent = true;
+					parameter.index = static_cast<unsigned>(fn_template.scope.dependent_variables.size() - 1);
+					fn_template.parameters.push_back(parameter);
+				}
 
 				if (tokens[index].type == TokenType::close_parenthesis)
 					break;
@@ -525,26 +531,26 @@ namespace parser
 			}
 		}
 
-		// Look for opening {
-		while (tokens[index].type != TokenType::open_brace)
-			index++;
+		// Skip ')'
 		index++;
-		int scope_depth = 1;
 
-		for (;;)
+		// Body of the function is enclosed by braces.
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' at start of function body.");
+		index++;
+
+		// Parse all statements in the function.
+		TypeId return_type = TypeId::deduce;
+		while (tokens[index].type != TokenType::close_brace)
 		{
-			if (tokens[index].type == TokenType::open_brace)
-				scope_depth++;
-			else if (tokens[index].type == TokenType::close_brace)
-				scope_depth--;
-
-			index++;
-
-			if (scope_depth == 0)
-				break;
+			auto statement = parse_substatement(tokens, index, {p.program, p.scope_stack, return_type});
+			if (statement)
+				fn_template.statement_templates.push_back(std::move(*statement));
 		}
 
-		fn_template.tokens = tokens.subspan(template_tokens_start, index - template_tokens_start);
+		p.scope_stack.pop_back();
+
+		// Skip closing brace.
+		index++;
 
 		expr::FunctionTemplateNode node;
 		node.function_template_id.index = static_cast<unsigned>(p.program.function_templates.size());
@@ -926,6 +932,17 @@ namespace parser
 					TypeId const template_instantiation = parse_template_instantiation_parameter_list(tokens, index, p.scope_stack, p.program, result.template_id);
 					return parse_struct_constructor_expression(tokens, index, p, template_instantiation);
 				},
+				[](lookup_result::DependentVariable result) -> ExpressionTree 
+				{ 
+					expr::tmp::LocalVariableNode var_node;
+					var_node.type = result.type;
+					var_node.name = result.name;
+					return var_node;
+				},
+				[](lookup_result::DependentType) -> ExpressionTree
+				{
+					mark_as_to_do("Dependent type constructor call");
+				},
 				[](lookup_result::Nothing) -> ExpressionTree { raise_syntax_error("Name lookup failed."); }
 			);
 			auto const lookup = lookup_name(p.scope_stack, tokens[index].source, p.program.string_pool);
@@ -1039,7 +1056,7 @@ namespace parser
 		stmt::VariableDeclarationStatement node;
 
 		// A statement begins with the type of the declared variable.
-		TypeId const type_found = parse_type_name(tokens, index, p.scope_stack, p.program);
+		TypeId const type_found = ignore_dependent_type_to_do(parse_type_name(tokens, index, p.scope_stack, p.program));
 
 		// The second token of the statement is the variable name.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
@@ -1239,19 +1256,22 @@ namespace parser
 
 		ExpressionTree return_expr = parse_subexpression(tokens, index, p);
 
-		TypeId const return_expr_type = expression_type_id(return_expr, p.program);
+		auto const return_expr_type = maybe_dependent_expression_type_id(return_expr, p.program);
 
-		if (p.current_return_type == TypeId::deduce)
-			p.current_return_type = decay(return_expr_type);
+		if (TypeId const * return_expr_type_id = try_get<TypeId>(return_expr_type))
+		{
+			// Cannot return special types that do not represent data types.
+			raise_syntax_error_if_not(is_data_type(*return_expr_type_id), "Cannot return special types that do not represent data types.");
 
-		if (return_expr_type != p.current_return_type)
-			return_expr = insert_conversion_node(std::move(return_expr), return_expr_type, p.current_return_type, p.program);
+			if (p.current_return_type == TypeId::deduce)
+				p.current_return_type = decay(*return_expr_type_id);
+
+			if (*return_expr_type_id != p.current_return_type)
+				return_expr = insert_conversion_node(std::move(return_expr), *return_expr_type_id, p.current_return_type, p.program);
+		}
 
 		stmt::ReturnStatement node;
 		node.returned_expression = std::move(return_expr);
-
-		// Cannot return special types that do not represent data types.
-		raise_syntax_error_if_not(is_data_type(expression_type_id(node.returned_expression, p.program)), "Cannot return special types that do not represent data types.");
 
 		return node;
 	}
@@ -1415,7 +1435,7 @@ namespace parser
 		{
 			MemberVariableTemplate member;
 
-			TypeId const member_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+			TypeId const member_type = ignore_dependent_type_to_do(parse_type_name(tokens, index, p.scope_stack, p.program));
 			if (member_type != TypeId::none)
 			{
 				raise_syntax_error_if_not(is_data_type(member_type), "Member variable cannot be void.");
@@ -1429,7 +1449,7 @@ namespace parser
 			{
 				std::string_view const member_type_name = tokens[index].source;
 				index++;
-				auto const it = std::find_if(new_struct_template.template_parameters.begin(), new_struct_template.template_parameters.end(), [&](TemplateParameter const & param)
+				auto const it = std::find_if(new_struct_template.template_parameters.begin(), new_struct_template.template_parameters.end(), [&](DependentType const & param)
 				{
 					return get(p.program, param.name) == member_type_name;
 				});
@@ -1501,7 +1521,7 @@ namespace parser
 		// Parse member variables.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			TypeId const member_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+			TypeId const member_type = ignore_dependent_type_to_do(parse_type_name(tokens, index, p.scope_stack, p.program));
 			raise_syntax_error_if_not(is_data_type(member_type), "Member variable cannot be void.");
 			raise_syntax_error_if_not(!member_type.is_reference, "Member variable cannot be reference.");
 			raise_syntax_error_if_not(!member_type.is_mutable, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");

@@ -99,7 +99,37 @@ struct Scope
 	std::vector<FunctionTemplateName> function_templates;
 	std::vector<StructTemplateName> struct_templates;
 };
-enum struct ScopeType { global, function, block };
+enum struct ScopeType { global, function, block, dependent_function, dependent_block };
+
+struct DependentTypeId
+{
+	union
+	{
+		struct
+		{
+			unsigned is_dependent : 1;
+			unsigned is_mutable : 1;
+			unsigned is_reference : 1;
+			unsigned index : 29;
+		};
+		unsigned flat_value;
+	};
+};
+
+struct DependentVariable
+{
+	PooledString name;
+	DependentTypeId type;
+};
+struct DependentType
+{
+	PooledString name;
+};
+struct DependentScope : Scope
+{
+	std::vector<DependentVariable> dependent_variables;
+	std::vector<DependentType> dependent_types;
+};
 
 struct CurrentScope
 {
@@ -117,6 +147,8 @@ namespace lookup_result
 	struct OverloadSet { std::vector<FunctionId> function_ids; std::vector<FunctionTemplateId> function_template_ids; };
 	struct Type { TypeId type_id; };
 	struct StructTemplate { StructTemplateId template_id; };
+	struct DependentType { PooledString name; int index; };
+	struct DependentVariable { PooledString name; DependentTypeId type; };
 }
 auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char const> string_pool) noexcept
 	-> std::variant<
@@ -125,7 +157,9 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 		lookup_result::GlobalVariable,
 		lookup_result::OverloadSet,
 		lookup_result::Type,
-		lookup_result::StructTemplate
+		lookup_result::StructTemplate,
+		lookup_result::DependentVariable,
+		lookup_result::DependentType
 	>;
 auto lookup_type_name(ScopeStackView program, std::string_view name, span<char const> string_pool) noexcept -> TypeId;
 

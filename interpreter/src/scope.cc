@@ -103,7 +103,9 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 		lookup_result::GlobalVariable,
 		lookup_result::OverloadSet,
 		lookup_result::Type,
-		lookup_result::StructTemplate
+		lookup_result::StructTemplate,
+		lookup_result::DependentVariable,
+		lookup_result::DependentType
 	>
 {
 	lookup_result::OverloadSet overload_set;
@@ -130,6 +132,14 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 				auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), pooled_name_equal(string_pool, name));
 				if (var != scope.variables.end())
 					return lookup_result::Variable{var->type, var->offset};
+
+				if (scope_stack[i].type == ScopeType::dependent_block || scope_stack[i].type == ScopeType::dependent_function)
+				{
+					DependentScope const & dependent_scope = static_cast<DependentScope const &>(scope);
+					auto const dep_var = std::find_if(dependent_scope.dependent_variables.begin(), dependent_scope.dependent_variables.end(), pooled_name_equal(string_pool, name));
+					if (dep_var != dependent_scope.dependent_variables.end())
+						return lookup_result::DependentVariable{dep_var->name , dep_var->type};
+				}
 			}
 			
 			auto const type = std::find_if(scope.types.begin(), scope.types.end(), pooled_name_equal(string_pool, name));
@@ -139,6 +149,14 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 			auto const struct_template = std::find_if(scope.struct_templates.begin(), scope.struct_templates.end(), pooled_name_equal(string_pool, name));
 			if (struct_template != scope.struct_templates.end())
 				return lookup_result::StructTemplate{struct_template->id};
+
+			if (scope_stack[i].type == ScopeType::dependent_block || scope_stack[i].type == ScopeType::dependent_function)
+			{
+				DependentScope const & dependent_scope = static_cast<DependentScope const &>(scope);
+				auto const dep_type = std::find_if(dependent_scope.dependent_types.begin(), dependent_scope.dependent_types.end(), pooled_name_equal(string_pool, name));
+				if (dep_type != dependent_scope.dependent_types.end())
+					return lookup_result::DependentType{dep_type->name, static_cast<int>(dep_type - dependent_scope.dependent_types.begin())};
+			}
 		}
 
 		// Functions.

@@ -52,7 +52,7 @@ auto run_statement(std::string_view src, interpreter::ProgramStack & stack, Prog
 	if (&scope != &program.global_scope)
 		scope_stack.push_back({&scope, ScopeType::function});
 	TypeId type = TypeId::none;
-	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), { program, scope_stack, type }), stack, program, 0);
+	interpreter::run_statement(*parser::parse_statement(lex::tokenize(src), {program, scope_stack, type}), stack, program, 0);
 }
 
 auto pretty_print_expr(std::string_view source, Program & program)
@@ -141,7 +141,7 @@ auto parse_statement(std::string_view source, Program & program) noexcept -> voi
 	ScopeStack scope_stack;
 	scope_stack.push_back({ &program.global_scope, ScopeType::global });
 	TypeId global_return_type = TypeId::none;
-	parser::parse_statement(lex::tokenize(source), { program, scope_stack, global_return_type });
+	parser::parse_statement(lex::tokenize(source), {program, scope_stack, global_return_type});
 }
 
 TEST_CASE("Identity function expression")
@@ -1184,7 +1184,7 @@ TEST_CASE("Conversion from immutable pointer to mutable pointer")
 
 	REQUIRE(parse_and_run(src) == 5);
 }
-
+/*
 TEST_CASE("A function template lets the user define generic functions")
 {
 	auto const src = R"(
@@ -1220,7 +1220,7 @@ TEST_CASE("A template parameter may be a reference or mutable")
 
 	REQUIRE(parse_and_run(src) == -225);
 }
-
+*/
 TEST_CASE("A structure template lets the user define generic structures")
 {
 	auto const src = R"(
@@ -1285,6 +1285,23 @@ TEST_CASE("Statement block in the default value of a member variable")
 	)"sv;
 
 	REQUIRE(parse_and_run(src) == 3 * 3 + 4 * 4);
+}
+
+TEST_CASE("Function template refactor: variable nodes")
+{
+	auto const src = R"(
+		let identity = fn<T>(T x) 
+		{ 
+			return x; 
+		};
+
+		let main = fn() -> int
+		{
+			return identity(1024);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 1024);
 }
 
 /*****************************************************************
