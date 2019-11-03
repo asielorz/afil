@@ -408,7 +408,7 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 	using namespace expr;
 
 	auto const visitor = overload(
-		[](auto const &) -> ExpressionTree { declare_unreachable(); },
+		[](auto const &) -> expr::ExpressionTree { declare_unreachable(); },
 		[&](tmp::LocalVariableNode const & var_node) -> ExpressionTree
 		{
 			// TODO: Index based approach?
@@ -511,11 +511,17 @@ auto instantiate_dependent_statement(stmt::Statement const & statement, Function
 		},
 		[&](ReturnStatement const & return_node) -> Statement
 		{
-			ExpressionStatement instantiated_node;
-			instantiated_node.expression = instantiate_dependent_expression(return_node.returned_expression, function, program);
-			TypeId const returned_expression_type = expression_type_id(instantiated_node.expression, program);
+			ReturnStatement instantiated_node;
+			instantiated_node.returned_expression = instantiate_dependent_expression(return_node.returned_expression, function, program);
+
+			TypeId const returned_expression_type = expression_type_id(instantiated_node.returned_expression, program);
 			if (returned_expression_type != function.return_type)
-				instantiated_node.expression = parser::insert_conversion_node(std::move(instantiated_node.expression), returned_expression_type, function.return_type, program);
+				instantiated_node.returned_expression = 
+				parser::insert_conversion_node(
+					std::move(instantiated_node.returned_expression),
+					returned_expression_type, function.return_type,
+					program);
+
 			return instantiated_node;
 		},
 		[&](IfStatement const & if_node) -> Statement
@@ -589,12 +595,16 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 			var_type.is_reference = var.type.is_reference;
 			var_type.is_mutable = var.type.is_mutable;
 			add_variable_to_scope(function, var.name, var_type, 0, program);
+			function.parameter_count++;
+			function.parameter_size = function.stack_frame_size;
 			dependent_variable_index = param.index + 1;
 		}
 		else
 		{
 			Variable const & var = fn_template.scope.variables[param.index];
 			add_variable_to_scope(function, var.name, var.type, 0, program);
+			function.parameter_count++;
+			function.parameter_size = function.stack_frame_size;
 			variable_index = param.index + 1;
 		}
 	}
