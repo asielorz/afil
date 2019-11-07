@@ -99,7 +99,7 @@ namespace expr
 			[](StatementBlockNode const & block_node) -> Ret { return block_node.return_type; },
 			[](StructConstructorNode const & constructor_node) -> Ret { return constructor_node.constructed_type; },
 			[](tmp::LocalVariableNode const & var_node) -> Ret { return var_node.type; },
-			[](tmp::FunctionCallNode const &) -> Ret { return TypeId::int_; }, // TODO
+			[](tmp::FunctionCallNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; }
 		);
 		return std::visit(visitor, tree.as_variant());

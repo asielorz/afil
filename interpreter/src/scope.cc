@@ -13,6 +13,8 @@ TypeId const TypeId::none = {true, false, false, 0};
 TypeId const TypeId::function = {true, false, false, 1};
 TypeId const TypeId::deduce = {true, false, false, 2};
 
+DependentTypeId const DependentTypeId::unknown = {true, false, false, false, 0};
+
 auto is_data_type(TypeId id) noexcept -> bool
 {
 	return !id.is_language_reseved && id.index != TypeId::void_.index;

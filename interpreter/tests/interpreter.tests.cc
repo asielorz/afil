@@ -1321,6 +1321,46 @@ TEST_CASE("Function template refactor: function call nodes")
 	REQUIRE(parse_and_run(src) == 9);
 }
 
+TEST_CASE("Function template refactor: operator call nodes")
+{
+	auto const src = R"(
+		let eq = fn<T>(T a, T b) 
+		{ 
+			return a == b; 
+		};
+
+		let main = fn() -> int
+		{
+			if (eq(3, 4))
+				return 5;
+			else
+				return -5;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -5);
+}
+
+TEST_CASE("Function template refactor: relational operator call nodes")
+{
+	auto const src = R"(
+		let less = fn<T>(T a, T b) 
+		{ 
+			return a < b; 
+		};
+
+		let main = fn() -> int
+		{
+			if (less(3, 4))
+				return 5;
+			else
+				return -5;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - templates

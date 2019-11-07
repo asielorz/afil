@@ -604,6 +604,9 @@ auto instantiate_dependent_statement(stmt::Statement const & statement, Function
 			instantiated_node.returned_expression = instantiate_dependent_expression(return_node.returned_expression, function, program);
 
 			TypeId const returned_expression_type = expression_type_id(instantiated_node.returned_expression, program);
+			if (function.return_type == TypeId::deduce)
+				function.return_type = decay(expression_type_id(instantiated_node.returned_expression, program));
+
 			if (returned_expression_type != function.return_type)
 				instantiated_node.returned_expression = 
 				insert_conversion_node(
@@ -713,7 +716,7 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 	}
 
 	// TODO: Return type.
-	function.return_type = TypeId::int_;
+	function.return_type = TypeId::deduce;
 
 	// Instantiate statement templates.
 	function.statements.reserve(fn_template.statement_templates.size());

@@ -107,13 +107,16 @@ struct DependentTypeId
 	{
 		struct
 		{
+			unsigned is_language_reserved : 1;
 			unsigned is_dependent : 1;
 			unsigned is_mutable : 1;
 			unsigned is_reference : 1;
-			unsigned index : 29;
+			unsigned index : 28;
 		};
 		unsigned flat_value;
 	};
+
+	static DependentTypeId const unknown;
 };
 
 struct DependentVariable
