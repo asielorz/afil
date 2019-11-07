@@ -1361,6 +1361,28 @@ TEST_CASE("Function template refactor: relational operator call nodes")
 	REQUIRE(parse_and_run(src) == 5);
 }
 
+
+TEST_CASE("Function template refactor: if expression")
+{
+	auto const src = R"(
+		let difference = fn<T>(T a, T b) 
+		{ 
+			return 
+				if (a < b)
+					b - a
+				else
+					a - b;
+		};
+
+		let main = fn() -> int
+		{
+			return difference(-4, 10);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 14);
+}
+
 /*****************************************************************
 Backlog
 - templates

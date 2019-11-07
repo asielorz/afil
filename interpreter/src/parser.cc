@@ -724,15 +724,18 @@ namespace parser
 
 		if_node.else_case = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, p));
 
-		// Ensure that both branches return the same type.
-		TypeId const then_type = expression_type_id(*if_node.then_case, p.program);
-		TypeId const else_type = expression_type_id(*if_node.else_case, p.program);
-		TypeId const common = common_type(then_type, else_type, p.program);
-		raise_syntax_error_if_not(common != TypeId::none, "Could not find common type for return types of then and else branches in if expression.");
-		if (then_type != common)
-			*if_node.then_case = insert_conversion_node(std::move(*if_node.then_case), then_type, common, p.program);
-		if (else_type != common)
-			*if_node.else_case = insert_conversion_node(std::move(*if_node.else_case), else_type, common, p.program);
+		if (!is_dependent(*if_node.then_case) && !is_dependent(*if_node.else_case))
+		{
+			// Ensure that both branches return the same type.
+			TypeId const then_type = expression_type_id(*if_node.then_case, p.program);
+			TypeId const else_type = expression_type_id(*if_node.else_case, p.program);
+			TypeId const common = common_type(then_type, else_type, p.program);
+			raise_syntax_error_if_not(common != TypeId::none, "Could not find common type for return types of then and else branches in if expression.");
+			if (then_type != common)
+				*if_node.then_case = insert_conversion_node(std::move(*if_node.then_case), then_type, common, p.program);
+			if (else_type != common)
+				*if_node.else_case = insert_conversion_node(std::move(*if_node.else_case), else_type, common, p.program);
+		}
 
 		return if_node;
 	}

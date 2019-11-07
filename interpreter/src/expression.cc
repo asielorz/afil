@@ -95,7 +95,7 @@ namespace expr
 			[](FunctionTemplateNode const &) -> Ret { return TypeId::function; },
 			[&](FunctionCallNode const & func_call_node) -> Ret { return return_type(program, func_call_node.function_id); },
 			[](RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; },
-			[&](IfNode const & if_node) -> Ret { return expression_type_id(*if_node.then_case, program); },
+			[&](IfNode const & if_node) -> Ret { return maybe_dependent_expression_type_id(*if_node.then_case, program); },
 			[](StatementBlockNode const & block_node) -> Ret { return block_node.return_type; },
 			[](StructConstructorNode const & constructor_node) -> Ret { return constructor_node.constructed_type; },
 			[](tmp::LocalVariableNode const & var_node) -> Ret { return var_node.type; },

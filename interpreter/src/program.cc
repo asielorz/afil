@@ -560,8 +560,8 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 			// Find the common type to ensure that both branches return the same type.
 			if (then_is_dependent || else_is_dependent)
 			{
-				TypeId const then_type = expression_type_id(*if_node.then_case, program);
-				TypeId const else_type = expression_type_id(*if_node.else_case, program);
+				TypeId const then_type = expression_type_id(*instantiated_node.then_case, program);
+				TypeId const else_type = expression_type_id(*instantiated_node.else_case, program);
 				TypeId const common = common_type(then_type, else_type, program);
 				raise_syntax_error_if_not(common != TypeId::none, "Could not find common type for return types of then and else branches in if expression.");
 				if (then_type != common)
