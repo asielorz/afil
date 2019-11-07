@@ -98,7 +98,9 @@ namespace expr
 			[&](IfNode const & if_node) -> Ret { return expression_type_id(*if_node.then_case, program); },
 			[](StatementBlockNode const & block_node) -> Ret { return block_node.return_type; },
 			[](StructConstructorNode const & constructor_node) -> Ret { return constructor_node.constructed_type; },
-			[](tmp::LocalVariableNode const & var_node) -> Ret { return var_node.type; }
+			[](tmp::LocalVariableNode const & var_node) -> Ret { return var_node.type; },
+			[](tmp::FunctionCallNode const &) -> Ret { return TypeId::int_; }, // TODO
+			[](tmp::RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}
@@ -108,11 +110,17 @@ namespace expr
 		return type_size(program, expression_type_id(tree, program));
 	}
 
+	struct Anything
+	{
+		template <typename T>
+		Anything(const T &) noexcept {}
+	};
+
 	auto is_dependent(ExpressionTree const & tree) noexcept -> bool
 	{
 		auto const visitor = overload(
-			[](auto const &) { return false; },
 			[](tmp::DependentNode const &) { return true; },
+			[](Anything) { return false; },
 
 			[](DereferenceNode const & deref_node) { return is_dependent(*deref_node.expression); },
 			[](AddressofNode const & addressof_node) { return is_dependent(*addressof_node.operand); },

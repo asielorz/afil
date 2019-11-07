@@ -128,6 +128,19 @@ namespace expr
 			DependentTypeId type;
 			PooledString name;
 		};
+
+		struct FunctionCallNode : DependentNode
+		{
+			lookup_result::OverloadSet overload_set;
+			std::vector<ExpressionTree> parameters;
+		};
+
+		struct RelationalOperatorCallNode : DependentNode // Convert <=> to < <= > >= and != to ==
+		{
+			lookup_result::OverloadSet overload_set;
+			Operator op;
+			value_ptr<std::array<ExpressionTree, 2>> parameters;
+		};
 	}
 
 	namespace detail
@@ -140,7 +153,8 @@ namespace expr
 			IfNode, StatementBlockNode,
 			StructConstructorNode,
 
-			tmp::LocalVariableNode
+			tmp::LocalVariableNode,
+			tmp::FunctionCallNode, tmp::RelationalOperatorCallNode
 		>;
 	}
 

@@ -130,6 +130,17 @@ struct OverloadSet
 	span<FunctionTemplateId const> function_template_ids;
 };
 auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
+auto insert_conversion_node(expr::ExpressionTree tree, TypeId from, TypeId to, Program const & program) noexcept -> expr::ExpressionTree;
+auto insert_conversions(
+	span<expr::ExpressionTree> parameters, 
+	span<TypeId const> parsed_parameter_types, 
+	span<TypeId const> target_parameter_types, 
+	Program const & program) noexcept -> void;
+auto resolve_function_overloading_and_insert_conversions(
+	OverloadSet overload_set,
+	span<expr::ExpressionTree> parameters,
+	span<TypeId const> parsed_parameter_types,
+	Program & program) noexcept -> FunctionId;
 
 auto add_type(Program & program, Type new_type) noexcept -> TypeId;
 auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;

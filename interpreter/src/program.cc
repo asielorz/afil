@@ -7,6 +7,7 @@
 #include "unreachable.hh"
 #include "overload.hh"
 #include "syntax_error.hh"
+#include "map.hh"
 #include <queue>
 #include <algorithm>
 #include <cassert>
@@ -275,6 +276,63 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 	}
 }
 
+auto insert_conversion_node(expr::ExpressionTree tree, TypeId from, TypeId to, Program const & program) noexcept -> expr::ExpressionTree
+{
+	if (from.index == to.index)
+	{
+		// From reference to reference and value to value there is no conversion. A pointer is a pointer, regardless of constness.
+		if (from.is_reference == to.is_reference)
+			return tree;
+
+		if (from.is_reference && !to.is_reference)
+		{
+			expr::DereferenceNode deref_node;
+			deref_node.expression = std::make_unique<expr::ExpressionTree>(std::move(tree));
+			deref_node.variable_type = to;
+			return deref_node;
+		}
+		else
+		{
+			raise_syntax_error_if_not(!to.is_mutable, "Can't bind a temporary to a mutable reference.");
+			mark_as_to_do("Address of temporaries");
+		}
+	}
+	else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
+	{
+		return std::move(tree);
+	}
+	raise_syntax_error("Conversion between types does not exist.");
+}
+
+auto insert_conversions(
+	span<expr::ExpressionTree> parameters, 
+	span<TypeId const> parsed_parameter_types, 
+	span<TypeId const> target_parameter_types, 
+	Program const & program) noexcept -> void
+{
+	for (size_t i = 0; i < target_parameter_types.size(); ++i)
+	{
+		if (parsed_parameter_types[i] != target_parameter_types[i])
+			parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program);
+	}
+}
+
+auto resolve_function_overloading_and_insert_conversions(
+	OverloadSet overload_set,
+	span<expr::ExpressionTree> parameters,
+	span<TypeId const> parsed_parameter_types,
+	Program & program) noexcept -> FunctionId
+{
+	FunctionId const function_id = resolve_function_overloading(overload_set, parsed_parameter_types, program);
+	raise_syntax_error_if_not(function_id != invalid_function_id, "Function overload not found.");
+
+	// If any conversion is needed in order to call the function, perform the conversion.
+	auto const target_parameter_types = parameter_types(program, function_id);
+	insert_conversions(parameters, parsed_parameter_types, target_parameter_types, program);
+
+	return function_id;
+}
+
 auto is_struct(Type const & type) noexcept -> bool
 {
 	return has_type<StructType>(type.extra_data);
@@ -398,11 +456,6 @@ auto return_type(Program const & program, FunctionId id) noexcept -> TypeId
 		return program.functions[id.index].return_type;
 }
 
-namespace parser
-{
-	auto insert_conversion_node(expr::ExpressionTree tree, TypeId from, TypeId to, Program const & program) noexcept ->expr::ExpressionTree;
-}
-
 auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Function & function, Program & program) noexcept -> expr::ExpressionTree
 {
 	using namespace expr;
@@ -445,6 +498,42 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 			instantiated_node.return_type = make_reference(std::get<PointerType>(type_with_id(program, expression_type_id(*instantiated_node.operand, program)).extra_data).value_type);
 			return instantiated_node;
 		},
+		[&](tmp::FunctionCallNode const & fn_call_node) -> ExpressionTree
+		{
+			FunctionCallNode instantiated_node;
+
+			instantiated_node.parameters.reserve(fn_call_node.parameters.size());
+			for (ExpressionTree const & param : fn_call_node.parameters)
+				instantiated_node.parameters.push_back(instantiate_dependent_expression(param, function, program));
+
+			std::vector<TypeId> const  parameter_types = map(instantiated_node.parameters, expr::expression_type_id(program));
+			instantiated_node.function_id = resolve_function_overloading_and_insert_conversions(
+				fn_call_node.overload_set, 
+				instantiated_node.parameters, 
+				parameter_types, 
+				program);
+
+			return instantiated_node;
+		},
+		[&](tmp::RelationalOperatorCallNode const & fn_call_node) -> ExpressionTree
+		{
+			RelationalOperatorCallNode instantiated_node;
+
+			instantiated_node.parameters = std::make_unique<std::array<expr::ExpressionTree, 2>>();
+			(*instantiated_node.parameters)[0] = instantiate_dependent_expression((*fn_call_node.parameters)[0], function, program);
+			(*instantiated_node.parameters)[1] = instantiate_dependent_expression((*fn_call_node.parameters)[1], function, program);
+
+			instantiated_node.op = fn_call_node.op;
+
+			TypeId const parameter_types[2] = {expression_type_id((*instantiated_node.parameters)[0], program), expression_type_id((*instantiated_node.parameters)[1], program)};
+			instantiated_node.function_id = resolve_function_overloading_and_insert_conversions(
+				fn_call_node.overload_set,
+				*instantiated_node.parameters,
+				parameter_types,
+				program);
+
+			return instantiated_node;
+		},
 		[&](IfNode const & if_node) -> ExpressionTree
 		{
 			IfNode instantiated_node;
@@ -476,9 +565,9 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 				TypeId const common = common_type(then_type, else_type, program);
 				raise_syntax_error_if_not(common != TypeId::none, "Could not find common type for return types of then and else branches in if expression.");
 				if (then_type != common)
-					*instantiated_node.then_case = parser::insert_conversion_node(std::move(*instantiated_node.then_case), then_type, common, program);
+					*instantiated_node.then_case = insert_conversion_node(std::move(*instantiated_node.then_case), then_type, common, program);
 				if (else_type != common)
-					*instantiated_node.else_case = parser::insert_conversion_node(std::move(*instantiated_node.else_case), else_type, common, program);
+					*instantiated_node.else_case = insert_conversion_node(std::move(*instantiated_node.else_case), else_type, common, program);
 			}
 
 			return instantiated_node;
@@ -487,7 +576,7 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 		//[](StructConstructorNode const & ctor_node) { TODO }
 	);
 
-	if (is_dependent(tree))
+	if (!is_dependent(tree))
 		return tree;
 	else
 		return std::visit(visitor, tree.as_variant());
@@ -517,7 +606,7 @@ auto instantiate_dependent_statement(stmt::Statement const & statement, Function
 			TypeId const returned_expression_type = expression_type_id(instantiated_node.returned_expression, program);
 			if (returned_expression_type != function.return_type)
 				instantiated_node.returned_expression = 
-				parser::insert_conversion_node(
+				insert_conversion_node(
 					std::move(instantiated_node.returned_expression),
 					returned_expression_type, function.return_type,
 					program);

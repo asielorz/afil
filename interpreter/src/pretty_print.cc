@@ -183,6 +183,32 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 		[&](tmp::LocalVariableNode const &)
 		{
 			return join(indent(indentation_level), "dependent local", '\n');
+		},
+		[&](tmp::FunctionCallNode const & func_call_node)
+		{
+			std::string str = join(indent(indentation_level), "dependent function call\n");
+
+			for (ExpressionTree const & param : func_call_node.parameters)
+				str += pretty_print_rec(param, program, indentation_level + 1);
+
+			return str;
+		},
+		[&](tmp::RelationalOperatorCallNode const & rel_op_node)
+		{
+			std::string str = indent(indentation_level);
+			str += "dependent ";
+			switch (rel_op_node.op)
+			{
+				case Operator::less:			str += "operator < ";  break;
+				case Operator::less_equal:		str += "operator <= "; break;
+				case Operator::greater:			str += "operator > ";  break;
+				case Operator::greater_equal:	str += "operator >= "; break;
+				case Operator::not_equal:		str += "operator != "; break;
+			}
+			str += '\n';
+			str += pretty_print_rec((*rel_op_node.parameters)[0], program, indentation_level + 1);
+			str += pretty_print_rec((*rel_op_node.parameters)[1], program, indentation_level + 1);
+			return str;
 		}
 	);
 	return std::visit(visitor, tree.as_variant());

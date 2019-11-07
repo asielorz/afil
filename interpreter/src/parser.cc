@@ -136,59 +136,6 @@ namespace parser
 			token.source == "not"sv;
 	}
 
-	auto insert_conversion_node(ExpressionTree tree, TypeId from, TypeId to, Program const & program) noexcept -> ExpressionTree
-	{
-		if (from.index == to.index)
-		{
-			// From reference to reference and value to value there is no conversion. A pointer is a pointer, regardless of constness.
-			if (from.is_reference == to.is_reference)
-				return tree;
-
-			if (from.is_reference && !to.is_reference)
-			{
-				expr::DereferenceNode deref_node;
-				deref_node.expression = std::make_unique<ExpressionTree>(std::move(tree));
-				deref_node.variable_type = to;
-				return deref_node;
-			}
-			else
-			{
-				raise_syntax_error_if_not(!to.is_mutable, "Can't bind a temporary to a mutable reference.");
-				mark_as_to_do("Address of temporaries");
-			}
-		}
-		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
-		{
-			return std::move(tree);
-		}
-		raise_syntax_error("Conversion between types does not exist.");
-	}
-
-	auto insert_conversions(span<ExpressionTree> parameters, span<TypeId const> parsed_parameter_types, span<TypeId const> target_parameter_types, Program const & program)
-	{
-		for (size_t i = 0; i < target_parameter_types.size(); ++i)
-		{
-			if (parsed_parameter_types[i] != target_parameter_types[i])
-				parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program);
-		}
-	}
-
-	auto resolve_function_overloading_and_insert_conversions(
-		OverloadSet overload_set,
-		span<ExpressionTree> parameters,
-		span<TypeId const> parsed_parameter_types,
-		Program & program) noexcept -> FunctionId
-	{
-		FunctionId const function_id = resolve_function_overloading(overload_set, parsed_parameter_types, program);
-		raise_syntax_error_if_not(function_id != invalid_function_id, "Function overload not found.");
-
-		// If any conversion is needed in order to call the function, perform the conversion.
-		auto const target_parameter_types = parameter_types(program, function_id);
-		insert_conversions(parameters, parsed_parameter_types, target_parameter_types, program);
-
-		return function_id;
-	}
-
 	auto insert_expression(OperatorTree & tree, OperatorTree & new_node) noexcept -> void
 	{
 		OperatorNode & tree_op = std::get<OperatorNode>(tree);
@@ -249,15 +196,13 @@ namespace parser
 				[](auto) -> ExpressionTree { raise_syntax_error("Looked up name does not name an overload set."); },
 				[&](lookup_result::OverloadSet const & overload_set) -> ExpressionTree
 				{
-					TypeId const operand_types[] = {expression_type_id(left, program), expression_type_id(right, program)};
-					auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set, operands, operand_types, program);
-					if (function_id != invalid_function_id)
+					if (is_dependent(left) || is_dependent(right))
 					{
 						if (op == Operator::not_equal || op == Operator::less || op == Operator::greater ||
 							op == Operator::less_equal || op == Operator::greater_equal)
 						{
-							expr::RelationalOperatorCallNode func_node;
-							func_node.function_id = function_id;
+							expr::tmp::RelationalOperatorCallNode func_node;
+							func_node.overload_set = overload_set;
 							func_node.op = op;
 							func_node.parameters = std::make_unique<std::array<ExpressionTree, 2>>();
 							(*func_node.parameters)[0] = std::move(left);
@@ -266,15 +211,43 @@ namespace parser
 						}
 						else
 						{
-							expr::FunctionCallNode func_node;
-							func_node.function_id = function_id;
+							expr::tmp::FunctionCallNode func_node;
+							func_node.overload_set = overload_set;
 							func_node.parameters.reserve(2);
 							func_node.parameters.push_back(std::move(left));
 							func_node.parameters.push_back(std::move(right));
 							return func_node;
 						}
 					}
-					else raise_syntax_error("Operator overload not found.");
+					else
+					{
+						TypeId const operand_types[] = { expression_type_id(left, program), expression_type_id(right, program) };
+						auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set, operands, operand_types, program);
+						if (function_id != invalid_function_id)
+						{
+							if (op == Operator::not_equal || op == Operator::less || op == Operator::greater ||
+								op == Operator::less_equal || op == Operator::greater_equal)
+							{
+								expr::RelationalOperatorCallNode func_node;
+								func_node.function_id = function_id;
+								func_node.op = op;
+								func_node.parameters = std::make_unique<std::array<ExpressionTree, 2>>();
+								(*func_node.parameters)[0] = std::move(left);
+								(*func_node.parameters)[1] = std::move(right);
+								return func_node;
+							}
+							else
+							{
+								expr::FunctionCallNode func_node;
+								func_node.function_id = function_id;
+								func_node.parameters.reserve(2);
+								func_node.parameters.push_back(std::move(left));
+								func_node.parameters.push_back(std::move(right));
+								return func_node;
+							}
+						}
+						else raise_syntax_error("Operator overload not found.");
+					}
 				}
 			);
 

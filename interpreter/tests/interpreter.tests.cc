@@ -1304,6 +1304,23 @@ TEST_CASE("Function template refactor: variable nodes")
 	REQUIRE(parse_and_run(src) == 1024);
 }
 
+TEST_CASE("Function template refactor: function call nodes")
+{
+	auto const src = R"(
+		let add = fn<T>(T a, T b) 
+		{ 
+			return a + b; 
+		};
+
+		let main = fn() -> int
+		{
+			return add(3, 6);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 9);
+}
+
 /*****************************************************************
 Backlog
 - templates
