@@ -1520,7 +1520,12 @@ TEST_CASE("Function template refactor: struct constructor of non-dependent type"
 /*****************************************************************
 Backlog
 - templates
+	- for statement and statement blocks with dependent scopes
+	- construct dependent type
+	- recursive dependent types
 	- member access to variable of dependent type
+	- struct declaration that contains dependent types
+	- function declaration with dependent types
 - arrays (depends on pointers)
 - strings (depends on arrays)
 - importing other files
