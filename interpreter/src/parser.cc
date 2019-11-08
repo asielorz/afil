@@ -1013,16 +1013,6 @@ namespace parser
 		return tree;
 	}
 
-	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data)
-	{
-		expr::StructConstructorNode default_constructor_node;
-		default_constructor_node.constructed_type = type_id;
-		default_constructor_node.parameters.reserve(struct_data.member_variables.size());
-		for (MemberVariable const & var : struct_data.member_variables)
-			default_constructor_node.parameters.push_back(*var.initializer_expression);
-		return default_constructor_node;
-	}
-
 	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::Statement
 	{
 		// A variable declaration statement has the following form:

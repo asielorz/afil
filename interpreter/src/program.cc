@@ -439,6 +439,16 @@ auto is_default_constructible(TypeId type_id, Program const & program) noexcept 
 		return false;
 }
 
+auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> expr::StructConstructorNode
+{
+	expr::StructConstructorNode default_constructor_node;
+	default_constructor_node.constructed_type = type_id;
+	default_constructor_node.parameters.reserve(struct_data.member_variables.size());
+	for (MemberVariable const & var : struct_data.member_variables)
+		default_constructor_node.parameters.push_back(*var.initializer_expression);
+	return default_constructor_node;
+}
+
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
 {
 	if (id.is_extern)
@@ -633,7 +643,10 @@ auto instantiate_dependent_statement(
 					assigned_expr_type, var.type, program);
 			}
 			else
-				mark_as_to_do("Synthesize default constructor");
+			{
+				raise_syntax_error_if_not(is_default_constructible(var.type, program), "Attempted to default construct a variable of a type that is not default constructible.");
+				instantiated_node.assigned_expression = synthesize_default_constructor(var.type, *struct_for_type(program, var.type));
+			}
 
 			return instantiated_node;
 		},

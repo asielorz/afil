@@ -1467,9 +1467,35 @@ TEST_CASE("Function template refactor: variable declaration of dependent type")
 	REQUIRE(parse_and_run(src) == midpoint(0, 10));
 }
 
+TEST_CASE("Function template refactor: synthesizing default constructor for variable declaration of dependent type")
+{
+	auto const src = R"(
+		let return_default = fn<T>(T ignored) 
+		{ 
+			T default_constructed;
+			return default_constructed;
+		};
+
+		struct DefaultConstructible
+		{
+			int value = 5;
+		}		
+
+		let main = fn() -> int
+		{
+			let x = DefaultConstructible(7);
+			let y = return_default(x);
+			return y.value;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - templates
+- member access to variable of dependent type
 - arrays (depends on pointers)
 - strings (depends on arrays)
 - importing other files
