@@ -1441,8 +1441,30 @@ TEST_CASE("Function template refactor: variable declaration statement of a non d
 		};
 	)"sv;
 
-	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 14);
+}
+
+TEST_CASE("Function template refactor: variable declaration of dependent type")
+{
+	auto const src = R"(
+		let midpoint = fn<T>(T a, T b) 
+		{ 
+			T m = (a + b) / 2;
+			return m;
+		};
+
+		let main = fn() -> int
+		{
+			return midpoint(0, 10);
+		};
+	)"sv;
+
+	auto const midpoint = [](auto a, auto b) 
+	{
+		return (a + b) / 2;
+	};
+
+	REQUIRE(parse_and_run(src) == midpoint(0, 10));
 }
 
 /*****************************************************************

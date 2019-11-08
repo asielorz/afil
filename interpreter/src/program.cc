@@ -612,6 +612,31 @@ auto instantiate_dependent_statement(
 			instantiated_node.assigned_expression = instantiate_dependent_expression(var_decl_node.assigned_expression, function, program, variable_offset_map);
 			return instantiated_node;
 		},
+		[&](tmp::VariableDeclarationStatement const & var_decl_node) -> Statement
+		{
+			VariableDeclarationStatement instantiated_node;
+
+			auto const it = std::find_if(function.variables.begin(), function.variables.end(), [&](Variable const & var)
+			{
+				return var.name.first == var_decl_node.variable_name.first && var.name.size == var_decl_node.variable_name.size;
+			});
+			assert(it != function.variables.end());
+			Variable const & var = *it;
+
+			instantiated_node.variable_offset = var.offset;
+			if (var_decl_node.assigned_expression)
+			{
+				instantiated_node.assigned_expression = instantiate_dependent_expression(*var_decl_node.assigned_expression, function, program, variable_offset_map);
+				TypeId const assigned_expr_type = expression_type_id(instantiated_node.assigned_expression, program);
+				instantiated_node.assigned_expression = insert_conversion_node(
+					std::move(instantiated_node.assigned_expression),
+					assigned_expr_type, var.type, program);
+			}
+			else
+				mark_as_to_do("Synthesize default constructor");
+
+			return instantiated_node;
+		},
 		[&](ExpressionStatement const & expr_node) -> Statement
 		{
 			ExpressionStatement instantiated_node;

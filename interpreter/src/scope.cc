@@ -182,15 +182,6 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 		return overload_set;
 }
 
-auto lookup_type_name(ScopeStackView scope_stack, std::string_view name, span<char const> string_pool) noexcept -> TypeId
-{
-	auto const visitor = overload(
-		[](auto const &) { return TypeId::none; },
-		[](lookup_result::Type type) { return type.type_id; }
-	);
-	return std::visit(visitor, lookup_name(scope_stack, name, string_pool));
-}
-
 auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int
 {
 	int const start = static_cast<int>(scope_stack.size() - 1);

@@ -381,7 +381,8 @@ namespace interpreter
 			[&](stmt::ContinueStatement const &) -> control_flow::Variant
 			{
 				return control_flow::Continue();
-			}
+			},
+			[](stmt::tmp::DependentNode const &) -> control_flow::Variant { declare_unreachable(); }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}

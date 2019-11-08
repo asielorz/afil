@@ -1,6 +1,7 @@
 #pragma once
 
 #include "expression.hh"
+#include <optional>
 
 namespace stmt
 {
@@ -54,13 +55,30 @@ namespace stmt
 	struct BreakStatement {};
 	struct ContinueStatement {};
 
+	namespace tmp
+	{
+		// Tag type. All dependent nodes inherit from it.
+		struct DependentNode
+		{
+		protected:
+			DependentNode() noexcept = default;
+		};
+
+		struct VariableDeclarationStatement : DependentNode
+		{
+			PooledString variable_name;
+			std::optional<expr::ExpressionTree> assigned_expression;
+		};
+	}
 
 	namespace detail
 	{
 		using StatementBase = std::variant<
 			VariableDeclarationStatement, ExpressionStatement, 
 			IfStatement, StatementBlock, WhileStatement, ForStatement,
-			ReturnStatement, BreakStatement, ContinueStatement
+			ReturnStatement, BreakStatement, ContinueStatement,
+
+			tmp::VariableDeclarationStatement
 		>;
 	}
 

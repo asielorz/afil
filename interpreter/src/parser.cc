@@ -293,7 +293,7 @@ namespace parser
 		if (TypeId const * const type = try_get<TypeId>(type_or_dependent_type))
 			return *type;
 
-		mark_as_to_do("Handling dependent types.");
+		mark_as_to_do("Handling dependent types");
 	}
 
 	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program, StructTemplateId template_id) noexcept -> TypeId
@@ -1023,15 +1023,49 @@ namespace parser
 		return default_constructor_node;
 	}
 
-	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::VariableDeclarationStatement
+	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::Statement
 	{
 		// A variable declaration statement has the following form:
 		// [type] [var_name] = [expr];
 
+		// A statement begins with the type of the declared variable.
+		auto const parsed_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+		raise_syntax_error_if_not(!has_type<lookup_result::Nothing>(parsed_type), "Expected type name.");
+
+		if (has_type<DependentTypeId>(parsed_type))
+		{
+			DependentTypeId const & dep_type = std::get<DependentTypeId>(parsed_type);
+
+			stmt::tmp::VariableDeclarationStatement node;
+
+			// The second token of the statement is the variable name.
+			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
+			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as variable name.");
+			raise_syntax_error_if_not(!is_name_taken(tokens[index].source, p.scope_stack, p.program), "More than one local variable with the same name.");
+			std::string_view const var_name = tokens[index].source;
+			index++;
+
+			PooledString const pooled_name = pool_string(p.program, var_name);
+			node.variable_name = pooled_name;
+
+			static_cast<DependentScope &>(top(p.scope_stack)).dependent_variables.push_back({pooled_name, dep_type});
+
+			if (tokens[index].type == TokenType::semicolon)
+				return node;
+
+			// The third token is a '='.
+			raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' or ';' after variable name in declaration.");
+			index++;
+
+			// The rest is the expression assigned to the variable.
+			node.assigned_expression = parse_subexpression(tokens, index, p);
+
+			return node;
+		}
+
 		stmt::VariableDeclarationStatement node;
 
-		// A statement begins with the type of the declared variable.
-		TypeId const type_found = ignore_dependent_type_to_do(parse_type_name(tokens, index, p.scope_stack, p.program));
+		TypeId const type_found = std::get<TypeId>(parsed_type);
 
 		// The second token of the statement is the variable name.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
@@ -1539,6 +1573,12 @@ namespace parser
 		return std::nullopt;
 	}
 
+	auto is_type_name(std::string_view name, ScopeStackView scope_stack, span<char const> string_pool) -> bool
+	{
+		auto const lookup = lookup_name(scope_stack, name, string_pool);
+		return has_type<lookup_result::Type>(lookup) || has_type<lookup_result::DependentType>(lookup);
+	}
+
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::optional<stmt::Statement>
 	{
 		std::optional<stmt::Statement> result;
@@ -1562,7 +1602,7 @@ namespace parser
 			result = parse_break_or_continue_statement<stmt::ContinueStatement>(tokens, index, p);
 		else if (tokens[index].source == "struct")
 			return parse_struct_declaration(tokens, index, p);
-		else if (lookup_type_name(p.scope_stack, tokens[index].source, p.program.string_pool) != TypeId::none)
+		else if (is_type_name(tokens[index].source, p.scope_stack, p.program.string_pool))
 			result = parse_variable_declaration_statement(tokens, index, p);
 		else
 			result = parse_expression_statement(tokens, index, p);

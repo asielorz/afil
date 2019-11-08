@@ -274,6 +274,12 @@ auto pretty_print_rec(Statement const & statement, Program const & program, int 
 		[&](ContinueStatement const &)
 		{
 			return join(indent(indentation_level), "continue\n");
+		},
+		[&](tmp::VariableDeclarationStatement const & var_node)
+		{
+			return
+				join(indent(indentation_level), "dependent variable declaration: ", get(program, var_node.variable_name), '\n',
+					var_node.assigned_expression.has_value() ? pretty_print_rec(*var_node.assigned_expression, program, indentation_level + 1) : "");
 		}
 	);
 	return std::visit(visitor, statement.as_variant());

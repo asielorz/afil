@@ -37,13 +37,17 @@ namespace stmt
 				static_cast<void>(for_node); // TODO
 				return false;
 			},
-			[&](BreakStatement const &)
+			[](BreakStatement const &)
 			{
 				return false;
 			},
-			[&](ContinueStatement const &)
+			[](ContinueStatement const &)
 			{
 				return false;
+			},
+			[](tmp::DependentNode const &)
+			{
+				return true;
 			}
 		);
 		return std::visit(visitor, statement.as_variant());
