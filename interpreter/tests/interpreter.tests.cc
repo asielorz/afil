@@ -1184,7 +1184,7 @@ TEST_CASE("Conversion from immutable pointer to mutable pointer")
 
 	REQUIRE(parse_and_run(src) == 5);
 }
-/*
+
 TEST_CASE("A function template lets the user define generic functions")
 {
 	auto const src = R"(
@@ -1220,7 +1220,7 @@ TEST_CASE("A template parameter may be a reference or mutable")
 
 	REQUIRE(parse_and_run(src) == -225);
 }
-*/
+
 TEST_CASE("A structure template lets the user define generic structures")
 {
 	auto const src = R"(
