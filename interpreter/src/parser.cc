@@ -690,11 +690,14 @@ namespace parser
 		}
 
 		raise_syntax_error_if_not(struct_member_types.size() == node.parameters.size(), "Number of parameters to constructor call does not match number of member variables.");
-		for (size_t i = 0; i < node.parameters.size(); ++i)
+		if (std::none_of(node.parameters.begin(), node.parameters.end(), expr::is_dependent))
 		{
-			TypeId const parsed_type = expression_type_id(node.parameters[i], p.program);
-			raise_syntax_error_if_not(is_convertible(parsed_type, struct_member_types[i], p.program), "Expression is not convertible to member type in constructor.");
-			node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, struct_member_types[i], p.program);
+			for (size_t i = 0; i < node.parameters.size(); ++i)
+			{
+				TypeId const parsed_type = expression_type_id(node.parameters[i], p.program);
+				raise_syntax_error_if_not(is_convertible(parsed_type, struct_member_types[i], p.program), "Expression is not convertible to member type in constructor.");
+				node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, struct_member_types[i], p.program);
+			}
 		}
 
 		return node;

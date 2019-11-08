@@ -598,9 +598,27 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 			}
 
 			return instantiated_node;
-		}
+		},
 		//[](StatementBlockNode const &) { TODO },
-		//[](StructConstructorNode const & ctor_node) { TODO }
+		[&](StructConstructorNode const & ctor_node) -> ExpressionTree
+		{
+			StructConstructorNode instantiated_node;
+			instantiated_node.constructed_type = ctor_node.constructed_type;
+
+			Struct const & struct_data = *struct_for_type(program, ctor_node.constructed_type);
+
+			instantiated_node.parameters.reserve(ctor_node.parameters.size());
+			for (size_t i = 0; i < ctor_node.parameters.size(); ++i)
+			{
+				expr::ExpressionTree const & param = ctor_node.parameters[i];
+				expr::ExpressionTree instantiated_param = instantiate_dependent_expression(param, function, program, variable_offset_map);
+				TypeId const param_type = expression_type_id(instantiated_param, program);
+				instantiated_param = insert_conversion_node(std::move(instantiated_param), param_type, struct_data.member_variables[i].type, program);
+				instantiated_node.parameters.push_back(std::move(instantiated_param));
+			}
+
+			return instantiated_node;
+		}
 	);
 
 	return std::visit(visitor, tree.as_variant());

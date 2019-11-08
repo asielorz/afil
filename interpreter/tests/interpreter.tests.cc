@@ -1492,14 +1492,40 @@ TEST_CASE("Function template refactor: synthesizing default constructor for vari
 	REQUIRE(parse_and_run(src) == 5);
 }
 
+TEST_CASE("Function template refactor: struct constructor of non-dependent type")
+{
+	auto const src = R"(
+		struct ivec3
+		{
+			int x;
+			int y;
+			int z;
+		}
+		
+		let make_vector = fn<T>(T x, T y, T z) 
+		{ 
+			return ivec3(x, y, z);
+		};
+
+		let main = fn() -> int
+		{
+			let v = make_vector(1, 2, 3);
+			return v.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 2);
+}
+
 /*****************************************************************
 Backlog
 - templates
-- member access to variable of dependent type
+	- member access to variable of dependent type
 - arrays (depends on pointers)
 - strings (depends on arrays)
 - importing other files
 - importing functions in C
 - contracts
+- concepts (depends on templates)
 - errors
 *****************************************************************/
