@@ -1361,7 +1361,6 @@ TEST_CASE("Function template refactor: relational operator call nodes")
 	REQUIRE(parse_and_run(src) == 5);
 }
 
-
 TEST_CASE("Function template refactor: if expression")
 {
 	auto const src = R"(
@@ -1380,6 +1379,69 @@ TEST_CASE("Function template refactor: if expression")
 		};
 	)"sv;
 
+	REQUIRE(parse_and_run(src) == 14);
+}
+
+TEST_CASE("Function template refactor: if statement")
+{
+	auto const src = R"(
+		let difference = fn<T>(T a, T b) 
+		{ 
+			if (a < b)
+				return b - a;
+			else
+				return a - b;
+		};
+
+		let main = fn() -> int
+		{
+			return difference(-4, 10);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 14);
+}
+
+TEST_CASE("Function template refactor: variable declaration statement of a non dependent type")
+{
+	auto const src = R"(
+		let difference = fn<T>(T a, T b) 
+		{ 
+			bool less = a < b;
+			if (less)
+				return b - a;
+			else
+				return a - b;
+		};
+
+		let main = fn() -> int
+		{
+			return difference(-4, 10);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 14);
+}
+
+TEST_CASE("Function template refactor: variable declaration statement of a non dependent type, round 2")
+{
+	auto const src = R"(
+		let difference = fn<T>(T a, T b) 
+		{ 
+			bool less = a < b;
+			if (less)
+				return b - a;
+			else
+				return a - b;
+		};
+
+		let main = fn() -> int
+		{
+			return difference(10, -4);
+		};
+	)"sv;
+
+	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 14);
 }
 

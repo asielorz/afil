@@ -710,8 +710,7 @@ namespace parser
 		index++;
 
 		expr::IfNode if_node;
-		if_node.condition = std::make_unique<ExpressionTree>(parse_subexpression(tokens, index, p));
-		raise_syntax_error_if_not(expression_type_id(*if_node.condition, p.program) == TypeId::bool_, "Condition expression of if must return bool.");
+		if_node.condition = std::make_unique<ExpressionTree>(insert_conversion_to_control_flow_condition(parse_subexpression(tokens, index, p), p.program));
 
 		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after if condition.");
 		index++;
@@ -1261,8 +1260,7 @@ namespace parser
 		index++;
 
 		stmt::IfStatement node;
-		node.condition = parse_subexpression(tokens, index, p);
-		raise_syntax_error_if_not(expression_type_id(node.condition, p.program) == TypeId::bool_, "Condition of an if statement must return bool.");
+		node.condition = insert_conversion_to_control_flow_condition(parse_subexpression(tokens, index, p), p.program);
 
 		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after condition in if statement.");
 		index++;
@@ -1319,8 +1317,7 @@ namespace parser
 		stmt::WhileStatement node;
 
 		// Parse condition. Must return bool.
-		node.condition = parse_subexpression(tokens, index, p);
-		raise_syntax_error_if_not(expression_type_id(node.condition, p.program) == TypeId::bool_, "Condition of while statement must return bool.");
+		node.condition = insert_conversion_to_control_flow_condition(parse_subexpression(tokens, index, p), p.program);
 
 		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after condition in while statement.");
 		index++;
@@ -1357,8 +1354,7 @@ namespace parser
 		for_node.init_statement = std::make_unique<stmt::Statement>(std::move(*init_statement));
 
 		// Parse condition. Must return bool.
-		for_node.condition = parse_subexpression(tokens, index, p);
-		raise_syntax_error_if_not(expression_type_id(for_node.condition, p.program) == TypeId::bool_, "Condition of for statement must return bool.");
+		for_node.condition = insert_conversion_to_control_flow_condition(parse_subexpression(tokens, index, p), p.program);
 
 		// Parse ; after condition.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after for statement condition.");

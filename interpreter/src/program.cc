@@ -304,6 +304,13 @@ auto insert_conversion_node(expr::ExpressionTree tree, TypeId from, TypeId to, P
 	raise_syntax_error("Conversion between types does not exist.");
 }
 
+auto insert_conversion_to_control_flow_condition(expr::ExpressionTree tree, Program const & program) noexcept -> expr::ExpressionTree
+{
+	TypeId const condition_expr_type = expression_type_id(tree, program);
+	raise_syntax_error_if_not(is_convertible(condition_expr_type, TypeId::bool_, program), "Condition expression must return bool.");
+	return insert_conversion_node(std::move(tree), condition_expr_type, TypeId::bool_, program);
+}
+
 auto insert_conversions(
 	span<expr::ExpressionTree> parameters, 
 	span<TypeId const> parsed_parameter_types, 
@@ -456,12 +463,27 @@ auto return_type(Program const & program, FunctionId id) noexcept -> TypeId
 		return program.functions[id.index].return_type;
 }
 
-auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Function & function, Program & program) noexcept -> expr::ExpressionTree
+struct RemappedVariableOffset
+{
+	int prev_offset;
+	int new_offset;
+};
+auto remap_offset(span<RemappedVariableOffset const> variable_offset_map, int offset) noexcept -> int
+{
+	auto const it = std::find_if(variable_offset_map.begin(), variable_offset_map.end(), [offset](RemappedVariableOffset r)
+	{
+		return r.prev_offset == offset;
+	});
+	assert(it != variable_offset_map.end());
+	return it->new_offset;
+}
+
+auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Function & function, Program & program, span<RemappedVariableOffset const> variable_offset_map) noexcept -> expr::ExpressionTree
 {
 	using namespace expr;
 
 	auto const visitor = overload(
-		[](auto const &) -> expr::ExpressionTree { declare_unreachable(); },
+		[](auto const & non_dependent) -> expr::ExpressionTree { return non_dependent; },
 		[&](tmp::LocalVariableNode const & var_node) -> ExpressionTree
 		{
 			// TODO: Index based approach?
@@ -477,24 +499,31 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 			instantiated_node.variable_offset = var.offset;
 			return instantiated_node;
 		},
+		[&](LocalVariableNode const & var_node) -> ExpressionTree
+		{
+			LocalVariableNode instantiated_node;
+			instantiated_node.variable_type = var_node.variable_type;
+			instantiated_node.variable_offset = remap_offset(variable_offset_map, var_node.variable_offset);
+			return instantiated_node;
+		},
 		[&](DereferenceNode const & deref_node) -> ExpressionTree
 		{
 			DereferenceNode instantiated_node;
-			instantiated_node.expression = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*deref_node.expression, function, program));
+			instantiated_node.expression = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*deref_node.expression, function, program, variable_offset_map));
 			instantiated_node.variable_type = remove_reference(expression_type_id(*instantiated_node.expression, program));
 			return instantiated_node;
 		},
 		[&](AddressofNode const & addressof_node) -> ExpressionTree
 		{
 			AddressofNode instantiated_node;
-			instantiated_node.operand = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*addressof_node.operand, function, program));
+			instantiated_node.operand = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*addressof_node.operand, function, program, variable_offset_map));
 			instantiated_node.return_type = pointer_type_for(remove_reference(expression_type_id(*instantiated_node.operand, program)), program);
 			return instantiated_node;
 		},
 		[&](DepointerNode const & deptr_node) -> ExpressionTree
 		{
 			DepointerNode instantiated_node;
-			instantiated_node.operand = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*deptr_node.operand, function, program));
+			instantiated_node.operand = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*deptr_node.operand, function, program, variable_offset_map));
 			instantiated_node.return_type = make_reference(std::get<PointerType>(type_with_id(program, expression_type_id(*instantiated_node.operand, program)).extra_data).value_type);
 			return instantiated_node;
 		},
@@ -504,7 +533,7 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 
 			instantiated_node.parameters.reserve(fn_call_node.parameters.size());
 			for (ExpressionTree const & param : fn_call_node.parameters)
-				instantiated_node.parameters.push_back(instantiate_dependent_expression(param, function, program));
+				instantiated_node.parameters.push_back(instantiate_dependent_expression(param, function, program, variable_offset_map));
 
 			std::vector<TypeId> const  parameter_types = map(instantiated_node.parameters, expr::expression_type_id(program));
 			instantiated_node.function_id = resolve_function_overloading_and_insert_conversions(
@@ -520,8 +549,8 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 			RelationalOperatorCallNode instantiated_node;
 
 			instantiated_node.parameters = std::make_unique<std::array<expr::ExpressionTree, 2>>();
-			(*instantiated_node.parameters)[0] = instantiate_dependent_expression((*fn_call_node.parameters)[0], function, program);
-			(*instantiated_node.parameters)[1] = instantiate_dependent_expression((*fn_call_node.parameters)[1], function, program);
+			(*instantiated_node.parameters)[0] = instantiate_dependent_expression((*fn_call_node.parameters)[0], function, program,variable_offset_map);
+			(*instantiated_node.parameters)[1] = instantiate_dependent_expression((*fn_call_node.parameters)[1], function, program,variable_offset_map);
 
 			instantiated_node.op = fn_call_node.op;
 
@@ -537,28 +566,16 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 		[&](IfNode const & if_node) -> ExpressionTree
 		{
 			IfNode instantiated_node;
-			if (is_dependent(*if_node.condition))
-			{
-				instantiated_node.condition = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*if_node.condition, function, program));
-				raise_syntax_error_if_not(expression_type_id(*instantiated_node.condition, program) == TypeId::bool_, "Condition of if expression must return bool.");
-			}
-			else
-				instantiated_node.condition = if_node.condition;
 
-			bool const then_is_dependent = is_dependent(*if_node.then_case);
-			if (then_is_dependent)
-				instantiated_node.then_case = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*if_node.then_case, function, program));
-			else
-				instantiated_node.then_case = if_node.then_case;
+			instantiated_node.condition = std::make_unique<ExpressionTree>(insert_conversion_to_control_flow_condition(
+				instantiate_dependent_expression(*if_node.condition, function, program, variable_offset_map),
+				program));
 
-			bool const else_is_dependent = is_dependent(*if_node.else_case);
-			if (else_is_dependent)
-				instantiated_node.else_case = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*if_node.else_case, function, program));
-			else
-				instantiated_node.else_case = if_node.else_case;
+			instantiated_node.then_case = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*if_node.then_case, function, program, variable_offset_map));
+			instantiated_node.else_case = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*if_node.else_case, function, program, variable_offset_map));
 
 			// Find the common type to ensure that both branches return the same type.
-			if (then_is_dependent || else_is_dependent)
+			if (is_dependent(*if_node.then_case) || is_dependent(*if_node.else_case))
 			{
 				TypeId const then_type = expression_type_id(*instantiated_node.then_case, program);
 				TypeId const else_type = expression_type_id(*instantiated_node.else_case, program);
@@ -576,32 +593,35 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 		//[](StructConstructorNode const & ctor_node) { TODO }
 	);
 
-	if (!is_dependent(tree))
-		return tree;
-	else
-		return std::visit(visitor, tree.as_variant());
+	return std::visit(visitor, tree.as_variant());
 }
 
-auto instantiate_dependent_statement(stmt::Statement const & statement, Function & function, Program & program) noexcept -> stmt::Statement
+auto instantiate_dependent_statement(
+	stmt::Statement const & statement, 
+	Function & function, 
+	Program & program, 
+	span<RemappedVariableOffset const> variable_offset_map) noexcept -> stmt::Statement
 {
 	using namespace stmt;
 
 	auto const visitor = overload(
 		[&](VariableDeclarationStatement const & var_decl_node) -> Statement
 		{
-			(void)var_decl_node;
-			mark_as_to_do("Dependent for statement");
+			VariableDeclarationStatement instantiated_node;
+			instantiated_node.variable_offset = remap_offset(variable_offset_map, var_decl_node.variable_offset);
+			instantiated_node.assigned_expression = instantiate_dependent_expression(var_decl_node.assigned_expression, function, program, variable_offset_map);
+			return instantiated_node;
 		},
 		[&](ExpressionStatement const & expr_node) -> Statement
 		{
 			ExpressionStatement instantiated_node;
-			instantiated_node.expression = instantiate_dependent_expression(expr_node.expression, function, program);
+			instantiated_node.expression = instantiate_dependent_expression(expr_node.expression, function, program, variable_offset_map);
 			return instantiated_node;
 		},
 		[&](ReturnStatement const & return_node) -> Statement
 		{
 			ReturnStatement instantiated_node;
-			instantiated_node.returned_expression = instantiate_dependent_expression(return_node.returned_expression, function, program);
+			instantiated_node.returned_expression = instantiate_dependent_expression(return_node.returned_expression, function, program, variable_offset_map);
 
 			TypeId const returned_expression_type = expression_type_id(instantiated_node.returned_expression, program);
 			if (function.return_type == TypeId::deduce)
@@ -619,15 +639,10 @@ auto instantiate_dependent_statement(stmt::Statement const & statement, Function
 		[&](IfStatement const & if_node) -> Statement
 		{
 			IfStatement instantiated_node;
-			if (is_dependent(if_node.condition))
-			{
-				instantiated_node.condition = instantiate_dependent_expression(if_node.condition, function, program);
-				raise_syntax_error_if_not(expression_type_id(instantiated_node.condition, program) == TypeId::bool_, "Condition of if statement must return bool.");
-			}
-			else
-				instantiated_node.condition = if_node.condition;
-
-			mark_as_to_do("Dependent if statement");
+			instantiated_node.condition = insert_conversion_to_control_flow_condition(instantiate_dependent_expression(if_node.condition, function, program, variable_offset_map), program);
+			instantiated_node.then_case = std::make_unique<Statement>(instantiate_dependent_statement(*if_node.then_case, function, program, variable_offset_map));
+			instantiated_node.else_case = std::make_unique<Statement>(instantiate_dependent_statement(*if_node.else_case, function, program, variable_offset_map));
+			return instantiated_node;
 		},
 		[&](StatementBlock const & block_node) -> Statement
 		{
@@ -636,8 +651,10 @@ auto instantiate_dependent_statement(stmt::Statement const & statement, Function
 		},
 		[&](WhileStatement const & while_node) -> Statement
 		{
-			(void)while_node;
-			mark_as_to_do("Dependent while statement");
+			WhileStatement instantiated_node;
+			instantiated_node.condition = insert_conversion_to_control_flow_condition(instantiate_dependent_expression(while_node.condition, function, program, variable_offset_map), program);
+			instantiated_node.body = std::make_unique<Statement>(instantiate_dependent_statement(*while_node.body, function, program, variable_offset_map));
+			return instantiated_node;
 		},
 		[&](ForStatement const & for_node) -> Statement
 		{
@@ -678,6 +695,9 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 	function.variables.reserve(fn_template.scope.variables.size() + fn_template.scope.dependent_variables.size());
 	int variable_index = 0;
 	int dependent_variable_index = 0;
+	
+	std::vector<RemappedVariableOffset> variable_offset_map;
+
 	for (FunctionTemplate::Parameter const & param : fn_template.parameters)
 	{
 		if (param.is_dependent)
@@ -694,17 +714,19 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 		else
 		{
 			Variable const & var = fn_template.scope.variables[param.index];
-			add_variable_to_scope(function, var.name, var.type, 0, program);
+			int const new_offset = add_variable_to_scope(function, var.name, var.type, 0, program);
 			function.parameter_count++;
 			function.parameter_size = function.stack_frame_size;
 			variable_index = param.index + 1;
+			variable_offset_map.push_back({var.offset, new_offset});
 		}
 	}
 
 	for (int i = variable_index; i < fn_template.scope.variables.size(); ++i)
 	{
 		Variable const & var = fn_template.scope.variables[i];
-		add_variable_to_scope(function, var.name, var.type, 0, program);
+		int const new_offset = add_variable_to_scope(function, var.name, var.type, 0, program);
+		variable_offset_map.push_back({var.offset, new_offset});
 	}
 	for (int i = dependent_variable_index; i < fn_template.scope.dependent_variables.size(); ++i)
 	{
@@ -721,7 +743,9 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 	// Instantiate statement templates.
 	function.statements.reserve(fn_template.statement_templates.size());
 	for (stmt::Statement const & statement_template : fn_template.statement_templates)
-		function.statements.push_back(instantiate_dependent_statement(statement_template, function, program));
+	{
+		function.statements.push_back(instantiate_dependent_statement(statement_template, function, program, variable_offset_map));
+	}
 
 	// Add function to program.
 	FunctionId instantiation_id;

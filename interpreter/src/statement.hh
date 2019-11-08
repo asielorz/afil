@@ -54,6 +54,7 @@ namespace stmt
 	struct BreakStatement {};
 	struct ContinueStatement {};
 
+
 	namespace detail
 	{
 		using StatementBase = std::variant<
@@ -70,5 +71,7 @@ namespace stmt
 		constexpr auto as_variant() noexcept -> Base & { return *this; }
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
 	};
+
+	auto is_dependent(Statement const & statement) noexcept -> bool;
 
 }

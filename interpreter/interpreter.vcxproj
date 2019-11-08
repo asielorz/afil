@@ -36,6 +36,7 @@
     <ClCompile Include="src\parser.cc" />
     <ClCompile Include="src\scope.cc" />
     <ClCompile Include="src\lexer.cc" />
+    <ClCompile Include="src\statement.cc" />
     <ClCompile Include="src\syntax_error.cc" />
     <ClCompile Include="src\unreachable.cc" />
     <ClCompile Include="src\utils.cc" />

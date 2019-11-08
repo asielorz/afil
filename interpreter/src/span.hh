@@ -34,7 +34,7 @@ namespace detail
 } // namespace detail
 
 template <typename T>
-struct span : public detail::span_impl<T>
+struct span : public ::detail::span_impl<T>
 {
 	constexpr span() noexcept : detail::span_impl<T>(nullptr, 0) {}
 	constexpr span(T data_[], size_t size_) noexcept : detail::span_impl<T>(data_, size_) {}
@@ -44,7 +44,7 @@ struct span : public detail::span_impl<T>
 };
 
 template <typename T>
-struct span<T const> : public detail::span_impl<T const>
+struct span<T const> : public ::detail::span_impl<T const>
 {
 	constexpr span() noexcept : detail::span_impl<T const>(nullptr, 0) {}
 	constexpr span(T const data_[], size_t size_) noexcept : detail::span_impl<T const>(data_, size_) {}
