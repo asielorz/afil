@@ -1596,6 +1596,25 @@ TEST_CASE("Function template refactor: Member access to dependent type")
 	REQUIRE(parse_and_run(src) == 5);
 }
 
+TEST_CASE("Member default initializer for struct templates")
+{
+	auto const src = R"(
+		struct<T, U> test_pair
+		{
+			T first = -4;
+			U second = -3;
+		}
+
+		let main = fn() -> int
+		{
+			let p = test_pair<int, int>();
+			return p.first + p.second;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -7);
+}
+
 /*****************************************************************
 Backlog
 - templates

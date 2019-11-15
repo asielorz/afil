@@ -92,6 +92,7 @@ struct MemberVariableTemplate
 	PooledString name;
 	bool is_dependent;
 	TypeId type;
+	std::optional<expr::ExpressionTree> initializer_expression;
 };
 
 struct StructTemplate

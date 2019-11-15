@@ -904,6 +904,11 @@ auto instantiate_struct_template(Program & program, StructTemplateId template_id
 			var_type.index = parameters[var_template.type.index].index;
 		
 		add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, var_template.name, var_type, 0, program);
+		if (var_template.initializer_expression)
+		{
+			Function deleteme;
+			new_struct.member_variables.back().initializer_expression = instantiate_dependent_expression(*var_template.initializer_expression, deleteme, program, parameters, {});
+		}
 	}
 
 	new_type.extra_data = StructType{static_cast<int>(program.structs.size())};

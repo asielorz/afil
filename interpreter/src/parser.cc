@@ -583,7 +583,7 @@ namespace parser
 
 		return expr::FunctionNode{func_id};
 	}
-
+	 
 	auto parse_comma_separated_expression_list(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::vector<ExpressionTree>
 	{
 		std::vector<ExpressionTree> parsed_expressions;
@@ -1514,9 +1514,11 @@ namespace parser
 			member.name = pool_string(p.program, tokens[index].source);
 			index++;
 
-			// TODO: Initializer expression.
 			if (tokens[index].source == "=")
-				mark_as_to_do("Member default initializer expressions for struct templates");
+			{
+				index++;
+				member.initializer_expression = parse_subexpression(tokens, index, p);
+			}
 
 			new_struct_template.member_variables.push_back(member);
 
