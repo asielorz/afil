@@ -1060,49 +1060,9 @@ namespace parser
 		return tree;
 	}
 
-	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::Statement
+	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, ParseParams p, TypeId type_found) noexcept -> stmt::Statement
 	{
-		// A variable declaration statement has the following form:
-		// [type] [var_name] = [expr];
-
-		// A statement begins with the type of the declared variable.
-		auto const parsed_type = parse_type_name(tokens, index, p.scope_stack, p.program);
-		raise_syntax_error_if_not(!has_type<lookup_result::Nothing>(parsed_type), "Expected type name.");
-
-		if (has_type<DependentTypeId>(parsed_type))
-		{
-			DependentTypeId const & dep_type = std::get<DependentTypeId>(parsed_type);
-
-			stmt::tmp::VariableDeclarationStatement node;
-
-			// The second token of the statement is the variable name.
-			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
-			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as variable name.");
-			raise_syntax_error_if_not(!is_name_taken(tokens[index].source, p.scope_stack, p.program), "More than one local variable with the same name.");
-			std::string_view const var_name = tokens[index].source;
-			index++;
-
-			PooledString const pooled_name = pool_string(p.program, var_name);
-			node.variable_name = pooled_name;
-
-			static_cast<DependentScope &>(top(p.scope_stack)).dependent_variables.push_back({pooled_name, dep_type});
-
-			if (tokens[index].type == TokenType::semicolon)
-				return node;
-
-			// The third token is a '='.
-			raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' or ';' after variable name in declaration.");
-			index++;
-
-			// The rest is the expression assigned to the variable.
-			node.assigned_expression = parse_subexpression(tokens, index, p);
-
-			return node;
-		}
-
 		stmt::VariableDeclarationStatement node;
-
-		TypeId const type_found = std::get<TypeId>(parsed_type);
 
 		// The second token of the statement is the variable name.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
@@ -1129,6 +1089,35 @@ namespace parser
 		raise_syntax_error_if_not(is_convertible(assigned_type, type_found, p.program), "Cannot convert initializer expression type to declared variable type.");
 		if (assigned_type != type_found)
 			node.assigned_expression = insert_conversion_node(std::move(node.assigned_expression), assigned_type, type_found, p.program);
+
+		return node;
+	}
+
+	auto parse_dependent_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, ParseParams p, DependentTypeId type) noexcept -> stmt::Statement
+	{
+		stmt::tmp::VariableDeclarationStatement node;
+
+		// The second token of the statement is the variable name.
+		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
+		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as variable name.");
+		raise_syntax_error_if_not(!is_name_taken(tokens[index].source, p.scope_stack, p.program), "More than one local variable with the same name.");
+		std::string_view const var_name = tokens[index].source;
+		index++;
+
+		PooledString const pooled_name = pool_string(p.program, var_name);
+		node.variable_name = pooled_name;
+
+		static_cast<DependentScope &>(top(p.scope_stack)).dependent_variables.push_back({pooled_name, type});
+
+		if (tokens[index].type == TokenType::semicolon)
+			return node;
+
+		// The third token is a '='.
+		raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' or ';' after variable name in declaration.");
+		index++;
+
+		// The rest is the expression assigned to the variable.
+		node.assigned_expression = parse_subexpression(tokens, index, p);
 
 		return node;
 	}
@@ -1641,11 +1630,17 @@ namespace parser
 			result = parse_break_or_continue_statement<stmt::ContinueStatement>(tokens, index, p);
 		else if (tokens[index].source == "struct")
 			return parse_struct_declaration(tokens, index, p);
-		else if (is_type_name(tokens[index].source, p.scope_stack, p.program.string_pool))
-			result = parse_variable_declaration_statement(tokens, index, p);
 		else
-			result = parse_expression_statement(tokens, index, p);
-
+		{
+			auto const parsed_type = parse_type_name(tokens, index, p.scope_stack, p.program);
+			if (TypeId const * type_id = try_get<TypeId>(parsed_type))
+				result = parse_variable_declaration_statement(tokens, index, p, *type_id);
+			else if (DependentTypeId const * dependent_type_id = try_get<DependentTypeId>(parsed_type))
+				result = parse_dependent_variable_declaration_statement(tokens, index, p, *dependent_type_id);
+			else
+				result = parse_expression_statement(tokens, index, p);
+		}
+		
 		// A statement must end with a semicolon.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after statement.");
 		index++;

@@ -1615,6 +1615,25 @@ TEST_CASE("Member default initializer for struct templates")
 	REQUIRE(parse_and_run(src) == -7);
 }
 
+TEST_CASE("Default construct struct template without let = syntax")
+{
+	auto const src = R"(
+		struct<T, U> test_pair
+		{
+			T first = -4;
+			U second = -3;
+		}
+
+		let main = fn() -> int
+		{
+			test_pair<int, int> p;
+			return p.first + p.second;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -7);
+}
+
 /*****************************************************************
 Backlog
 - templates
@@ -1622,7 +1641,6 @@ Backlog
 	- recursive dependent types
 	- struct declaration that contains dependent types
 	- function declaration with dependent types
-	- member default initializer for struct templates
 - arrays (depends on pointers)
 - strings (depends on arrays)
 - importing other files
