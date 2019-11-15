@@ -219,6 +219,13 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 			str += pretty_print_rec((*rel_op_node.parameters)[0], program, indentation_level + 1);
 			str += pretty_print_rec((*rel_op_node.parameters)[1], program, indentation_level + 1);
 			return str;
+		},
+		[&](tmp::StructConstructorNode const & ctor_node)
+		{
+			std::string str = join(indent(indentation_level), "dependent constructor", '\n');
+			for (ExpressionTree const & param : ctor_node.parameters)
+				str += pretty_print_rec(param, program, indentation_level + 1);
+			return str;
 		}
 	);
 	return std::visit(visitor, tree.as_variant());

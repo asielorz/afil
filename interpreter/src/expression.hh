@@ -147,6 +147,12 @@ namespace expr
 			Operator op;
 			value_ptr<std::array<ExpressionTree, 2>> parameters;
 		};
+
+		struct StructConstructorNode : DependentNode
+		{
+			DependentTypeId type;
+			std::vector<ExpressionTree> parameters;
+		};
 	}
 
 	namespace detail
@@ -160,7 +166,8 @@ namespace expr
 			StructConstructorNode,
 
 			tmp::LocalVariableNode,
-			tmp::FunctionCallNode, tmp::RelationalOperatorCallNode
+			tmp::FunctionCallNode, tmp::RelationalOperatorCallNode,
+			tmp::StructConstructorNode
 		>;
 	}
 

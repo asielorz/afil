@@ -710,8 +710,6 @@ namespace parser
 		// and add default constructor if so.
 		if (node.parameters.empty())
 		{
-			// TODO: Recursive default construction.
-
 			node.parameters.reserve(struct_data.member_variables.size());
 			for (MemberVariable const & var : struct_data.member_variables)
 			{
@@ -948,9 +946,14 @@ namespace parser
 					var_node.name = result.name;
 					return var_node;
 				},
-				[](lookup_result::DependentType) -> ExpressionTree
+				[&](lookup_result::DependentType result) -> ExpressionTree
 				{
-					mark_as_to_do("Dependent type constructor call");
+					expr::tmp::StructConstructorNode node;
+					node.type.flat_value = 0;
+					node.type.index = result.index;
+					node.type.is_dependent = true;
+					node.parameters = parse_comma_separated_expression_list(tokens, index, p);
+					return node;
 				},
 				[](lookup_result::Nothing) -> ExpressionTree { raise_syntax_error("Name lookup failed."); }
 			);

@@ -101,7 +101,8 @@ namespace expr
 			[](StructConstructorNode const & constructor_node) -> Ret { return constructor_node.constructed_type; },
 			[](tmp::LocalVariableNode const & var_node) -> Ret { return var_node.type; },
 			[](tmp::FunctionCallNode const &) -> Ret { return DependentTypeId::unknown; },
-			[](tmp::RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; }
+			[](tmp::RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; },
+			[](tmp::StructConstructorNode const &) -> Ret { return TypeId::bool_; }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}

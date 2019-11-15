@@ -1536,6 +1536,37 @@ TEST_CASE("Structs are assignable by default")
 	REQUIRE(parse_and_run(src) == 6);
 }
 
+TEST_CASE("Function template refactor: struct constructor of dependent type")
+{
+	auto const src = R"(
+		struct Foo
+		{
+			int x = 0;
+		}
+		struct Bar
+		{
+			int a = 0;
+		}
+
+		let assign_constructed_from_int = fn<T>(T mut & x, int val)
+		{
+			x = T(val);
+		};
+
+		let main = fn() -> int
+		{
+			Foo mut f;
+			Bar mut b;
+			assign_constructed_from_int(f, 6);
+			assign_constructed_from_int(b, 2);
+			return f.x + b.a;
+		};
+	)"sv;
+
+	parse_and_print(src);
+	REQUIRE(parse_and_run(src) == 8);
+}
+
 /*****************************************************************
 Backlog
 - templates
