@@ -1601,7 +1601,6 @@ Backlog
 - templates
 	- for statement and statement blocks with dependent scopes
 	- recursive dependent types
-	- member access to variable of dependent type
 	- struct declaration that contains dependent types
 	- function declaration with dependent types
 	- member default initializer for struct templates
