@@ -135,6 +135,12 @@ namespace expr
 			PooledString name;
 		};
 
+		struct MemberVariableNode : DependentNode
+		{
+			value_ptr<ExpressionTree> owner;
+			PooledString name;
+		};
+
 		struct FunctionCallNode : DependentNode
 		{
 			lookup_result::OverloadSet overload_set;
@@ -165,7 +171,7 @@ namespace expr
 			IfNode, StatementBlockNode,
 			StructConstructorNode,
 
-			tmp::LocalVariableNode,
+			tmp::LocalVariableNode, tmp::MemberVariableNode,
 			tmp::FunctionCallNode, tmp::RelationalOperatorCallNode,
 			tmp::StructConstructorNode
 		>;

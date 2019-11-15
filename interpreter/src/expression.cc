@@ -90,7 +90,18 @@ namespace expr
 			[](AddressofNode const & addressof_node) -> Ret { return addressof_node.return_type; },
 			[](DepointerNode const & deptr_node) -> Ret { return deptr_node.return_type; },
 			[](VariableNode const & var_node) -> Ret { return make_reference(var_node.variable_type); },
-			[](MemberVariableNode const & var_node) -> Ret { return var_node.variable_type; },
+			[&](MemberVariableNode const & var_node) -> Ret 
+			{
+				auto const owner_type = maybe_dependent_expression_type_id(*var_node.owner, program);
+				if (TypeId const * owner_type_id = try_get<TypeId>(owner_type))
+				{
+					TypeId var_type = var_node.variable_type;
+					var_type.is_reference = owner_type_id->is_reference;
+					var_type.is_mutable = owner_type_id->is_mutable;
+					return var_type;
+				}
+				declare_unreachable(); // A MemberVariableNode can't have a dependent owner. That's what tmp::MemberVariableNode is for.
+			},
 			[](FunctionNode const &) -> Ret { return TypeId::function; },
 			[](FunctionTemplateNode const &) -> Ret { return TypeId::function; },
 			[&](FunctionCallNode const & func_call_node) -> Ret { return return_type(program, func_call_node.function_id); },
@@ -100,6 +111,7 @@ namespace expr
 			[](StatementBlockNode const & block_node) -> Ret { return block_node.return_type; },
 			[](StructConstructorNode const & constructor_node) -> Ret { return constructor_node.constructed_type; },
 			[](tmp::LocalVariableNode const & var_node) -> Ret { return var_node.type; },
+			[](tmp::MemberVariableNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::FunctionCallNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; },
 			[](tmp::StructConstructorNode const &) -> Ret { return TypeId::bool_; }

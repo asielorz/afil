@@ -194,6 +194,11 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 		{
 			return join(indent(indentation_level), "dependent local", '\n');
 		},
+		[&](tmp::MemberVariableNode const & var_node)
+		{
+			return join(indent(indentation_level), '.', get(program, var_node.name), '\n',
+				pretty_print_rec(*var_node.owner, program, indentation_level + 1));
+		},
 		[&](tmp::FunctionCallNode const & func_call_node)
 		{
 			std::string str = join(indent(indentation_level), "dependent function call\n");

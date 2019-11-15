@@ -989,16 +989,26 @@ namespace parser
 			if (tokens[index].type == TokenType::period)
 			{
 				index++;
+
+				raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected member name after '.'.");
+				std::string_view const member_name = tokens[index].source;
+				index++;
+
+				if (is_dependent(tree))
+				{
+					expr::tmp::MemberVariableNode var_node;
+					var_node.owner = std::make_unique<ExpressionTree>(std::move(tree));
+					var_node.name = pool_string(p.program, member_name);
+					return var_node;
+				}
+
 				TypeId const last_operand_type_id = expression_type_id(tree, p.program);
 				Type const & last_operand_type = type_with_id(p.program, last_operand_type_id);
 				raise_syntax_error_if_not(is_struct(last_operand_type), "Member access only allowed for struct types.");
 				Struct const & last_operand_struct = *struct_for_type(p.program, last_operand_type);
 
-				raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected member name after '.'.");
-				std::string_view const member_name = tokens[index].source;
 				int const member_variable_index = find_member_variable(last_operand_struct, member_name, p.program.string_pool);
 				raise_syntax_error_if_not(member_variable_index != -1, "Expected member name after '.'.");
-				index++;
 				Variable const & member_variable = last_operand_struct.member_variables[member_variable_index];
 
 				expr::MemberVariableNode var_node;

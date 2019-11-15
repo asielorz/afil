@@ -1563,19 +1563,48 @@ TEST_CASE("Function template refactor: struct constructor of dependent type")
 		};
 	)"sv;
 
-	parse_and_print(src);
 	REQUIRE(parse_and_run(src) == 8);
+}
+
+TEST_CASE("Function template refactor: Member access to dependent type")
+{
+	auto const src = R"(
+		struct Foo
+		{
+			int x;
+		}
+		struct ivec3
+		{
+			int x;
+			int y;
+			int z;
+		}
+
+		let get_x = fn<T>(T t)
+		{
+			return t.x;
+		};
+
+		let main = fn() -> int
+		{
+			let f = Foo(6);
+			let v = ivec3(1, 2, 3);
+			return get_x(f) - get_x(v);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
 }
 
 /*****************************************************************
 Backlog
 - templates
 	- for statement and statement blocks with dependent scopes
-	- construct dependent type
 	- recursive dependent types
 	- member access to variable of dependent type
 	- struct declaration that contains dependent types
 	- function declaration with dependent types
+	- member default initializer for struct templates
 - arrays (depends on pointers)
 - strings (depends on arrays)
 - importing other files

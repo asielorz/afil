@@ -512,6 +512,24 @@ auto instantiate_dependent_expression(
 			instantiated_node.variable_offset = var.offset;
 			return instantiated_node;
 		},
+		[&](tmp::MemberVariableNode const & var_node) -> ExpressionTree
+		{
+			MemberVariableNode instantiated_node;
+			instantiated_node.owner = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*var_node.owner, function, program, template_parameters, variable_offset_map));
+			TypeId const owner_type_id = expression_type_id(*instantiated_node.owner, program);
+			Type const & owner_type = type_with_id(program, owner_type_id);
+			raise_syntax_error_if_not(is_struct(owner_type), "Attempted to access member of non-struct type.");
+			Struct const & owner_struct = *struct_for_type(program, owner_type);
+
+			std::string_view const var_name = get(program, var_node.name);
+			int const member_variable_index = find_member_variable(owner_struct, var_name, program.string_pool);
+			raise_syntax_error_if_not(member_variable_index != -1, "Expected member name after '.'.");
+			Variable const & member_variable = owner_struct.member_variables[member_variable_index];
+
+			instantiated_node.variable_type = member_variable.type;
+			instantiated_node.variable_offset = member_variable.offset;
+			return instantiated_node;
+		},
 		[&](LocalVariableNode const & var_node) -> ExpressionTree
 		{
 			LocalVariableNode instantiated_node;
