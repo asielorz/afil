@@ -93,6 +93,12 @@ namespace expr
 		value_ptr<std::array<ExpressionTree, 2>> parameters;
 	};
 
+	struct AssignmentNode
+	{
+		value_ptr<ExpressionTree> destination;
+		value_ptr<ExpressionTree> source;
+	};
+
 	struct IfNode
 	{
 		value_ptr<ExpressionTree> condition;
@@ -149,7 +155,7 @@ namespace expr
 			Literal<int>, Literal<float>, Literal<bool>,
 			DereferenceNode, AddressofNode, DepointerNode,
 			LocalVariableNode, GlobalVariableNode, MemberVariableNode,
-			FunctionNode, FunctionTemplateNode, FunctionCallNode, RelationalOperatorCallNode,
+			FunctionNode, FunctionTemplateNode, FunctionCallNode, RelationalOperatorCallNode, AssignmentNode,
 			IfNode, StatementBlockNode,
 			StructConstructorNode,
 

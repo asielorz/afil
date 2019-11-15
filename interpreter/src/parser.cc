@@ -194,6 +194,30 @@ namespace parser
 
 			auto const visitor = overload(
 				[](auto) -> ExpressionTree { raise_syntax_error("Looked up name does not name an overload set."); },
+				[&](lookup_result::Nothing) -> ExpressionTree 
+				{
+					if (op == Operator::assign)
+					{
+						if (is_dependent(left) || is_dependent(right))
+						{
+							expr::AssignmentNode assign_node;
+							assign_node.destination = std::make_unique<expr::ExpressionTree>(left);
+							assign_node.source = std::make_unique<expr::ExpressionTree>(right);
+							return assign_node;
+						}
+
+						TypeId const operand_types[] = { expression_type_id(left, program), expression_type_id(right, program) };
+						if (decay(operand_types[0]) == decay(operand_types[1]) && operand_types[0].is_reference && operand_types[0].is_mutable)
+						{
+							expr::AssignmentNode assign_node;
+							assign_node.destination = std::make_unique<expr::ExpressionTree>(left);
+							assign_node.source = std::make_unique<expr::ExpressionTree>(insert_conversion_node(std::move(right), operand_types[1], decay(operand_types[1]), program));
+							return assign_node;
+						}
+					}
+
+					raise_syntax_error("Looked up name does not name an overload set."); 
+				},
 				[&](lookup_result::OverloadSet const & overload_set) -> ExpressionTree
 				{
 					if (is_dependent(left) || is_dependent(right))
@@ -245,6 +269,13 @@ namespace parser
 								func_node.parameters.push_back(std::move(right));
 								return func_node;
 							}
+						}
+						else if (op == Operator::assign && decay(operand_types[0]) == decay(operand_types[1]) && operand_types[0].is_reference && operand_types[0].is_mutable)
+						{
+							expr::AssignmentNode assign_node;
+							assign_node.destination = std::make_unique<expr::ExpressionTree>(left);
+							assign_node.source = std::make_unique<expr::ExpressionTree>(insert_conversion_node(std::move(right), operand_types[1], decay(operand_types[1]), program));
+							return assign_node;
 						}
 						else raise_syntax_error("Operator overload not found.");
 					}

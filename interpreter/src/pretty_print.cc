@@ -10,6 +10,9 @@ using stmt::Statement;
 
 auto to_string(TypeId id, Program const & program) noexcept -> std::string
 {
+	if (id.is_language_reseved)
+		return "reserved!!! fix this";
+
 	TypeId const decayed_id = decay(id);
 
 	std::string type_name;
@@ -156,6 +159,13 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 			str += pretty_print_rec((*rel_op_node.parameters)[0], program, indentation_level + 1);
 			str += pretty_print_rec((*rel_op_node.parameters)[1], program, indentation_level + 1);
 			return str;
+		},
+		[&](AssignmentNode const & assign_node)
+		{
+			return join(
+				indent(indentation_level), "assignment\n",
+				pretty_print_rec(*assign_node.destination, program, indentation_level + 1),
+				pretty_print_rec(*assign_node.source, program, indentation_level + 1));
 		},
 		[&](IfNode const & if_node)
 		{

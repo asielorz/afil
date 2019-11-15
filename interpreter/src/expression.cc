@@ -95,6 +95,7 @@ namespace expr
 			[](FunctionTemplateNode const &) -> Ret { return TypeId::function; },
 			[&](FunctionCallNode const & func_call_node) -> Ret { return return_type(program, func_call_node.function_id); },
 			[](RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; },
+			[](AssignmentNode const &) -> Ret { return TypeId::void_; },
 			[&](IfNode const & if_node) -> Ret { return maybe_dependent_expression_type_id(*if_node.then_case, program); },
 			[](StatementBlockNode const & block_node) -> Ret { return block_node.return_type; },
 			[](StructConstructorNode const & constructor_node) -> Ret { return constructor_node.constructed_type; },
@@ -125,7 +126,8 @@ namespace expr
 			[](DereferenceNode const & deref_node) { return is_dependent(*deref_node.expression); },
 			[](AddressofNode const & addressof_node) { return is_dependent(*addressof_node.operand); },
 			[](DepointerNode const & deptr_node) { return is_dependent(*deptr_node.operand); },
-			[&](IfNode const & if_node) { return is_dependent(*if_node.condition) || is_dependent(*if_node.then_case) || is_dependent(*if_node.else_case); },
+			[](IfNode const & if_node) { return is_dependent(*if_node.condition) || is_dependent(*if_node.then_case) || is_dependent(*if_node.else_case); },
+			[](AssignmentNode const & assign_node) { return is_dependent(*assign_node.source) || is_dependent(*assign_node.source);  },
 			//[](StatementBlockNode const &) { TODO },
 			[](StructConstructorNode const & ctor_node) { return std::any_of(ctor_node.parameters.begin(), ctor_node.parameters.end(), is_dependent); }
 		);

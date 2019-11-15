@@ -73,7 +73,6 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 		{"%"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a % b; })},
 		{"=="sv,	extern_function_descriptor(+[](int a, int b) noexcept -> bool { return a == b; })},
 		{"<=>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
-		{"="sv,		extern_function_descriptor(+[](int & a, int b) noexcept -> void { a = b; })},
 		{"-"sv,		extern_function_descriptor(+[](int a) noexcept -> int { return -a; })},
 
 		{"+"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a + b; })},
@@ -82,7 +81,6 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 		{"/"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a / b; })},
 		{"=="sv,	extern_function_descriptor(+[](float a, float b) noexcept -> bool { return a == b; })},
 		{"<=>"sv,	extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
-		{"="sv,		extern_function_descriptor(+[](float & a, float b) noexcept -> void { a = b; })},
 		{"-"sv,		extern_function_descriptor(+[](float a) noexcept -> float { return -a; })},
 
 		{"and"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a && b; })},
@@ -90,7 +88,6 @@ auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_vi
 		{"xor"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a != b; })},
 		{"not"sv,	extern_function_descriptor(+[](bool a) noexcept -> bool { return !a; })},
 		{"=="sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a == b; })},
-		{"="sv,		extern_function_descriptor(+[](bool & a, bool b) noexcept -> void { a = b; })},
 	};
 }
 
@@ -331,7 +328,8 @@ auto resolve_function_overloading_and_insert_conversions(
 	Program & program) noexcept -> FunctionId
 {
 	FunctionId const function_id = resolve_function_overloading(overload_set, parsed_parameter_types, program);
-	raise_syntax_error_if_not(function_id != invalid_function_id, "Function overload not found.");
+	if (function_id == invalid_function_id)
+		return invalid_function_id;
 
 	// If any conversion is needed in order to call the function, perform the conversion.
 	auto const target_parameter_types = parameter_types(program, function_id);
@@ -551,6 +549,7 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 				instantiated_node.parameters, 
 				parameter_types, 
 				program);
+			raise_syntax_error_if_not(instantiated_node.function_id != invalid_function_id, "Function overload not found in template instantiation.");
 
 			return instantiated_node;
 		},
@@ -570,7 +569,23 @@ auto instantiate_dependent_expression(expr::ExpressionTree const & tree, Functio
 				*instantiated_node.parameters,
 				parameter_types,
 				program);
+			raise_syntax_error_if_not(instantiated_node.function_id != invalid_function_id, "Function overload not found in template instantiation.");
 
+			return instantiated_node;
+		},
+		[&](AssignmentNode const & assign_node) -> ExpressionTree
+		{
+			AssignmentNode instantiated_node;
+			instantiated_node.source = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*assign_node.source, function, program, variable_offset_map));
+			instantiated_node.destination = std::make_unique<ExpressionTree>(instantiate_dependent_expression(*assign_node.destination, function, program, variable_offset_map));
+
+			TypeId const source_type = expression_type_id(*instantiated_node.source, program);
+			TypeId const dest_type = expression_type_id(*instantiated_node.destination, program);
+			raise_syntax_error_if_not(
+				decay(source_type) == decay(dest_type) && dest_type.is_reference && dest_type.is_reference,
+				"Could not instantiate assignment operator."
+			);
+			*instantiated_node.source = insert_conversion_node(*std::move(instantiated_node.source), source_type, decay(source_type), program);
 			return instantiated_node;
 		},
 		[&](IfNode const & if_node) -> ExpressionTree

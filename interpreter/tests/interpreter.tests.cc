@@ -1517,6 +1517,25 @@ TEST_CASE("Function template refactor: struct constructor of non-dependent type"
 	REQUIRE(parse_and_run(src) == 2);
 }
 
+TEST_CASE("Structs are assignable by default")
+{
+	auto const src = R"(
+		struct Foo
+		{
+			int x;
+		}
+
+		let main = fn() -> int
+		{
+			Foo mut f = Foo(5);
+			f = Foo(6);
+			return f.x;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 6);
+}
+
 /*****************************************************************
 Backlog
 - templates

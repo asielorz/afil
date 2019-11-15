@@ -239,6 +239,13 @@ namespace interpreter
 					free_up_to(stack, prev_stack_top);
 				}
 			},
+			[&](expr::AssignmentNode const & assign_node)
+			{
+				const int dest_address = eval_expression_tree(*assign_node.destination, stack, program);
+				const int source_address = eval_expression_tree(*assign_node.source, stack, program);
+				memcpy(read<void *>(stack, dest_address), pointer_at_address(stack, source_address), expression_type_size(*assign_node.source, program));
+				free_up_to(stack, dest_address);
+			},
 			[&](expr::IfNode const & if_node)
 			{
 				int const result_addr = eval_expression_tree(*if_node.condition, stack, program);
