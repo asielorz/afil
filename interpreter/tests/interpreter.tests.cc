@@ -1634,6 +1634,34 @@ TEST_CASE("Default construct struct template without let = syntax")
 	REQUIRE(parse_and_run(src) == -7);
 }
 
+TEST_CASE("For loops in dependent contexts")
+{
+	auto const src = R"(
+		let some_sum = fn<T>(T first, T last, T step)
+		{
+			T mut sum = first;
+			for (T mut i = first + step; i < last; i = i + step)
+				sum = sum + i;
+			return sum;
+		};
+
+		let main = fn() -> int
+		{
+			return some_sum(0, 10, 1);
+		};
+	)"sv;
+
+	auto const some_sum = [](auto first, auto last, auto step)
+	{
+		auto sum = first;
+		for (auto i = first + step; i < last; i = i + step)
+			sum = sum + i;
+		return sum;
+	};
+
+	REQUIRE(parse_and_run(src) == some_sum(0, 10, 1));
+}
+
 /*****************************************************************
 Backlog
 - templates

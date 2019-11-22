@@ -69,6 +69,15 @@ namespace stmt
 			PooledString variable_name;
 			std::optional<expr::ExpressionTree> assigned_expression;
 		};
+
+		struct ForStatement : DependentNode
+		{
+			DependentScope scope;
+			value_ptr<Statement> init_statement;
+			expr::ExpressionTree condition;
+			expr::ExpressionTree end_expression;
+			value_ptr<Statement> body;
+		};
 	}
 
 	namespace detail
@@ -78,7 +87,7 @@ namespace stmt
 			IfStatement, StatementBlock, WhileStatement, ForStatement,
 			ReturnStatement, BreakStatement, ContinueStatement,
 
-			tmp::VariableDeclarationStatement
+			tmp::VariableDeclarationStatement, tmp::ForStatement
 		>;
 	}
 

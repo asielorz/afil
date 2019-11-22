@@ -126,6 +126,7 @@ namespace parser
 		declare_unreachable();
 	}
 	auto top(ScopeStack & stack) noexcept -> Scope & { return *stack.back().scope; }
+	auto is_dependent(ScopeType type) noexcept -> bool { return type == ScopeType::dependent_block || type == ScopeType::dependent_function; }
 
 	auto is_unary_operator(lex::Token const & token) noexcept -> bool
 	{
@@ -1107,6 +1108,7 @@ namespace parser
 		PooledString const pooled_name = pool_string(p.program, var_name);
 		node.variable_name = pooled_name;
 
+		assert(is_dependent(p.scope_stack.back().type));
 		static_cast<DependentScope &>(top(p.scope_stack)).dependent_variables.push_back({pooled_name, type});
 
 		if (tokens[index].type == TokenType::semicolon)
@@ -1390,7 +1392,7 @@ namespace parser
 		return node;
 	}
 
-	auto parse_for_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::ForStatement
+	auto parse_for_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::Statement
 	{
 		// Syntax of for loop
 		// for (declaration-or-expression; condition-expression; end-expression)
@@ -1403,37 +1405,79 @@ namespace parser
 		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after for.");
 		index++;
 
-		stmt::ForStatement for_node;
-		p.scope_stack.push_back({&for_node.scope, ScopeType::block});
+		if (is_dependent(p.scope_stack.back().type))
+		{
+			stmt::tmp::ForStatement for_node;
+			p.scope_stack.push_back({&for_node.scope, ScopeType::dependent_block});
 
-		// Parse init statement. Must be an expression or a declaration.
-		auto init_statement = parse_substatement(tokens, index, p);
-		raise_syntax_error_if_not(
-			init_statement.has_value() && (has_type<stmt::VariableDeclarationStatement>(*init_statement) || has_type<stmt::ExpressionStatement>(*init_statement)),
-			"init-statement of a for statement must be a variable declaration or an expression.");
-		for_node.init_statement = std::make_unique<stmt::Statement>(std::move(*init_statement));
+			// Parse init statement. Must be an expression or a declaration.
+			auto init_statement = parse_substatement(tokens, index, p);
+			raise_syntax_error_if_not(
+				init_statement.has_value() && (
+					has_type<stmt::VariableDeclarationStatement>(*init_statement) ||
+					has_type<stmt::ExpressionStatement>(*init_statement) ||
+					has_type<stmt::tmp::VariableDeclarationStatement>(*init_statement)),
+				"init-statement of a for statement must be a variable declaration or an expression.");
+			for_node.init_statement = std::make_unique<stmt::Statement>(std::move(*init_statement));
 
-		// Parse condition. Must return bool.
-		for_node.condition = insert_conversion_to_control_flow_condition(parse_subexpression(tokens, index, p), p.program);
+			// Parse condition. Must return bool.
+			for_node.condition = parse_subexpression(tokens, index, p);
+			if (!is_dependent(for_node.condition))
+				for_node.condition = insert_conversion_to_control_flow_condition(std::move(for_node.condition), p.program);
 
-		// Parse ; after condition.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after for statement condition.");
-		index++;
+			// Parse ; after condition.
+			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after for statement condition.");
+			index++;
 
-		// Parse end expression.
-		for_node.end_expression = parse_subexpression(tokens, index, p);
+			// Parse end expression.
+			for_node.end_expression = parse_subexpression(tokens, index, p);
 
-		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after for statement end expression.");
-		index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after for statement end expression.");
+			index++;
 
-		// Parse body
-		auto body = parse_substatement(tokens, index, p);
-		raise_syntax_error_if_not(body.has_value(), "No-op statement not allowed as body of for statement.");
-		for_node.body = std::make_unique<stmt::Statement>(std::move(*body));
+			// Parse body
+			auto body = parse_substatement(tokens, index, p);
+			raise_syntax_error_if_not(body.has_value(), "No-op statement not allowed as body of for statement.");
+			for_node.body = std::make_unique<stmt::Statement>(std::move(*body));
 
-		p.scope_stack.pop_back();
+			p.scope_stack.pop_back();
 
-		return for_node;
+			return for_node;
+		}
+		else
+		{
+			stmt::ForStatement for_node;
+			p.scope_stack.push_back({ &for_node.scope, ScopeType::block });
+
+			// Parse init statement. Must be an expression or a declaration.
+			auto init_statement = parse_substatement(tokens, index, p);
+			raise_syntax_error_if_not(
+				init_statement.has_value() && (has_type<stmt::VariableDeclarationStatement>(*init_statement) || has_type<stmt::ExpressionStatement>(*init_statement)),
+				"init-statement of a for statement must be a variable declaration or an expression.");
+			for_node.init_statement = std::make_unique<stmt::Statement>(std::move(*init_statement));
+
+			// Parse condition. Must return bool.
+			for_node.condition = insert_conversion_to_control_flow_condition(parse_subexpression(tokens, index, p), p.program);
+
+			// Parse ; after condition.
+			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after for statement condition.");
+			index++;
+
+			// Parse end expression.
+			for_node.end_expression = parse_subexpression(tokens, index, p);
+
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after for statement end expression.");
+			index++;
+
+			// Parse body
+			auto body = parse_substatement(tokens, index, p);
+			raise_syntax_error_if_not(body.has_value(), "No-op statement not allowed as body of for statement.");
+			for_node.body = std::make_unique<stmt::Statement>(std::move(*body));
+
+			p.scope_stack.pop_back();
+
+			return for_node;
+		}
 	}
 
 	template <typename Stmt>
