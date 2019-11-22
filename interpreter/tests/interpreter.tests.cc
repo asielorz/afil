@@ -1702,6 +1702,24 @@ TEST_CASE("Statement block expressions in dependent contexts")
 	REQUIRE(parse_and_run(src) == 3 + 5);
 }
 
+TEST_CASE("Recursive dependent types")
+{
+	auto const src = R"(
+		let dereference = fn<T>(T * p)
+		{
+			return *p;
+		};
+
+		let main = fn() -> int
+		{
+			int x = 25;
+			return dereference(&x);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 25);
+}
+
 /*****************************************************************
 Backlog
 - templates
