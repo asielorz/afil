@@ -78,6 +78,12 @@ namespace stmt
 			expr::ExpressionTree end_expression;
 			value_ptr<Statement> body;
 		};
+
+		struct StatementBlock : DependentNode
+		{
+			DependentScope scope;
+			std::vector<stmt::Statement> statements;
+		};
 	}
 
 	namespace detail
@@ -87,7 +93,7 @@ namespace stmt
 			IfStatement, StatementBlock, WhileStatement, ForStatement,
 			ReturnStatement, BreakStatement, ContinueStatement,
 
-			tmp::VariableDeclarationStatement, tmp::ForStatement
+			tmp::VariableDeclarationStatement, tmp::ForStatement, tmp::StatementBlock
 		>;
 	}
 

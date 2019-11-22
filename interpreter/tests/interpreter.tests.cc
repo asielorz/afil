@@ -1662,6 +1662,25 @@ TEST_CASE("For loops in dependent contexts")
 	REQUIRE(parse_and_run(src) == some_sum(0, 10, 1));
 }
 
+TEST_CASE("Statement blocks in dependent contexts")
+{
+	auto const src = R"(
+		let add = fn<T>(T a, T b)
+		{
+			{
+				return a + b;
+			}
+		};
+
+		let main = fn() -> int
+		{
+			return add(3, 5);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 + 5);
+}
+
 /*****************************************************************
 Backlog
 - templates

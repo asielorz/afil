@@ -306,6 +306,10 @@ auto pretty_print_rec(Statement const & statement, Program const & program, int 
 		[&](tmp::ForStatement const &)
 		{
 			return join(indent(indentation_level), "for todo\n");
+		},
+		[&](tmp::StatementBlock const &)
+		{
+			return join(indent(indentation_level), "statement block todo\n");
 		}
 	);
 	return std::visit(visitor, statement.as_variant());

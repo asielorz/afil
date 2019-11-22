@@ -832,6 +832,25 @@ auto instantiate_dependent_statement(
 
 			return instantiated_node;
 		},
+		[&](tmp::StatementBlock const & block_node) -> Statement
+		{
+			StatementBlock instantiated_node;
+
+			size_t const prev_offset_map_size = variable_offset_map.size();
+			instantiated_node.scope = instantiate_dependent_scope(block_node.scope, template_parameters, program, variable_offset_map);
+
+			variable_stack.push_back(instantiated_node.scope.variables);
+
+			instantiated_node.statements.reserve(block_node.statements.size());
+			for (Statement const & statement_template : block_node.statements)
+				instantiated_node.statements.push_back(
+					instantiate_dependent_statement(statement_template, return_type, program, template_parameters, variable_offset_map, variable_stack));
+
+			variable_stack.pop_back();
+			variable_offset_map.resize(prev_offset_map_size);
+
+			return instantiated_node;
+		},
 		[&](BreakStatement const & break_stmt) -> Statement
 		{
 			return break_stmt;

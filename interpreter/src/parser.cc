@@ -1344,27 +1344,51 @@ namespace parser
 		return node;
 	}
 
-	auto parse_statement_block(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::StatementBlock
+	auto parse_statement_block(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::Statement
 	{
 		// Skip opening }
 		index++;
 
-		stmt::StatementBlock node;
-		p.scope_stack.push_back({&node.scope, ScopeType::block});
-
-		// Parse all statements in the function.
-		while (tokens[index].type != TokenType::close_brace)
+		if (is_dependent(p.scope_stack.back().type))
 		{
-			auto statement = parse_substatement(tokens, index, p);
-			if (statement)
-				node.statements.push_back(std::move(*statement));
+			stmt::tmp::StatementBlock node;
+
+			p.scope_stack.push_back({&node.scope, ScopeType::dependent_block});
+
+			// Parse all statements in the function.
+			while (tokens[index].type != TokenType::close_brace)
+			{
+				auto statement = parse_substatement(tokens, index, p);
+				if (statement)
+					node.statements.push_back(std::move(*statement));
+			}
+			p.scope_stack.pop_back();
+
+			// Skip closing brace.
+			index++;
+
+			return node;
 		}
-		p.scope_stack.pop_back();
+		else
+		{
+			stmt::StatementBlock node;
 
-		// Skip closing brace.
-		index++;
+			p.scope_stack.push_back({ &node.scope, ScopeType::block });
 
-		return node;
+			// Parse all statements in the function.
+			while (tokens[index].type != TokenType::close_brace)
+			{
+				auto statement = parse_substatement(tokens, index, p);
+				if (statement)
+					node.statements.push_back(std::move(*statement));
+			}
+			p.scope_stack.pop_back();
+
+			// Skip closing brace.
+			index++;
+
+			return node;
+		}
 	}
 
 	auto parse_while_statement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> stmt::WhileStatement
