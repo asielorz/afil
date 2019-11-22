@@ -114,7 +114,8 @@ namespace expr
 			[](tmp::MemberVariableNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::FunctionCallNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; },
-			[](tmp::StructConstructorNode const &) -> Ret { return TypeId::bool_; }
+			[](tmp::StructConstructorNode const &) -> Ret { return TypeId::bool_; },
+			[](tmp::StatementBlockNode const &) -> Ret { return DependentTypeId::unknown; }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}

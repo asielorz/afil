@@ -1681,6 +1681,27 @@ TEST_CASE("Statement blocks in dependent contexts")
 	REQUIRE(parse_and_run(src) == 3 + 5);
 }
 
+TEST_CASE("Statement block expressions in dependent contexts")
+{
+	auto const src = R"(
+		let add = fn<T>(T a, T b)
+		{
+			return {
+				T needless_copy_1 = a;
+				T needless_copy_2 = b;
+				return needless_copy_1 + needless_copy_2;
+			};
+		};
+
+		let main = fn() -> int
+		{
+			return add(3, 5);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 + 5);
+}
+
 /*****************************************************************
 Backlog
 - templates

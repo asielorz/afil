@@ -790,32 +790,59 @@ namespace parser
 		return std::visit(visitor, statement.as_variant());
 	}
 
-	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::StatementBlockNode
+	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::ExpressionTree
 	{
 		// Skip opening brace.
 		index++;
 
-		expr::StatementBlockNode node;
-		node.return_type = TypeId::deduce;
-
-		// Parse all statements in the function.
-		while (tokens[index].type != TokenType::close_brace)
+		if (is_dependent(p.scope_stack.back().type))
 		{
-			p.scope_stack.push_back({&node.scope, ScopeType::block});
-			auto statement = parse_substatement(tokens, index, {p.program, p.scope_stack, node.return_type});
-			p.scope_stack.pop_back();
-			if (statement)
-				node.statements.push_back(std::move(*statement));
+			expr::tmp::StatementBlockNode node;
+			auto return_type = TypeId::deduce;
+
+			// Parse all statements in the function.
+			while (tokens[index].type != TokenType::close_brace)
+			{
+				p.scope_stack.push_back({&node.scope, ScopeType::dependent_block});
+				auto statement = parse_substatement(tokens, index, {p.program, p.scope_stack, return_type});
+				p.scope_stack.pop_back();
+				if (statement)
+					node.statements.push_back(std::move(*statement));
+			}
+
+			// Ensure that all branches return.
+			raise_syntax_error_if_not(all_branches_return(node.statements.back(), p.program), "Not all branches of statement block expression return.");
+
+			// Skip closing brace.
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_brace, "Expected '}' at the end of statement block expression.");
+			index++;
+
+			return node;
 		}
+		else
+		{
+			expr::StatementBlockNode node;
+			node.return_type = TypeId::deduce;
 
-		// Ensure that all branches return.
-		raise_syntax_error_if_not(all_branches_return(node.statements.back(), p.program), "Not all branches of statement block expression return.");
+			// Parse all statements in the function.
+			while (tokens[index].type != TokenType::close_brace)
+			{
+				p.scope_stack.push_back({&node.scope, ScopeType::block});
+				auto statement = parse_substatement(tokens, index, {p.program, p.scope_stack, node.return_type});
+				p.scope_stack.pop_back();
+				if (statement)
+					node.statements.push_back(std::move(*statement));
+			}
 
-		// Skip closing brace.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::close_brace, "Expected '}' at the end of statement block expression.");
-		index++;
+			// Ensure that all branches return.
+			raise_syntax_error_if_not(all_branches_return(node.statements.back(), p.program), "Not all branches of statement block expression return.");
 
-		return node;
+			// Skip closing brace.
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_brace, "Expected '}' at the end of statement block expression.");
+			index++;
+
+			return node;
+		}
 	}
 
 	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree

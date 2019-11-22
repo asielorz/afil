@@ -159,6 +159,13 @@ namespace expr
 			DependentTypeId type;
 			std::vector<ExpressionTree> parameters;
 		};
+
+		struct StatementBlockNode : DependentNode
+		{
+			DependentScope scope;
+			std::vector<stmt::Statement> statements;
+		};
+
 	}
 
 	namespace detail
@@ -173,7 +180,8 @@ namespace expr
 
 			tmp::LocalVariableNode, tmp::MemberVariableNode,
 			tmp::FunctionCallNode, tmp::RelationalOperatorCallNode,
-			tmp::StructConstructorNode
+			tmp::StructConstructorNode,
+			tmp::StatementBlockNode
 		>;
 	}
 

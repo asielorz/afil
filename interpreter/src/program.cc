@@ -521,6 +521,14 @@ auto instantiate_dependent_scope(DependentScope const & scope_template, span<Typ
 	return instantiated_scope;
 }
 
+auto instantiate_dependent_statement(
+	stmt::Statement const & statement,
+	TypeId & return_type,
+	Program & program,
+	span<TypeId const> template_parameters,
+	std::vector<RemappedVariableOffset> & variable_offset_map,
+	std::vector<span<Variable const>> & variable_stack) noexcept -> stmt::Statement;
+
 auto instantiate_dependent_expression(
 	expr::ExpressionTree const & tree,
 	TypeId & return_type,
@@ -700,7 +708,27 @@ auto instantiate_dependent_expression(
 
 			return instantiated_node;
 		},
-		//[](StatementBlockNode const &) { TODO },
+		[](StatementBlockNode const & block_node) -> ExpressionTree { return block_node; },
+		[&](tmp::StatementBlockNode const & block_node) -> ExpressionTree 
+		{
+			StatementBlockNode instantiated_node;
+			instantiated_node.return_type = TypeId::deduce;
+
+			size_t const prev_offset_map_size = variable_offset_map.size();
+			instantiated_node.scope = instantiate_dependent_scope(block_node.scope, template_parameters, program, variable_offset_map);
+
+			variable_stack.push_back(instantiated_node.scope.variables);
+
+			instantiated_node.statements.reserve(block_node.statements.size());
+			for (stmt::Statement const & statement_template : block_node.statements)
+				instantiated_node.statements.push_back(
+					instantiate_dependent_statement(statement_template, instantiated_node.return_type, program, template_parameters, variable_offset_map, variable_stack));
+
+			variable_stack.pop_back();
+			variable_offset_map.resize(prev_offset_map_size);
+
+			return instantiated_node;
+		},
 		[&](StructConstructorNode const & ctor_node) -> ExpressionTree
 		{
 			StructConstructorNode instantiated_node;
