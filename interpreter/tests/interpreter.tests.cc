@@ -1705,7 +1705,6 @@ TEST_CASE("Statement block expressions in dependent contexts")
 /*****************************************************************
 Backlog
 - templates
-	- for statement and statement blocks with dependent scopes
 	- recursive dependent types
 	- struct declaration that contains dependent types
 	- function declaration with dependent types
