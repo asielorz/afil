@@ -705,6 +705,34 @@ auto instantiate_dependent_expression(
 
 			return instantiated_node;
 		},
+		[&](tmp::DereferenceNode const & deref_node) -> ExpressionTree
+		{
+			ExpressionTree operand = instantiate_dependent_expression(*deref_node.operand, return_type, program, template_parameters, variable_offset_map, variable_stack);
+			TypeId const operand_type = expression_type_id(operand, program);
+			if (is_pointer(type_with_id(program, operand_type)))
+			{
+				expr::DepointerNode instantiated_node;
+				instantiated_node.return_type = make_reference(std::get<PointerType>(type_with_id(program, operand_type).extra_data).value_type);
+				instantiated_node.operand = std::make_unique<ExpressionTree>(insert_conversion_node(std::move(operand), operand_type, remove_reference(operand_type), program));
+
+				return instantiated_node;
+			}
+			else
+			{
+				FunctionCallNode instantiated_node;
+				instantiated_node.parameters.push_back(std::move(operand));
+
+				instantiated_node.function_id = resolve_function_overloading_and_insert_conversions(
+					deref_node.overload_set,
+					instantiated_node.parameters,
+					span<TypeId const>{&operand_type, 1},
+					program);
+
+				raise_syntax_error_if_not(instantiated_node.function_id != invalid_function_id, "Function overload not found in template instantiation.");
+
+				return instantiated_node;
+			}
+		},
 		[&](tmp::StructConstructorNode const & ctor_node) -> ExpressionTree
 		{
 			TypeId constructed_type = template_parameters[ctor_node.type.index];

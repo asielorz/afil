@@ -183,6 +183,7 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<char co
 		lookup_result::DependentType
 	>;
 
+
 auto local_variable_offset(ScopeStackView scope_stack) noexcept -> int;
 
 template <typename T>

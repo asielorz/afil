@@ -31,6 +31,7 @@ namespace expr
 	};
 	auto precedence(Operator op) noexcept -> int;
 	auto operator_function_name(Operator op) noexcept->std::string_view;
+	auto operator_overload_set(Operator op, ScopeStackView scope_stack, span<char const> string_pool) -> lookup_result::OverloadSet;
 
 	struct ExpressionTree;
 
@@ -154,6 +155,12 @@ namespace expr
 			value_ptr<std::array<ExpressionTree, 2>> parameters;
 		};
 
+		struct DereferenceNode : DependentNode
+		{
+			value_ptr<ExpressionTree> operand;
+			lookup_result::OverloadSet overload_set;
+		};
+
 		struct StructConstructorNode : DependentNode
 		{
 			DependentTypeId::BaseCase type;
@@ -179,7 +186,7 @@ namespace expr
 			StructConstructorNode,
 
 			tmp::LocalVariableNode, tmp::MemberVariableNode,
-			tmp::FunctionCallNode, tmp::RelationalOperatorCallNode,
+			tmp::FunctionCallNode, tmp::RelationalOperatorCallNode, tmp::DereferenceNode,
 			tmp::StructConstructorNode,
 			tmp::StatementBlockNode
 		>;

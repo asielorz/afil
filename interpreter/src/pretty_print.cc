@@ -225,6 +225,11 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 			str += pretty_print_rec((*rel_op_node.parameters)[1], program, indentation_level + 1);
 			return str;
 		},
+		[&](tmp::DereferenceNode const & deref_node)
+		{
+			return join(indent(indentation_level), "dependent function call\n", 
+				pretty_print_rec(*deref_node.operand, program, indentation_level + 1));
+		},
 		[&](tmp::StructConstructorNode const & ctor_node)
 		{
 			std::string str = join(indent(indentation_level), "dependent constructor", '\n');

@@ -892,12 +892,40 @@ namespace parser
 		}
 	}
 
+	auto parse_unary_operator_dependent(Operator op, ExpressionTree operand, ParseParams p) noexcept->ExpressionTree
+	{
+		if (op == Operator::addressof)
+		{
+			expr::AddressofNode node;
+			node.return_type = TypeId::deduce;
+			node.operand = std::make_unique<ExpressionTree>(std::move(operand));
+			return node;
+		}
+		else if (op == Operator::dereference)
+		{
+			expr::tmp::DereferenceNode deref_node;
+			deref_node.operand = std::make_unique<ExpressionTree>(std::move(operand));
+			return deref_node;
+		}
+		else
+		{
+			expr::tmp::FunctionCallNode fn_node;
+			fn_node.overload_set = operator_overload_set(op, p.scope_stack, p.program.string_pool);
+			fn_node.parameters.push_back(std::move(operand));
+			return fn_node;
+		}
+	}
+
 	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree
 	{
 		Operator const op = parse_operator(tokens[index].source);
 		index++;
 
 		auto operand = parse_expression_and_trailing_subexpressions(tokens, index, p);
+
+		if (is_dependent(operand))
+			return parse_unary_operator_dependent(op, std::move(operand), p);
+
 		TypeId const operand_type = expression_type_id(operand, p.program);
 
 		// Addressof is a particular case that cannot be overloaded and is implemented by the compiler.
@@ -920,26 +948,16 @@ namespace parser
 		}
 		else
 		{
-			auto const visitor = overload(
-				[](auto) -> expr::FunctionCallNode { raise_syntax_error("Name does not name an operator overload set."); },
-				[&](lookup_result::OverloadSet const & overload_set) -> expr::FunctionCallNode
-				{
-					TypeId const operand_type = expression_type_id(operand, p.program);
-					auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set, { &operand, 1 }, { &operand_type, 1 }, p.program);
-					if (function_id != invalid_function_id)
-					{
-						expr::FunctionCallNode func_node;
-						func_node.function_id = function_id;
-						func_node.parameters.push_back(std::move(operand));
-						return func_node;
-					}
-					else raise_syntax_error("Overload not found.");
-				}
-			);
-
-			std::string_view const function_name = operator_function_name(op);
-			auto const lookup = lookup_name(p.scope_stack, function_name, p.program.string_pool);
-			return std::visit(visitor, lookup);
+			lookup_result::OverloadSet const overload_set = operator_overload_set(op, p.scope_stack, p.program.string_pool);
+			auto const function_id = resolve_function_overloading_and_insert_conversions(overload_set, { &operand, 1 }, { &operand_type, 1 }, p.program);
+			if (function_id != invalid_function_id)
+			{
+				expr::FunctionCallNode func_node;
+				func_node.function_id = function_id;
+				func_node.parameters.push_back(std::move(operand));
+				return func_node;
+			}
+			else raise_syntax_error("Overload not found.");
 		}
 	}
 

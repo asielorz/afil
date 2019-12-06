@@ -61,6 +61,18 @@ namespace expr
 		declare_unreachable();
 	}
 
+	auto operator_overload_set(Operator op, ScopeStackView scope_stack, span<char const> string_pool) -> lookup_result::OverloadSet
+	{
+		auto const visitor = overload(
+			[](auto) -> lookup_result::OverloadSet { declare_unreachable(); },
+			[](lookup_result::Nothing) { return lookup_result::OverloadSet(); },
+			[](lookup_result::OverloadSet overload_set) { return overload_set; }
+		);
+
+		std::string_view const function_name = operator_function_name(op);
+		return std::visit(visitor, lookup_name(scope_stack, function_name, string_pool));
+	}
+
 	auto is_operator_node(OperatorTree const & tree) noexcept -> bool
 	{
 		return tree.index() == 0;
@@ -114,6 +126,7 @@ namespace expr
 			[](tmp::MemberVariableNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::FunctionCallNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::RelationalOperatorCallNode const &) -> Ret { return TypeId::bool_; },
+			[](tmp::DereferenceNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::StructConstructorNode const &) -> Ret { return TypeId::bool_; },
 			[](tmp::StatementBlockNode const &) -> Ret { return DependentTypeId::unknown; }
 		);
