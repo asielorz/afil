@@ -314,6 +314,35 @@ namespace parser
 			return type;
 	}
 
+	auto pointer_type_for(DependentTypeId type) noexcept -> DependentTypeId
+	{
+		DependentTypeId pointer_type;
+		pointer_type.is_reference = false;
+		pointer_type.is_mutable = false;
+		pointer_type.value = DependentTypeId::Pointer{std::make_unique<DependentTypeId>(type)};
+		return pointer_type;
+	}
+
+	auto parse_mutable_and_pointer_dependent(span<lex::Token const> tokens, size_t & index, DependentTypeId type) noexcept -> DependentTypeId
+	{
+		// Look for mutable qualifier.
+		if (tokens[index].source == "mut"sv)
+		{
+			type.is_mutable = true;
+			index++;
+		}
+
+		// Look for pointer type
+		if (tokens[index].source == "*"sv)
+		{
+			DependentTypeId const pointer_type = pointer_type_for(type);
+			index++;
+			return parse_mutable_and_pointer_dependent(tokens, index, pointer_type);
+		}
+		else
+			return type;
+	}
+
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> std::variant<lookup_result::Nothing, TypeId, DependentTypeId>;
 
 	// This function should be removed in the end.
@@ -355,40 +384,58 @@ namespace parser
 
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> std::variant<lookup_result::Nothing, TypeId, DependentTypeId>
 	{
-		bool is_dependent_type = false;
+		using Ret = std::variant<lookup_result::Nothing, TypeId, DependentTypeId>;
 
 		// Lookup type name.
 		auto const visitor = overload(
-			[](auto const &) { return TypeId::none; },
-			[&](lookup_result::Type type) { index++;  return type.type_id; },
-			[&](lookup_result::StructTemplate struct_template) { index++; return parse_template_instantiation_parameter_list(tokens, index, scope_stack, program, struct_template.template_id); },
-			[&](lookup_result::DependentType dep_type) { index++; is_dependent_type = true; return TypeId::with_index(dep_type.index); }
+			[](auto const &) -> Ret { return lookup_result::Nothing(); },
+			[&](lookup_result::Type type) -> Ret 
+			{
+				index++;  
+				TypeId type_found = parse_mutable_and_pointer(tokens, index, type.type_id, program);
+
+				// Look for reference qualifier.
+				if (tokens[index].source == "&"sv)
+				{
+					type_found.is_reference = true;
+					index++;
+				}
+
+				return type_found;
+			},
+			[&](lookup_result::StructTemplate struct_template) -> Ret
+			{
+				index++; 
+				TypeId type_found = parse_template_instantiation_parameter_list(tokens, index, scope_stack, program, struct_template.template_id);
+				type_found = parse_mutable_and_pointer(tokens, index, type_found, program);
+
+				// Look for reference qualifier.
+				if (tokens[index].source == "&"sv)
+				{
+					type_found.is_reference = true;
+					index++;
+				}
+
+				return type_found;
+			},
+			[&](lookup_result::DependentType dep_type) -> Ret
+			{ 
+				index++;
+				DependentTypeId type_found = DependentTypeId::with_index(dep_type.index); 
+				type_found = parse_mutable_and_pointer_dependent(tokens, index, type_found);
+
+				// Look for reference qualifier.
+				if (tokens[index].source == "&"sv)
+				{
+					type_found.is_reference = true;
+					index++;
+				}
+
+				return type_found;
+			}
 		);
 		std::string_view const type_name = tokens[index].source;
-		TypeId type_found = std::visit(visitor, lookup_name(scope_stack, type_name, program.string_pool));
-
-		if (type_found == TypeId::none)
-			return lookup_result::Nothing();
-
-		type_found = parse_mutable_and_pointer(tokens, index, type_found, program);
-
-		// Look for reference qualifier.
-		if (tokens[index].source == "&"sv)
-		{
-			type_found.is_reference = true;
-			index++;
-		}
-
-		if (is_dependent_type)
-		{
-			DependentTypeId dep_type;
-			dep_type.index = type_found.index;
-			dep_type.is_mutable = type_found.is_mutable;
-			dep_type.is_reference = type_found.is_reference;
-			return dep_type;
-		}
-		else
-			return type_found;
+		return std::visit(visitor, lookup_name(scope_stack, type_name, program.string_pool));
 	}
 
 	auto parse_template_parameter_list(span<lex::Token const> tokens, size_t & index, Program & program) noexcept -> std::vector<DependentType>
@@ -977,7 +1024,7 @@ namespace parser
 				[&](lookup_result::DependentType result) -> ExpressionTree
 				{
 					expr::tmp::StructConstructorNode node;
-					node.type.flat_value = 0;
+					node.type.is_language_reserved = false;
 					node.type.index = result.index;
 					node.type.is_dependent = true;
 					node.parameters = parse_comma_separated_expression_list(tokens, index, p);
@@ -1004,7 +1051,7 @@ namespace parser
 		{
 			return parse_unary_operator(tokens, index, p);
 		}
-		else raise_syntax_error("Unrecognized token. Expected expression."); // TODO: Actual error handling.
+		else raise_syntax_error("Unrecognized token. Expected expression.");
 	}
 
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree

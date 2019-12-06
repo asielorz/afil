@@ -3,6 +3,7 @@
 #include "function_id.hh"
 #include "span.hh"
 #include "utils.hh"
+#include "value_ptr.hh"
 #include <string_view>
 #include <variant>
 
@@ -103,19 +104,36 @@ enum struct ScopeType { global, function, block, dependent_function, dependent_b
 
 struct DependentTypeId
 {
-	union
+	union BaseCase
 	{
 		struct
 		{
 			unsigned is_language_reserved : 1;
 			unsigned is_dependent : 1;
-			unsigned is_mutable : 1;
-			unsigned is_reference : 1;
-			unsigned index : 28;
+			unsigned index : 30;
 		};
 		unsigned flat_value;
 	};
+	struct Pointer
+	{
+		value_ptr<DependentTypeId> pointee;
+	};
+	struct Array
+	{
+		value_ptr<DependentTypeId> pointee;
+		int size;
+	};
+	struct Template
+	{
+		StructTemplateId template_id;
+		std::vector<DependentTypeId> parameters;
+	};
 
+	std::variant<BaseCase, Pointer, Array> value;
+	bool is_mutable : 1;
+	bool is_reference : 1;
+
+	static auto with_index(unsigned index) noexcept -> DependentTypeId;
 	static DependentTypeId const unknown;
 };
 

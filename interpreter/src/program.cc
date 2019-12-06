@@ -134,6 +134,92 @@ auto check_type_validness_as_overload_candidate(TypeId param_type, TypeId parsed
 	}
 }
 
+auto resolve_dependent_type(span<TypeId const> template_parameters, DependentTypeId dependent_type, Program & program) -> TypeId
+{
+	auto const visitor = overload(
+		[&](DependentTypeId::BaseCase const & base_case)
+		{
+			if (base_case.is_dependent)
+			{
+				return template_parameters[base_case.index];
+			}
+			else
+			{
+				TypeId type;
+				type.index = base_case.index;
+				type.is_language_reseved = base_case.is_language_reserved;
+				return type;
+			}
+		},
+		[&](DependentTypeId::Pointer const & pointer)
+		{
+			TypeId const pointee = resolve_dependent_type(template_parameters, *pointer.pointee, program);
+			return pointer_type_for(pointee, program);
+		},
+		[](DependentTypeId::Array const & /*array*/) -> TypeId
+		{
+			mark_as_to_do("Dependent array types");
+		},
+		[](DependentTypeId::Template const & /*template_instantiation*/) -> TypeId
+		{
+			mark_as_to_do("Dependent template instantiations");
+		}
+	);
+
+	TypeId type = std::visit(visitor, dependent_type.value);
+	type.is_reference = dependent_type.is_reference;
+	type.is_mutable = dependent_type.is_mutable;
+	return type;
+}
+
+// Checks if a type satisfies a pattern, and resolves missing dependent types.
+auto expected_type_according_to_pattern(TypeId given_parameter, DependentTypeId expected_pattern, span<TypeId> resolved_dependent_types, Program & program) -> TypeId
+{
+	auto const visitor = overload(
+		[&](DependentTypeId::BaseCase const & base_case)
+		{
+			TypeId const expected_type = decay(given_parameter);
+			if (resolved_dependent_types[base_case.index] == TypeId::none)
+			{
+				resolved_dependent_types[base_case.index] = expected_type;
+				return expected_type;
+			}
+			else if (resolved_dependent_types[base_case.index] == expected_type)
+				return expected_type;
+			else
+				return TypeId::none;
+		},
+		[&](DependentTypeId::Pointer const & pointer)
+		{
+			Type const & type = type_with_id(program, given_parameter);
+
+			if (!is_pointer(type))
+				return TypeId::none; // Does not satisfy the pattern
+
+			TypeId const pointee = pointee_type(type);
+			TypeId const expected_pointee = expected_type_according_to_pattern(pointee, *pointer.pointee, resolved_dependent_types, program);
+
+			if (expected_pointee == TypeId::none)
+				return TypeId::none;
+			else
+				return pointer_type_for(expected_pointee, program);
+		},
+		[](DependentTypeId::Array const & /*array*/) -> TypeId
+		{
+			mark_as_to_do("Dependent array types");
+		},
+		[](DependentTypeId::Template const & /*template_instantiation*/) -> TypeId
+		{
+			mark_as_to_do("Dependent template instantiations");
+		}
+	);
+
+	TypeId expected_type = std::visit(visitor, expected_pattern.value);
+	expected_type.is_reference = expected_pattern.is_reference;
+	expected_type.is_mutable = expected_pattern.is_mutable;
+	return expected_type;
+}
+
 auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId
 {
 	struct Candidate
@@ -202,31 +288,17 @@ auto resolve_function_overloading(OverloadSet overload_set, span<TypeId const> p
 				else
 				{
 					DependentTypeId const dependent_type = fn.scope.dependent_variables[template_params[i].index].type;
-					if (resolved_dependent_types[dependent_type.index] != TypeId::none)
+					TypeId const expected_type = expected_type_according_to_pattern(parameters[i], dependent_type, resolved_dependent_types, program);
+					if (expected_type == TypeId::none)
 					{
-						if (!check_type_validness_as_overload_candidate(resolved_dependent_types[dependent_type.index], parameters[i], program, conversions))
-						{
-							discard = true;
-							break;
-						}
+						discard = true;
+						break;
 					}
-					else
-					{
-						// TODO: Patterns with dependent types.
-						TypeId resolved_type;
-						resolved_type.index = parameters[i].index;
-						resolved_type.is_reference = dependent_type.is_reference;
-						resolved_type.is_mutable = dependent_type.is_mutable;
 
-						if (check_type_validness_as_overload_candidate(resolved_type, parameters[i], program, conversions))
-						{
-							resolved_dependent_types[dependent_type.index] = decay(resolved_type);
-						}
-						else
-						{
-							discard = true;
-							break;
-						}
+					if (!check_type_validness_as_overload_candidate(expected_type, parameters[i], program, conversions))
+					{
+						discard = true;
+						break;
 					}
 				}
 			}
@@ -512,9 +584,7 @@ auto instantiate_dependent_scope(DependentScope const & scope_template, span<Typ
 
 	for (DependentVariable const & var : scope_template.dependent_variables)
 	{
-		TypeId var_type = parameters[var.type.index];
-		var_type.is_reference = var.type.is_reference;
-		var_type.is_mutable = var.type.is_mutable;
+		TypeId var_type = resolve_dependent_type(parameters, var.type, program);
 		add_variable_to_scope(instantiated_scope, var.name, var_type, 0, program);
 	}
 
@@ -638,8 +708,8 @@ auto instantiate_dependent_expression(
 		[&](tmp::StructConstructorNode const & ctor_node) -> ExpressionTree
 		{
 			TypeId constructed_type = template_parameters[ctor_node.type.index];
-			constructed_type.is_mutable = ctor_node.type.is_mutable;
-			constructed_type.is_reference = ctor_node.type.is_reference;
+			constructed_type.is_mutable = false;
+			constructed_type.is_reference = false;
 
 			Type const & type = type_with_id(program, constructed_type);
 			raise_syntax_error_if_not(is_struct(type), "Constructor call syntax is only available for structs (for now).");
@@ -920,9 +990,7 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 		if (param.is_dependent)
 		{
 			DependentVariable const & var = fn_template.scope.dependent_variables[param.index];
-			TypeId var_type = parameters[var.type.index];
-			var_type.is_reference = var.type.is_reference;
-			var_type.is_mutable = var.type.is_mutable;
+			TypeId var_type = resolve_dependent_type(parameters, var.type, program);
 			add_variable_to_scope(function, var.name, var_type, 0, program);
 			function.parameter_count++;
 			function.parameter_size = function.stack_frame_size;
@@ -948,9 +1016,7 @@ auto instantiate_function_template(Program & program, FunctionTemplateId templat
 	for (int i = dependent_variable_index; i < fn_template.scope.dependent_variables.size(); ++i)
 	{
 		DependentVariable const & var = fn_template.scope.dependent_variables[i];
-		TypeId var_type = parameters[var.type.index];
-		var_type.is_reference = var.type.is_reference;
-		var_type.is_mutable = var.type.is_mutable;
+		TypeId var_type = resolve_dependent_type(parameters, var.type, program);
 		add_variable_to_scope(function, var.name, var_type, 0, program);
 	}
 

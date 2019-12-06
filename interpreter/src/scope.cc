@@ -13,7 +13,21 @@ TypeId const TypeId::none = {true, false, false, 0};
 TypeId const TypeId::function = {true, false, false, 1};
 TypeId const TypeId::deduce = {true, false, false, 2};
 
-DependentTypeId const DependentTypeId::unknown = {true, false, false, false, 0};
+auto DependentTypeId::with_index(unsigned index) noexcept -> DependentTypeId
+{
+	DependentTypeId::BaseCase base_case;
+	base_case.index = index;
+	base_case.is_dependent = true;
+	base_case.is_language_reserved = false;
+
+	DependentTypeId type;
+	type.is_mutable = false;
+	type.is_reference = false;
+	type.value = base_case;
+	return type;
+}
+
+DependentTypeId const DependentTypeId::unknown = {DependentTypeId::BaseCase{true, false, 0}, false, false};
 
 auto is_data_type(TypeId id) noexcept -> bool
 {

@@ -156,7 +156,7 @@ namespace expr
 
 		struct StructConstructorNode : DependentNode
 		{
-			DependentTypeId type;
+			DependentTypeId::BaseCase type;
 			std::vector<ExpressionTree> parameters;
 		};
 
