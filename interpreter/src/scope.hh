@@ -120,7 +120,7 @@ struct DependentTypeId
 	};
 	struct Array
 	{
-		value_ptr<DependentTypeId> pointee;
+		value_ptr<DependentTypeId> value_type;
 		int size;
 	};
 	struct Template

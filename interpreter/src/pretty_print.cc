@@ -21,6 +21,12 @@ auto to_string(TypeId id, Program const & program) noexcept -> std::string
 		type_name = to_string(std::get<PointerType>(type_with_id(program, decayed_id).extra_data).value_type, program);
 		type_name += " *";
 	}
+	else if (is_array(type_with_id(program, decayed_id)))
+	{
+		ArrayType const & array = std::get<ArrayType>(type_with_id(program, decayed_id).extra_data);
+		type_name = to_string(array.value_type, program);
+		type_name += join('[', array.size, ']');
+	}
 	else
 	{
 		// TODO: Maybe a more exhaustive search? Same for functions.
@@ -190,6 +196,13 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 				str += pretty_print_rec(param, program, indentation_level + 1);
 			return str;
 		},
+		[&](ArrayConstructorNode const & ctor_node)
+		{
+			std::string str = join(indent(indentation_level), to_string(ctor_node.constructed_type, program), '\n');
+			for (ExpressionTree const & param : ctor_node.parameters)
+				str += pretty_print_rec(param, program, indentation_level + 1);
+			return str;
+		},
 		[&](tmp::LocalVariableNode const &)
 		{
 			return join(indent(indentation_level), "dependent local", '\n');
@@ -272,7 +285,7 @@ auto pretty_print_rec(Statement const & statement, Program const & program, int 
 				indent(indentation_level), "if statement\n",
 				pretty_print_rec(if_node.condition, program, indentation_level + 1),
 				pretty_print_rec(*if_node.then_case, program, indentation_level + 1),
-				pretty_print_rec(*if_node.else_case, program, indentation_level + 1)
+				if_node.else_case ? pretty_print_rec(*if_node.else_case, program, indentation_level + 1) : ""
 			);
 		},
 		[&](StatementBlock const & block_node)

@@ -1720,10 +1720,221 @@ TEST_CASE("Recursive dependent types")
 	REQUIRE(parse_and_run(src) == 25);
 }
 
+TEST_CASE("Declaring an array")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let a = int[4](1, 2, 3, 4);
+			return 0;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+
+TEST_CASE("Default constructed array")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+
+		let main = fn() -> int
+		{
+			ivec2[4] a;
+			return 0;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+
+TEST_CASE("User can overload subscript operator for their type")
+{
+	auto const src = R"(
+		struct ivec4
+		{
+			int x = 0;
+			int y = 0;
+			int z = 0;
+			int w = 0;
+		}
+
+		let ([]) = fn(ivec4 v, int i)
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec4(1, 3, 5, 7);
+			return v[3] - v[1];
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 4);
+}
+
+TEST_CASE("Can overload based on mutability")
+{
+	auto const src = R"(
+		struct ivec4
+		{
+			int x = 0;
+			int y = 0;
+			int z = 0;
+			int w = 0;
+		}
+
+		let ([]) = fn(ivec4 & v, int i) -> int &
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let ([]) = fn(ivec4 mut & v, int i) -> int mut &
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec4(1, 3, 5, 7);
+			let mut mv = ivec4();
+
+			for (int mut i = 0; i < 4; i = i + 1)
+				mv[i] = v[i];
+
+			return mv[3] - mv[1];
+		};
+
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 4);
+}
+
+TEST_CASE("Can overload based on mutability independent of order")
+{
+	auto const src = R"(
+		struct ivec4
+		{
+			int x = 0;
+			int y = 0;
+			int z = 0;
+			int w = 0;
+		}
+
+		let ([]) = fn(ivec4 mut & v, int i) -> int mut &
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let ([]) = fn(ivec4 & v, int i) -> int &
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec4(1, 3, 5, 7);
+			let mut mv = ivec4();
+
+			for (int mut i = 0; i < 4; i = i + 1)
+				mv[i] = v[i];
+
+			return mv[3] - mv[1];
+		};
+
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 4);
+}
+
+TEST_CASE("Subscript on dependent types")
+{
+	auto const src = R"(
+		struct ivec4
+		{
+			int x = 0;
+			int y = 0;
+			int z = 0;
+			int w = 0;
+		}
+
+		let ([]) = fn(ivec4 v, int i)
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let subscript = fn<T>(T & array, int i)
+		{
+			return array[i];
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec4(1, 3, 5, 7);
+			return subscript(v, 3) - subscript(v, 0);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 6);
+}
+
+TEST_CASE("Array of dependent type")
+{
+	auto const src = R"(
+		let foo = fn<T>(T a, T b)
+		{
+			let results = T[4](a + b, a - b, a * b, a / b);
+			return 0;
+		};
+
+		let main = fn() -> int
+		{
+			return foo(8, 4);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+
+//TEST_CASE("Subscripting array types")
+//{
+//	auto const src = R"(
+//		let main = fn() -> int
+//		{
+//			let a = int[4](1, 2, 3, 4);
+//			return a[0] + a[1] + a[2] + a[3];
+//		};
+//	)"sv;
+//
+//	REQUIRE(parse_and_run(src) == 10);
+//}
+
 /*****************************************************************
 Backlog
 - templates
-	- recursive dependent types
 	- struct declaration that contains dependent types
 	- function declaration with dependent types
 - arrays (depends on pointers)

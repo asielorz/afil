@@ -150,6 +150,8 @@ auto type_size(Program const & program, TypeId id) noexcept -> int;
 auto is_default_constructible(Struct const & type) noexcept -> bool;
 auto is_default_constructible(TypeId type, Program const & program) noexcept -> bool;
 auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> expr::StructConstructorNode;
+auto synthesize_default_constructor(TypeId type_id, ArrayType array_data, Program const & program) noexcept -> expr::ArrayConstructorNode;
+auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expr::ExpressionTree;
 
 auto is_struct(Type const & type) noexcept -> bool;
 auto struct_for_type(Program const & program, Type const & type) noexcept -> Struct const *;
@@ -160,6 +162,9 @@ auto is_pointer(Type const & type) noexcept -> bool;
 auto pointer_type_for(TypeId pointee_type, Program & program) noexcept -> TypeId;
 auto pointee_type(Type const & pointer_type) noexcept -> TypeId;
 auto pointee_type(TypeId pointer_type_id, Program const & program) noexcept -> TypeId;
+
+auto is_array(Type const & type) noexcept -> bool;
+auto array_type_for(TypeId value_type, int size, Program & program) noexcept -> TypeId;
 
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;

@@ -17,6 +17,7 @@ namespace lex
 			operator_,								// + - / *
 			open_parenthesis, close_parenthesis,	// ( )
 			open_brace, close_brace,				// { }
+			open_bracket, close_bracket,			// [ ]
 			semicolon,								// ;
 			comma,									// ,
 			period,									// .

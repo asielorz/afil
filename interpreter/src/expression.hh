@@ -120,6 +120,12 @@ namespace expr
 		std::vector<ExpressionTree> parameters;
 	};
 
+	struct ArrayConstructorNode
+	{
+		TypeId constructed_type;
+		std::vector<ExpressionTree> parameters;
+	};
+
 	// Template nodes.
 	namespace tmp
 	{
@@ -163,7 +169,7 @@ namespace expr
 
 		struct StructConstructorNode : DependentNode
 		{
-			DependentTypeId::BaseCase type;
+			DependentTypeId type;
 			std::vector<ExpressionTree> parameters;
 		};
 
@@ -183,7 +189,7 @@ namespace expr
 			LocalVariableNode, GlobalVariableNode, MemberVariableNode,
 			FunctionNode, FunctionTemplateNode, FunctionCallNode, RelationalOperatorCallNode, AssignmentNode,
 			IfNode, StatementBlockNode,
-			StructConstructorNode,
+			StructConstructorNode, ArrayConstructorNode,
 
 			tmp::LocalVariableNode, tmp::MemberVariableNode,
 			tmp::FunctionCallNode, tmp::RelationalOperatorCallNode, tmp::DereferenceNode,

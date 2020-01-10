@@ -274,6 +274,13 @@ namespace interpreter
 				for (size_t i = 0; i < struct_data.member_variables.size(); ++i)
 					eval_expression_tree(ctor_node.parameters[i], stack, program, return_address + struct_data.member_variables[i].offset);
 			},
+			[&](expr::ArrayConstructorNode const & ctor_node)
+			{
+				ArrayType const array = std::get<ArrayType>(type_with_id(program, ctor_node.constructed_type).extra_data);
+				int const value_type_size = type_size(program, array.value_type);
+				for (int i = 0; i < array.size; ++i)
+					eval_expression_tree(ctor_node.parameters[i], stack, program, return_address + value_type_size * i);
+			},
 
 			[](expr::tmp::DependentNode const &) { declare_unreachable(); }
 		);

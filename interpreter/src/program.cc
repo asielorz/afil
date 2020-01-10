@@ -156,9 +156,10 @@ auto resolve_dependent_type(span<TypeId const> template_parameters, DependentTyp
 			TypeId const pointee = resolve_dependent_type(template_parameters, *pointer.pointee, program);
 			return pointer_type_for(pointee, program);
 		},
-		[](DependentTypeId::Array const & /*array*/) -> TypeId
+		[&](DependentTypeId::Array const & array) -> TypeId
 		{
-			mark_as_to_do("Dependent array types");
+			TypeId const value_type = resolve_dependent_type(template_parameters, *array.value_type, program);
+			return array_type_for(value_type, array.size, program);
 		},
 		[](DependentTypeId::Template const & /*template_instantiation*/) -> TypeId
 		{
@@ -460,6 +461,32 @@ auto pointer_type_for(TypeId pointee_type, Program & program) noexcept -> TypeId
 	return add_type(program, std::move(new_type));
 }
 
+auto is_array(Type const & type) noexcept -> bool
+{
+	return has_type<ArrayType>(type.extra_data);
+}
+
+auto array_type_for(TypeId value_type, int size, Program & program) noexcept -> TypeId
+{
+	assert(!value_type.is_reference); // An array can't contain references.
+	assert(!value_type.is_mutable); // An array can't contain mutable stuff.
+
+	// If an array type for this type has already been created, return that.
+	for (Type const & type : program.types)
+		if (auto const array = try_get<ArrayType>(type.extra_data))
+			if (array->value_type == value_type && array->size == size)
+				return TypeId::with_index(static_cast<unsigned>(&type - program.types.data()));
+
+	Type const & value_type_data = type_with_id(program, value_type);
+
+	// Otherwise create one.
+	Type new_type;
+	new_type.size = value_type_data.size * size;
+	new_type.alignment = value_type_data.alignment;
+	new_type.extra_data = ArrayType{value_type, size};
+	return add_type(program, std::move(new_type));
+}
+
 auto pointee_type(Type const & pointer_type) noexcept->TypeId
 {
 	assert(is_pointer(pointer_type));
@@ -503,8 +530,12 @@ auto is_default_constructible(TypeId type_id, Program const & program) noexcept 
 	if (type_id.is_language_reseved)
 		return false;
 
-	if (Struct const * const struct_data = struct_for_type(program, type_id))
+	Type const & type = type_with_id(program, type_id);
+
+	if (Struct const * const struct_data = struct_for_type(program, type))
 		return is_default_constructible(*struct_data);
+	else if (ArrayType const * array = try_get<ArrayType>(type.extra_data))
+		return is_default_constructible(array->value_type, program);
 	else
 		return false;
 }
@@ -517,6 +548,28 @@ auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) 
 	for (MemberVariable const & var : struct_data.member_variables)
 		default_constructor_node.parameters.push_back(*var.initializer_expression);
 	return default_constructor_node;
+}
+
+auto synthesize_default_constructor(TypeId type_id, ArrayType array_data, Program const & program) noexcept -> expr::ArrayConstructorNode
+{
+	expr::ArrayConstructorNode node;
+	node.constructed_type = type_id;
+	node.parameters.reserve(array_data.size);
+	node.parameters.push_back(synthesize_default_constructor(array_data.value_type, program));
+	for (int i = 1; i < array_data.size; ++i)
+		node.parameters.push_back(node.parameters[0]);
+	return node;
+}
+
+auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expr::ExpressionTree
+{
+	Type const & type = type_with_id(program, type_id);
+	if (is_struct(type))
+		return synthesize_default_constructor(type_id, *struct_for_type(program, type));
+	else if (is_array(type))
+		return synthesize_default_constructor(type_id, std::get<ArrayType>(type.extra_data), program);
+
+	declare_unreachable();
 }
 
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
@@ -735,35 +788,62 @@ auto instantiate_dependent_expression(
 		},
 		[&](tmp::StructConstructorNode const & ctor_node) -> ExpressionTree
 		{
-			TypeId constructed_type = template_parameters[ctor_node.type.index];
+			TypeId constructed_type = resolve_dependent_type(template_parameters, ctor_node.type, program);
 			constructed_type.is_mutable = false;
 			constructed_type.is_reference = false;
 
 			Type const & type = type_with_id(program, constructed_type);
-			raise_syntax_error_if_not(is_struct(type), "Constructor call syntax is only available for structs (for now).");
-			Struct const & struct_data = *struct_for_type(program, type);
-			auto const struct_member_types = map(struct_data.member_variables, &Variable::type);
-
-			if (ctor_node.parameters.empty())
+			if (is_struct(type))
 			{
-				raise_syntax_error_if_not(is_default_constructible(struct_data), "Attempted to default construct type that is not default constructible.");
-				return synthesize_default_constructor(constructed_type, struct_data);
+				Struct const & struct_data = *struct_for_type(program, type);
+				auto const struct_member_types = map(struct_data.member_variables, &Variable::type);
+
+				if (ctor_node.parameters.empty())
+				{
+					raise_syntax_error_if_not(is_default_constructible(struct_data), "Attempted to default construct type that is not default constructible.");
+					return synthesize_default_constructor(constructed_type, struct_data);
+				}
+
+				raise_syntax_error_if_not(struct_data.member_variables.size() == ctor_node.parameters.size(), "Incorrect number of parameters in struct constructor.");
+
+				StructConstructorNode instantiated_node;
+				instantiated_node.constructed_type = constructed_type;
+				instantiated_node.parameters.resize(ctor_node.parameters.size());
+
+				for (size_t i = 0; i < ctor_node.parameters.size(); ++i)
+				{
+					ExpressionTree param = instantiate_dependent_expression(ctor_node.parameters[i], return_type, program, template_parameters, variable_offset_map, variable_stack);
+					TypeId const param_type = expression_type_id(param, program);
+					raise_syntax_error_if_not(is_convertible(param_type, struct_member_types[i], program), "Expression is not convertible to member type in constructor.");
+					instantiated_node.parameters[i] = insert_conversion_node(std::move(param), param_type, struct_member_types[i], program);
+				}
+				return instantiated_node;
 			}
-
-			raise_syntax_error_if_not(struct_data.member_variables.size() == ctor_node.parameters.size(), "Incorrect number of parameters in struct constructor.");
-
-			StructConstructorNode instantiated_node;
-			instantiated_node.constructed_type = constructed_type;
-			instantiated_node.parameters.resize(ctor_node.parameters.size());
-
-			for (size_t i = 0; i < ctor_node.parameters.size(); ++i)
+			else if (is_array(type))
 			{
-				ExpressionTree param = instantiate_dependent_expression(ctor_node.parameters[i], return_type, program, template_parameters, variable_offset_map, variable_stack);
-				TypeId const param_type = expression_type_id(param, program);
-				raise_syntax_error_if_not(is_convertible(param_type, struct_member_types[i], program), "Expression is not convertible to member type in constructor.");
-				instantiated_node.parameters[i] = insert_conversion_node(std::move(param), param_type, struct_member_types[i], program);
+				ArrayType const array = std::get<ArrayType>(type.extra_data);
+
+				if (ctor_node.parameters.empty())
+				{
+					raise_syntax_error_if_not(is_default_constructible(constructed_type, program), "Attempted to default construct type that is not default constructible.");
+					return synthesize_default_constructor(constructed_type, array, program);
+				}
+
+				ArrayConstructorNode instantiated_node;
+				instantiated_node.constructed_type = constructed_type;
+				instantiated_node.parameters.resize(ctor_node.parameters.size());
+
+				raise_syntax_error_if_not(ctor_node.parameters.size() == static_cast<size_t>(array.size), "Number of initializers does not match array size");
+				for (size_t i = 0; i < ctor_node.parameters.size(); ++i)
+				{
+					ExpressionTree param = instantiate_dependent_expression(ctor_node.parameters[i], return_type, program, template_parameters, variable_offset_map, variable_stack);
+					TypeId const param_type = expression_type_id(param, program);
+					raise_syntax_error_if_not(is_convertible(param_type, array.value_type, program), "Expression is not convertible to member type in constructor.");
+					instantiated_node.parameters[i] = insert_conversion_node(std::move(param), param_type, array.value_type, program);
+				}
+				return instantiated_node;
 			}
-			return instantiated_node;
+			raise_syntax_error("Constructor call syntax is only available for structs and arrays (for now).");
 		},
 		[&](AssignmentNode const & assign_node) -> ExpressionTree
 		{

@@ -45,7 +45,7 @@ namespace lex
 
 	auto is_reserved_for_the_language(char c) noexcept -> bool
 	{
-		return (c == '(') || (c == ')') || (c == '{') || (c == '}') || (c == ';') || (c == ',') || (c == '.');
+		return (c == '(') || (c == ')') || (c == '{') || (c == '}') || (c == '[') || (c == ']') || (c == ';') || (c == ',') || (c == '.');
 	}
 
 	auto is_whitespace(char c) noexcept -> bool
@@ -195,6 +195,8 @@ namespace lex
 		if (src[index] == ')')			return {Token::Type::close_parenthesis,	1};
 		if (src[index] == '{')			return {Token::Type::open_brace,		1};
 		if (src[index] == '}')			return {Token::Type::close_brace,		1};
+		if (src[index] == '[')			return {Token::Type::open_bracket,		1};
+		if (src[index] == ']')			return {Token::Type::close_bracket,		1};
 		if (src[index] == ';')			return {Token::Type::semicolon,			1};
 		if (src[index] == ',')			return {Token::Type::comma,				1};
 		if (src[index] == '.')			return {Token::Type::period,			1};

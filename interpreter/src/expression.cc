@@ -122,6 +122,7 @@ namespace expr
 			[&](IfNode const & if_node) -> Ret { return maybe_dependent_expression_type_id(*if_node.then_case, program); },
 			[](StatementBlockNode const & block_node) -> Ret { return block_node.return_type; },
 			[](StructConstructorNode const & constructor_node) -> Ret { return constructor_node.constructed_type; },
+			[](ArrayConstructorNode const & constructor_node) -> Ret { return constructor_node.constructed_type; },
 			[](tmp::LocalVariableNode const & var_node) -> Ret { return var_node.type; },
 			[](tmp::MemberVariableNode const &) -> Ret { return DependentTypeId::unknown; },
 			[](tmp::FunctionCallNode const &) -> Ret { return DependentTypeId::unknown; },
@@ -156,7 +157,8 @@ namespace expr
 			[](IfNode const & if_node) { return is_dependent(*if_node.condition) || is_dependent(*if_node.then_case) || is_dependent(*if_node.else_case); },
 			[](AssignmentNode const & assign_node) { return is_dependent(*assign_node.source) || is_dependent(*assign_node.source);  },
 			//[](StatementBlockNode const &) { TODO },
-			[](StructConstructorNode const & ctor_node) { return std::any_of(ctor_node.parameters.begin(), ctor_node.parameters.end(), is_dependent); }
+			[](StructConstructorNode const & ctor_node) { return std::any_of(ctor_node.parameters.begin(), ctor_node.parameters.end(), is_dependent); },
+			[](ArrayConstructorNode const & ctor_node) { return std::any_of(ctor_node.parameters.begin(), ctor_node.parameters.end(), is_dependent); }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}

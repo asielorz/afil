@@ -294,7 +294,7 @@ namespace parser
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> ExpressionTree;
 	auto parse_substatement(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::optional<stmt::Statement>;
 
-	auto parse_mutable_and_pointer(span<lex::Token const> tokens, size_t & index, TypeId type, Program & program) noexcept -> TypeId
+	auto parse_mutable_pointer_and_array(span<lex::Token const> tokens, size_t & index, TypeId type, Program & program) noexcept -> TypeId
 	{
 		// Look for mutable qualifier.
 		if (tokens[index].source == "mut"sv)
@@ -308,10 +308,38 @@ namespace parser
 		{
 			TypeId const pointer_type = pointer_type_for(type, program);
 			index++;
-			return parse_mutable_and_pointer(tokens, index, pointer_type, program);
+			return parse_mutable_pointer_and_array(tokens, index, pointer_type, program);
 		}
-		else
-			return type;
+		
+		// Look for array type
+		if (tokens[index].type == TokenType::open_bracket)
+		{
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::literal_int, "Expected integral constant after [ in array type.");
+			int const size = parse_number_literal<int>(tokens[index].source);
+			raise_syntax_error_if_not(size > 0, "Array size must be greater than 0.");
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ] after array size.");
+			index++;
+			TypeId const array_type = array_type_for(type, size, program);
+			return parse_mutable_pointer_and_array(tokens, index, array_type, program);
+		}
+
+		return type;
+	}
+
+	auto parse_mutable_pointer_array_and_reference(span<lex::Token const> tokens, size_t & index, TypeId type, Program & program) noexcept -> TypeId
+	{
+		type = parse_mutable_pointer_and_array(tokens, index, type, program);
+
+		// Look for reference qualifier.
+		if (tokens[index].source == "&"sv)
+		{
+			type.is_reference = true;
+			index++;
+		}
+
+		return type;
 	}
 
 	auto pointer_type_for(DependentTypeId type) noexcept -> DependentTypeId
@@ -323,7 +351,16 @@ namespace parser
 		return pointer_type;
 	}
 
-	auto parse_mutable_and_pointer_dependent(span<lex::Token const> tokens, size_t & index, DependentTypeId type) noexcept -> DependentTypeId
+	auto array_type_for(DependentTypeId type, int size) noexcept -> DependentTypeId
+	{
+		DependentTypeId array_type;
+		array_type.is_reference = false;
+		array_type.is_mutable = false;
+		array_type.value = DependentTypeId::Array{std::make_unique<DependentTypeId>(type), size};
+		return array_type;
+	}
+
+	auto parse_mutable_pointer_and_array_dependent(span<lex::Token const> tokens, size_t & index, DependentTypeId type) noexcept -> DependentTypeId
 	{
 		// Look for mutable qualifier.
 		if (tokens[index].source == "mut"sv)
@@ -337,10 +374,24 @@ namespace parser
 		{
 			DependentTypeId const pointer_type = pointer_type_for(type);
 			index++;
-			return parse_mutable_and_pointer_dependent(tokens, index, pointer_type);
+			return parse_mutable_pointer_and_array_dependent(tokens, index, pointer_type);
 		}
-		else
-			return type;
+		
+		// Look for array type
+		if (tokens[index].type == TokenType::open_bracket)
+		{
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::literal_int, "Expected integral constant after [ in array type.");
+			int const size = parse_number_literal<int>(tokens[index].source);
+			raise_syntax_error_if_not(size > 0, "Array size must be greater than 0.");
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ] after array size.");
+			index++;
+			DependentTypeId const array_type = array_type_for(type, size);
+			return parse_mutable_pointer_and_array_dependent(tokens, index, array_type);
+		}
+
+		return type;
 	}
 
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, ScopeStackView scope_stack, Program & program) noexcept -> std::variant<lookup_result::Nothing, TypeId, DependentTypeId>;
@@ -392,37 +443,19 @@ namespace parser
 			[&](lookup_result::Type type) -> Ret 
 			{
 				index++;  
-				TypeId type_found = parse_mutable_and_pointer(tokens, index, type.type_id, program);
-
-				// Look for reference qualifier.
-				if (tokens[index].source == "&"sv)
-				{
-					type_found.is_reference = true;
-					index++;
-				}
-
-				return type_found;
+				return parse_mutable_pointer_array_and_reference(tokens, index, type.type_id, program);
 			},
 			[&](lookup_result::StructTemplate struct_template) -> Ret
 			{
 				index++; 
 				TypeId type_found = parse_template_instantiation_parameter_list(tokens, index, scope_stack, program, struct_template.template_id);
-				type_found = parse_mutable_and_pointer(tokens, index, type_found, program);
-
-				// Look for reference qualifier.
-				if (tokens[index].source == "&"sv)
-				{
-					type_found.is_reference = true;
-					index++;
-				}
-
-				return type_found;
+				return parse_mutable_pointer_array_and_reference(tokens, index, type_found, program);
 			},
 			[&](lookup_result::DependentType dep_type) -> Ret
 			{ 
 				index++;
 				DependentTypeId type_found = DependentTypeId::with_index(dep_type.index); 
-				type_found = parse_mutable_and_pointer_dependent(tokens, index, type_found);
+				type_found = parse_mutable_pointer_and_array_dependent(tokens, index, type_found);
 
 				// Look for reference qualifier.
 				if (tokens[index].source == "&"sv)
@@ -632,11 +665,12 @@ namespace parser
 		return expr::FunctionNode{func_id};
 	}
 	 
-	auto parse_comma_separated_expression_list(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> std::vector<ExpressionTree>
+	auto parse_comma_separated_expression_list(span<lex::Token const> tokens, size_t & index, ParseParams p, 
+		TokenType opener = TokenType::open_parenthesis, TokenType delimiter = TokenType::close_parenthesis) noexcept -> std::vector<ExpressionTree>
 	{
 		std::vector<ExpressionTree> parsed_expressions;
 
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '('.");
+		raise_syntax_error_if_not(tokens[index].type == opener, "Expected '('.");
 		index++;
 
 		// Check for empty list.
@@ -651,8 +685,8 @@ namespace parser
 			// Parse a parameter.
 			parsed_expressions.push_back(parse_subexpression(tokens, index, p));
 
-			// If after a parameter we find a close parenthesis, end parameter list.
-			if (tokens[index].type == TokenType::close_parenthesis)
+			// If after a parameter we find a delimiter token, end parameter list.
+			if (tokens[index].type == delimiter)
 			{
 				index++;
 				break;
@@ -741,7 +775,7 @@ namespace parser
 	auto parse_struct_constructor_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, TypeId type_id) noexcept -> expr::StructConstructorNode
 	{
 		Type const & type = type_with_id(p.program, type_id);
-		raise_syntax_error_if_not(is_struct(type), "Constructor call syntax is only available for structs (for now).");
+		assert(is_struct(type));
 		Struct const & struct_data = *struct_for_type(p.program, type);
 		auto const struct_member_types = map(struct_data.member_variables, &Variable::type);
 
@@ -758,12 +792,8 @@ namespace parser
 		// and add default constructor if so.
 		if (node.parameters.empty())
 		{
-			node.parameters.reserve(struct_data.member_variables.size());
-			for (MemberVariable const & var : struct_data.member_variables)
-			{
-				raise_syntax_error_if_not(var.initializer_expression.has_value(), "Attempted to default construct a struct with a member that is not default constructible.");
-				node.parameters.push_back(*var.initializer_expression);
-			}
+			raise_syntax_error_if_not(is_default_constructible(struct_data), "Attempted to default construct a struct with a member that is not default constructible.");
+			node = synthesize_default_constructor(type_id, struct_data);
 		}
 
 		raise_syntax_error_if_not(struct_member_types.size() == node.parameters.size(), "Number of parameters to constructor call does not match number of member variables.");
@@ -778,6 +808,46 @@ namespace parser
 		}
 
 		return node;
+	}
+
+	auto parse_array_constructor_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, TypeId type_id) noexcept -> expr::ArrayConstructorNode
+	{
+		Type const & type = type_with_id(p.program, type_id);
+		assert(is_array(type));
+		ArrayType const array = std::get<ArrayType>(type.extra_data);
+
+		expr::ArrayConstructorNode node;
+		node.constructed_type = type_id;
+		node.parameters = parse_comma_separated_expression_list(tokens, index, p);
+
+		if (node.parameters.size() == 0)
+		{
+			raise_syntax_error_if_not(is_default_constructible(type_id, p.program), "Attempted to default construct array of non-default constructible type.");
+			node = synthesize_default_constructor(type_id, array, p.program);
+		}
+		else
+		{
+			raise_syntax_error_if_not(node.parameters.size() == static_cast<size_t>(array.size), "Number of initializers does not match array size");
+			for (size_t i = 0; i < node.parameters.size(); ++i)
+			{
+				TypeId const parsed_type = expression_type_id(node.parameters[i], p.program);
+				raise_syntax_error_if_not(is_convertible(parsed_type, array.value_type, p.program), "Expression is not convertible to member type in constructor.");
+				node.parameters[i] = insert_conversion_node(std::move(node.parameters[i]), parsed_type, array.value_type, p.program);
+			}
+		}
+
+		return node;
+	}
+
+	auto parse_constructor_expression(span<lex::Token const> tokens, size_t & index, ParseParams p, TypeId type_id) noexcept -> expr::ExpressionTree
+	{
+		Type const & type = type_with_id(p.program, type_id);
+		if (is_struct(type))
+			return parse_struct_constructor_expression(tokens, index, p, type_id);
+		else if (is_array(type))
+			return parse_array_constructor_expression(tokens, index, p, type_id);
+
+		raise_syntax_error("Constructor call syntax is only available for structs and arrays (for now).");
 	}
 
 	auto parse_if_expression(span<lex::Token const> tokens, size_t & index, ParseParams p) noexcept -> expr::IfNode
@@ -1025,12 +1095,14 @@ namespace parser
 				},
 				[&](lookup_result::Type result) -> ExpressionTree 
 				{
-					return parse_struct_constructor_expression(tokens, index, p, result.type_id);
+					TypeId const qualified_type = parse_mutable_pointer_and_array(tokens, index, result.type_id, p.program);
+					return parse_constructor_expression(tokens, index, p, qualified_type);
 				},
 				[&](lookup_result::StructTemplate result) -> ExpressionTree
 				{
 					TypeId const template_instantiation = parse_template_instantiation_parameter_list(tokens, index, p.scope_stack, p.program, result.template_id);
-					return parse_struct_constructor_expression(tokens, index, p, template_instantiation);
+					TypeId const qualified_type = parse_mutable_pointer_and_array(tokens, index, template_instantiation, p.program);
+					return parse_struct_constructor_expression(tokens, index, p, qualified_type);
 				},
 				[](lookup_result::DependentVariable result) -> ExpressionTree 
 				{ 
@@ -1041,10 +1113,17 @@ namespace parser
 				},
 				[&](lookup_result::DependentType result) -> ExpressionTree
 				{
+					DependentTypeId::BaseCase base_case;
+					base_case.index = result.index;
+					base_case.is_language_reserved = false;
+					base_case.is_dependent = true;
+					DependentTypeId dependent_type;
+					dependent_type.is_mutable = false;
+					dependent_type.is_reference = false;
+					dependent_type.value = base_case;
+
 					expr::tmp::StructConstructorNode node;
-					node.type.is_language_reserved = false;
-					node.type.index = result.index;
-					node.type.is_dependent = true;
+					node.type = parse_mutable_pointer_and_array_dependent(tokens, index, dependent_type);;
 					node.parameters = parse_comma_separated_expression_list(tokens, index, p);
 					return node;
 				},
@@ -1092,31 +1171,63 @@ namespace parser
 					expr::tmp::MemberVariableNode var_node;
 					var_node.owner = std::make_unique<ExpressionTree>(std::move(tree));
 					var_node.name = pool_string(p.program, member_name);
-					return var_node;
+					tree = std::move(var_node);
 				}
-
-				TypeId const last_operand_type_id = expression_type_id(tree, p.program);
-				Type const & last_operand_type = type_with_id(p.program, last_operand_type_id);
-				raise_syntax_error_if_not(is_struct(last_operand_type), "Member access only allowed for struct types.");
-				Struct const & last_operand_struct = *struct_for_type(p.program, last_operand_type);
-
-				int const member_variable_index = find_member_variable(last_operand_struct, member_name, p.program.string_pool);
-				raise_syntax_error_if_not(member_variable_index != -1, "Expected member name after '.'.");
-				Variable const & member_variable = last_operand_struct.member_variables[member_variable_index];
-
-				expr::MemberVariableNode var_node;
-				var_node.owner = std::make_unique<ExpressionTree>(std::move(tree));
-				var_node.variable_type = member_variable.type;
-
-				if (last_operand_type_id.is_reference)
+				else
 				{
-					var_node.variable_type.is_reference = true;
+					TypeId const last_operand_type_id = expression_type_id(tree, p.program);
+					Type const & last_operand_type = type_with_id(p.program, last_operand_type_id);
+					raise_syntax_error_if_not(is_struct(last_operand_type), "Member access only allowed for struct types.");
+					Struct const & last_operand_struct = *struct_for_type(p.program, last_operand_type);
 
-					if (last_operand_type_id.is_mutable)
-						var_node.variable_type.is_mutable = true;
+					int const member_variable_index = find_member_variable(last_operand_struct, member_name, p.program.string_pool);
+					raise_syntax_error_if_not(member_variable_index != -1, "Expected member name after '.'.");
+					Variable const & member_variable = last_operand_struct.member_variables[member_variable_index];
+
+					expr::MemberVariableNode var_node;
+					var_node.owner = std::make_unique<ExpressionTree>(std::move(tree));
+					var_node.variable_type = member_variable.type;
+
+					if (last_operand_type_id.is_reference)
+					{
+						var_node.variable_type.is_reference = true;
+
+						if (last_operand_type_id.is_mutable)
+							var_node.variable_type.is_mutable = true;
+					}
+					var_node.variable_offset = member_variable.offset;
+					tree = std::move(var_node);
 				}
-				var_node.variable_offset = member_variable.offset;
-				tree = std::move(var_node);
+			}
+			// Subscript
+			else if (tokens[index].type == TokenType::open_bracket)
+			{
+				std::vector<ExpressionTree> params = parse_comma_separated_expression_list(tokens, index, p, TokenType::open_bracket, TokenType::close_bracket);
+
+				auto const lookup_result = lookup_name(p.scope_stack, "[]"sv, p.program.string_pool);
+				auto const * const overload_set = try_get<lookup_result::OverloadSet>(lookup_result);
+				raise_syntax_error_if_not(overload_set != nullptr, "Overload not found for operator [].");
+
+				params.insert(params.begin(), std::move(tree));
+
+				if (std::any_of(params.begin(), params.end(), expr::is_dependent))
+				{
+					expr::tmp::FunctionCallNode subscript_call_node;
+					subscript_call_node.overload_set = *overload_set;
+					subscript_call_node.parameters = std::move(params);
+					tree = std::move(subscript_call_node);
+				}
+				else
+				{
+					auto const param_types = map(params, expr::expression_type_id(p.program));
+					FunctionId const function_id = resolve_function_overloading_and_insert_conversions(*overload_set, params, param_types, p.program);
+					raise_syntax_error_if_not(function_id != invalid_function_id, "Overload not found for operator [].");
+
+					expr::FunctionCallNode subscript_call_node;
+					subscript_call_node.function_id = function_id;
+					subscript_call_node.parameters = std::move(params);
+					tree = std::move(subscript_call_node);
+				}
 			}
 			else break;
 		}
@@ -1167,7 +1278,7 @@ namespace parser
 		if (tokens[index].type == TokenType::semicolon)
 		{
 			raise_syntax_error_if_not(is_default_constructible(type_found, p.program), "Attempted to default construct a type that is not default constructible.");
-			node.assigned_expression = synthesize_default_constructor(type_found, *struct_for_type(p.program, type_found));
+			node.assigned_expression = synthesize_default_constructor(type_found, p.program);
 			return node;
 		}
 
@@ -1322,8 +1433,17 @@ namespace parser
 			if (tokens[index].type == TokenType::open_parenthesis)
 			{
 				index++;
-				raise_syntax_error_if_not(tokens[index].type == TokenType::operator_, "Expected operator after '(' in function declaration.");
-				name = tokens[index].source;
+				if (tokens[index].type == TokenType::open_bracket)
+				{
+					index++;
+					raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected operator after '(' in function declaration.");
+					name = "[]"sv;
+				}
+				else
+				{
+					raise_syntax_error_if_not(tokens[index].type == TokenType::operator_, "Expected operator after '(' in function declaration.");
+					name = tokens[index].source;
+				}
 				index++;
 				raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after operator in function declaration.");
 				index++;

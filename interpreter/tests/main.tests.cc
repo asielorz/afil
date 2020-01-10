@@ -7,7 +7,10 @@ auto run_tests() noexcept -> int
 {
 	int const result = Catch::Session().run();
 	if (result != 0)
+	{
+		::MessageBoxA(nullptr, "One of the tests failed. Look at the console for more information.", "A test failed", MB_OK | MB_ICONINFORMATION);
 		system("pause");
+	}
 	return result;
 }
 
