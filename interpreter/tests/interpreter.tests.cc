@@ -1942,6 +1942,20 @@ TEST_CASE("Array of dependent type")
 	REQUIRE(parse_and_run(src) == 0);
 }
 
+TEST_CASE("Array pointer type")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let a = int[4](1, 2, 3, 4);
+			int[] pa = data(a);
+			return pa[2];
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3);
+}
+
 //TEST_CASE("Subscripting array types")
 //{
 //	auto const src = R"(

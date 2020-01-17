@@ -112,6 +112,14 @@ auto pretty_print_rec(ExpressionTree const & tree, Program const & program, int 
 				pretty_print_rec(*deptr_node.operand, program, indentation_level + 1)
 			);
 		},
+		[&](SubscriptNode const & subscript_node)
+		{
+			return join(
+				indent(indentation_level), "subscript<", to_string(subscript_node.return_type, program), ">\n",
+				pretty_print_rec(*subscript_node.array, program, indentation_level + 1),
+				pretty_print_rec(*subscript_node.index, program, indentation_level + 1)
+			);
+		},
 		[&](LocalVariableNode const & var_node) 
 		{
 			return join(indent(indentation_level), "local<", to_string(var_node.variable_type, program), ">: ", var_node.variable_offset, '\n');

@@ -315,14 +315,24 @@ namespace parser
 		if (tokens[index].type == TokenType::open_bracket)
 		{
 			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::literal_int, "Expected integral constant after [ in array type.");
-			int const size = parse_number_literal<int>(tokens[index].source);
-			raise_syntax_error_if_not(size > 0, "Array size must be greater than 0.");
-			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ] after array size.");
-			index++;
-			TypeId const array_type = array_type_for(type, size, program);
-			return parse_mutable_pointer_and_array(tokens, index, array_type, program);
+
+			if (tokens[index].type == TokenType::close_bracket)
+			{
+				TypeId const pointer_type = array_pointer_type_for(type, program);
+				index++;
+				return parse_mutable_pointer_and_array(tokens, index, pointer_type, program);
+			}
+			else
+			{
+				raise_syntax_error_if_not(tokens[index].type == TokenType::literal_int, "Expected integral constant after [ in array type.");
+				int const size = parse_number_literal<int>(tokens[index].source);
+				raise_syntax_error_if_not(size > 0, "Array size must be greater than 0.");
+				index++;
+				raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ] after array size.");
+				index++;
+				TypeId const array_type = array_type_for(type, size, program);
+				return parse_mutable_pointer_and_array(tokens, index, array_type, program);
+			}
 		}
 
 		return type;
@@ -1053,6 +1063,27 @@ namespace parser
 		{
 			return parse_if_expression(tokens, index, p);
 		}
+		//**********************************************************************************************************
+		// Hardcoded
+		else if (tokens[index].source == "data" && tokens[index + 1].type == TokenType::open_parenthesis)
+		{
+			index += 2;
+			ExpressionTree parameter = parse_subexpression(tokens, index, p);
+
+			TypeId const parameter_type_id = expression_type_id(parameter, p.program);
+			Type const & parameter_type = type_with_id(p.program, parameter_type_id);
+			raise_syntax_error_if_not(is_array(parameter_type) && parameter_type_id.is_reference, "Parameter to data must be an array for now.");
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after parameter for data.");
+			index++;
+
+			expr::DepointerNode node;
+			TypeId value_type = array_value_type(parameter_type);
+			value_type.is_mutable = parameter_type_id.is_mutable;
+			node.return_type = array_pointer_type_for(value_type, p.program);
+			node.operand = std::make_unique<ExpressionTree>(std::move(parameter));
+			return node;
+		}
+		//**********************************************************************************************************
 		else if (tokens[index].type == TokenType::open_brace)
 		{
 			return parse_statement_block_expression(tokens, index, p);
@@ -1202,6 +1233,27 @@ namespace parser
 			// Subscript
 			else if (tokens[index].type == TokenType::open_bracket)
 			{
+				// *************************************************************************************************
+				// Hardcoded
+				if (!is_dependent(tree) && is_array_pointer(expression_type(tree, p.program)))
+				{
+					index++;
+					ExpressionTree param = parse_subexpression(tokens, index, p);
+					raise_syntax_error_if_not(expression_type_id(param, p.program).index == TypeId::int_.index, "Parameter of array subscript must be int.");
+					raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ']' after subscript index.");
+					index++;
+
+					expr::SubscriptNode node;
+					TypeId const array_type = expression_type_id(tree, p.program);
+					node.return_type = pointee_type(type_with_id(p.program, array_type));
+					node.return_type.is_reference = true;
+					node.array = std::make_unique<ExpressionTree>(insert_conversion_node(std::move(tree), array_type, remove_reference(array_type), p.program));
+					node.index = std::make_unique<ExpressionTree>(insert_conversion_node(std::move(param), expression_type_id(param, p.program), TypeId::int_, p.program));
+					tree = std::move(node);
+					continue;
+				}
+				//**************************************************************************************************
+
 				std::vector<ExpressionTree> params = parse_comma_separated_expression_list(tokens, index, p, TokenType::open_bracket, TokenType::close_bracket);
 
 				auto const lookup_result = lookup_name(p.scope_stack, "[]"sv, p.program.string_pool);

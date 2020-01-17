@@ -71,6 +71,13 @@ namespace expr
 		value_ptr<ExpressionTree> operand;
 	};
 
+	struct SubscriptNode
+	{
+		value_ptr<ExpressionTree> array;
+		value_ptr<ExpressionTree> index;
+		TypeId return_type;
+	};
+
 	struct FunctionNode
 	{
 		FunctionId function_id;
@@ -185,7 +192,7 @@ namespace expr
 	{
 		using ExpressionTreeBase = std::variant<
 			Literal<int>, Literal<float>, Literal<bool>,
-			DereferenceNode, AddressofNode, DepointerNode,
+			DereferenceNode, AddressofNode, DepointerNode, SubscriptNode,
 			LocalVariableNode, GlobalVariableNode, MemberVariableNode,
 			FunctionNode, FunctionTemplateNode, FunctionCallNode, RelationalOperatorCallNode, AssignmentNode,
 			IfNode, StatementBlockNode,

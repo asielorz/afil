@@ -196,6 +196,16 @@ namespace interpreter
 			{
 				eval_expression_tree(*deptr_node.operand, stack, program, return_address);
 			},
+			[&](expr::SubscriptNode const & subscript_node)
+			{
+				StackGuard const g(stack);
+				int const array_address = eval_expression_tree(*subscript_node.array, stack, program);
+				int const index_address = eval_expression_tree(*subscript_node.index, stack, program);
+				char const * const array = read<char const *>(stack, array_address);
+				int const index = read<int>(stack, index_address);
+				int const value_type_size = type_size(program, remove_reference(subscript_node.return_type));
+				write(stack, return_address, array + index * value_type_size);
+			},
 			[&](expr::FunctionNode const & func_node) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
 			{
 				write(stack, return_address, func_node.function_id);

@@ -461,6 +461,20 @@ auto pointer_type_for(TypeId pointee_type, Program & program) noexcept -> TypeId
 	return add_type(program, std::move(new_type));
 }
 
+auto pointee_type(Type const & pointer_type) noexcept->TypeId
+{
+	assert(is_pointer(pointer_type) || is_array_pointer(pointer_type));
+	if (is_pointer(pointer_type))
+		return try_get<PointerType>(pointer_type.extra_data)->value_type;
+	else
+		return try_get<ArrayPointerType>(pointer_type.extra_data)->value_type;
+}
+
+auto pointee_type(TypeId pointer_type_id, Program const & program) noexcept -> TypeId
+{
+	return pointee_type(type_with_id(program, pointer_type_id));
+}
+
 auto is_array(Type const & type) noexcept -> bool
 {
 	return has_type<ArrayType>(type.extra_data);
@@ -487,15 +501,38 @@ auto array_type_for(TypeId value_type, int size, Program & program) noexcept -> 
 	return add_type(program, std::move(new_type));
 }
 
-auto pointee_type(Type const & pointer_type) noexcept->TypeId
+auto array_value_type(Type const & array_type) noexcept -> TypeId
 {
-	assert(is_pointer(pointer_type));
-	return try_get<PointerType>(pointer_type.extra_data)->value_type;
+	assert(is_array(array_type));
+	return try_get<ArrayType>(array_type.extra_data)->value_type;
 }
 
-auto pointee_type(TypeId pointer_type_id, Program const & program) noexcept -> TypeId
+auto array_value_type(TypeId array_type_id, Program const & program) noexcept -> TypeId
 {
-	return pointee_type(type_with_id(program, pointer_type_id));
+	return array_value_type(type_with_id(program, array_type_id));
+}
+
+auto is_array_pointer(Type const & type) noexcept -> bool
+{
+	return has_type<ArrayPointerType>(type.extra_data);
+}
+
+auto array_pointer_type_for(TypeId pointee_type, Program & program) noexcept -> TypeId
+{
+	assert(!pointee_type.is_reference); // A pointer can't point at a reference.
+
+	// If a pointer type for this type has already been created, return that.
+	for (Type const & type : program.types)
+		if (auto const pointer = try_get<ArrayPointerType>(type.extra_data))
+			if (pointer->value_type == pointee_type)
+				return TypeId::with_index(static_cast<unsigned>(&type - program.types.data()));
+
+	// Otherwise create one.
+	Type new_type;
+	new_type.size = sizeof(void *);
+	new_type.alignment = alignof(void *);
+	new_type.extra_data = ArrayPointerType{pointee_type};
+	return add_type(program, std::move(new_type));
 }
 
 auto add_type(Program & program, Type new_type) noexcept -> TypeId

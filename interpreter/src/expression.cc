@@ -101,6 +101,7 @@ namespace expr
 			[](DereferenceNode const & deref_node) -> Ret { return deref_node.variable_type; },
 			[](AddressofNode const & addressof_node) -> Ret { return addressof_node.return_type; },
 			[](DepointerNode const & deptr_node) -> Ret { return deptr_node.return_type; },
+			[](SubscriptNode const & subscript_node) -> Ret { return subscript_node.return_type; },
 			[](VariableNode const & var_node) -> Ret { return make_reference(var_node.variable_type); },
 			[&](MemberVariableNode const & var_node) -> Ret 
 			{
@@ -154,6 +155,7 @@ namespace expr
 			[](DereferenceNode const & deref_node) { return is_dependent(*deref_node.expression); },
 			[](AddressofNode const & addressof_node) { return is_dependent(*addressof_node.operand); },
 			[](DepointerNode const & deptr_node) { return is_dependent(*deptr_node.operand); },
+			[](SubscriptNode const & subscript_node) { return is_dependent(*subscript_node.array) || is_dependent(*subscript_node.index); },
 			[](IfNode const & if_node) { return is_dependent(*if_node.condition) || is_dependent(*if_node.then_case) || is_dependent(*if_node.else_case); },
 			[](AssignmentNode const & assign_node) { return is_dependent(*assign_node.source) || is_dependent(*assign_node.source);  },
 			//[](StatementBlockNode const &) { TODO },

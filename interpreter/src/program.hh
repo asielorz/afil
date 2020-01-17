@@ -21,6 +21,10 @@ struct ArrayType
 	TypeId value_type;
 	int size;
 };
+struct ArrayPointerType
+{
+	TypeId value_type;
+};
 struct StructType
 {
 	int struct_index;
@@ -30,7 +34,7 @@ struct Type
 {
 	int size;
 	int alignment;
-	std::variant<BuiltInType, PointerType, ArrayType, StructType> extra_data;
+	std::variant<BuiltInType, PointerType, ArrayType, ArrayPointerType, StructType> extra_data;
 };
 
 struct Function : Scope
@@ -164,7 +168,12 @@ auto pointee_type(Type const & pointer_type) noexcept -> TypeId;
 auto pointee_type(TypeId pointer_type_id, Program const & program) noexcept -> TypeId;
 
 auto is_array(Type const & type) noexcept -> bool;
-auto array_type_for(TypeId value_type, int size, Program & program) noexcept -> TypeId;
+auto array_type_for(TypeId pointee_type, int size, Program & program) noexcept -> TypeId;
+auto array_value_type(Type const & array_type) noexcept->TypeId;
+auto array_value_type(TypeId array_type_id, Program const & program) noexcept->TypeId;
+
+auto is_array_pointer(Type const & type) noexcept -> bool;
+auto array_pointer_type_for(TypeId value_type, Program & program) noexcept -> TypeId;
 
 auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>; // Stack allocator?
 auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
