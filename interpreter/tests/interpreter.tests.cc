@@ -1901,6 +1901,29 @@ TEST_CASE("Subscript on dependent types")
 	REQUIRE(parse_and_run(src) == 6);
 }
 
+TEST_CASE("Multiple argument subscript")
+{
+	auto const src = R"(
+		struct foo
+		{
+			int value;
+		}
+
+		let ([]) = fn(foo f, int i, int j)
+		{
+			return f.value + i + j;
+		};
+
+		let main = fn() -> int
+		{
+			let f = foo(3);
+			return f[4, 2];
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 + 4 + 2);
+}
+
 TEST_CASE("Array of dependent type")
 {
 	auto const src = R"(
