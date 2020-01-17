@@ -370,6 +370,15 @@ namespace parser
 		return array_type;
 	}
 
+	auto array_pointer_type_for(DependentTypeId type) noexcept -> DependentTypeId
+	{
+		DependentTypeId pointer_type;
+		pointer_type.is_reference = false;
+		pointer_type.is_mutable = false;
+		pointer_type.value = DependentTypeId::ArrayPointer{std::make_unique<DependentTypeId>(type)};
+		return pointer_type;
+	}
+
 	auto parse_mutable_pointer_and_array_dependent(span<lex::Token const> tokens, size_t & index, DependentTypeId type) noexcept -> DependentTypeId
 	{
 		// Look for mutable qualifier.
@@ -382,23 +391,33 @@ namespace parser
 		// Look for pointer type
 		if (tokens[index].source == "*"sv)
 		{
-			DependentTypeId const pointer_type = pointer_type_for(type);
+			DependentTypeId pointer_type = pointer_type_for(type);
 			index++;
-			return parse_mutable_pointer_and_array_dependent(tokens, index, pointer_type);
+			return parse_mutable_pointer_and_array_dependent(tokens, index, std::move(pointer_type));
 		}
 		
 		// Look for array type
 		if (tokens[index].type == TokenType::open_bracket)
 		{
 			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::literal_int, "Expected integral constant after [ in array type.");
-			int const size = parse_number_literal<int>(tokens[index].source);
-			raise_syntax_error_if_not(size > 0, "Array size must be greater than 0.");
-			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ] after array size.");
-			index++;
-			DependentTypeId const array_type = array_type_for(type, size);
-			return parse_mutable_pointer_and_array_dependent(tokens, index, array_type);
+
+			if (tokens[index].type == TokenType::close_bracket)
+			{
+				DependentTypeId pointer_type = array_pointer_type_for(type);
+				index++;
+				return parse_mutable_pointer_and_array_dependent(tokens, index, std::move(pointer_type));
+			}
+			else
+			{
+				raise_syntax_error_if_not(tokens[index].type == TokenType::literal_int, "Expected integral constant after [ in array type.");
+				int const size = parse_number_literal<int>(tokens[index].source);
+				raise_syntax_error_if_not(size > 0, "Array size must be greater than 0.");
+				index++;
+				raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ] after array size.");
+				index++;
+				DependentTypeId array_type = array_type_for(type, size);
+				return parse_mutable_pointer_and_array_dependent(tokens, index, std::move(array_type));
+			}
 		}
 
 		return type;

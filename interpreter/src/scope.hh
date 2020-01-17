@@ -123,13 +123,17 @@ struct DependentTypeId
 		value_ptr<DependentTypeId> value_type;
 		int size;
 	};
+	struct ArrayPointer
+	{
+		value_ptr<DependentTypeId> pointee;
+	};
 	struct Template
 	{
 		StructTemplateId template_id;
 		std::vector<DependentTypeId> parameters;
 	};
 
-	std::variant<BaseCase, Pointer, Array> value;
+	std::variant<BaseCase, Pointer, Array, ArrayPointer> value;
 	bool is_mutable : 1;
 	bool is_reference : 1;
 

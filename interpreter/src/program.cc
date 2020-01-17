@@ -161,6 +161,11 @@ auto resolve_dependent_type(span<TypeId const> template_parameters, DependentTyp
 			TypeId const value_type = resolve_dependent_type(template_parameters, *array.value_type, program);
 			return array_type_for(value_type, array.size, program);
 		},
+		[&](DependentTypeId::ArrayPointer const & array_pointer)
+		{
+			TypeId const pointee = resolve_dependent_type(template_parameters, *array_pointer.pointee, program);
+			return array_pointer_type_for(pointee, program);
+		},
 		[](DependentTypeId::Template const & /*template_instantiation*/) -> TypeId
 		{
 			mark_as_to_do("Dependent template instantiations");
@@ -208,6 +213,21 @@ auto expected_type_according_to_pattern(TypeId given_parameter, DependentTypeId 
 		[](DependentTypeId::Array const & /*array*/) -> TypeId
 		{
 			mark_as_to_do("Dependent array types");
+		},
+		[&](DependentTypeId::ArrayPointer const & pointer)
+		{
+			Type const & type = type_with_id(program, given_parameter);
+
+			if (!is_array_pointer(type))
+				return TypeId::none; // Does not satisfy the pattern
+
+			TypeId const pointee = pointee_type(type);
+			TypeId const expected_pointee = expected_type_according_to_pattern(pointee, *pointer.pointee, resolved_dependent_types, program);
+
+			if (expected_pointee == TypeId::none)
+				return TypeId::none;
+			else
+				return array_pointer_type_for(expected_pointee, program);
 		},
 		[](DependentTypeId::Template const & /*template_instantiation*/) -> TypeId
 		{

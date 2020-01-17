@@ -1956,6 +1956,25 @@ TEST_CASE("Array pointer type")
 	REQUIRE(parse_and_run(src) == 3);
 }
 
+TEST_CASE("Function template that takes array of pointer type")
+{
+	auto const src = R"(
+		let subscript = fn<T>(T[] array, int i)
+		{
+			return array[i];
+		};
+	
+		let main = fn() -> int
+		{
+			let a = int[4](1, 2, 3, 4);
+			int[] pa = data(a);
+			return subscript(pa, 2);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3);
+}
+
 //TEST_CASE("Subscripting array types")
 //{
 //	auto const src = R"(
