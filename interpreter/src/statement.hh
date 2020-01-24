@@ -1,110 +1,77 @@
 #pragma once
 
 #include "expression.hh"
-#include <optional>
 
-namespace stmt
+namespace incomplete
 {
 
 	struct Statement;
 
-	struct VariableDeclarationStatement
+	namespace statement
 	{
-		int variable_offset;
-		expr::ExpressionTree assigned_expression;
-	};
-
-	struct ExpressionStatement
-	{
-		expr::ExpressionTree expression;
-	};
-
-	struct ReturnStatement
-	{
-		expr::ExpressionTree returned_expression;
-	};
-
-	struct IfStatement
-	{
-		expr::ExpressionTree condition;
-		value_ptr<Statement> then_case;
-		value_ptr<Statement> else_case;
-	};
-
-	struct StatementBlock
-	{
-		Scope scope;
-		std::vector<stmt::Statement> statements;
-	};
-
-	struct WhileStatement
-	{
-		expr::ExpressionTree condition;
-		value_ptr<Statement> body;
-	};
-
-	struct ForStatement
-	{
-		Scope scope;
-		value_ptr<Statement> init_statement;
-		expr::ExpressionTree condition;
-		expr::ExpressionTree end_expression;
-		value_ptr<Statement> body;
-	};
-
-	struct BreakStatement {};
-	struct ContinueStatement {};
-
-	namespace tmp
-	{
-		// Tag type. All dependent nodes inherit from it.
-		struct DependentNode
+		struct VariableDeclaration
 		{
-		protected:
-			DependentNode() noexcept = default;
+			std::string variable_name;
+			ExpressionTree assigned_expression;
 		};
 
-		struct VariableDeclarationStatement : DependentNode
+		struct ExpressionStatement
 		{
-			PooledString variable_name;
-			std::optional<expr::ExpressionTree> assigned_expression;
+			ExpressionTree expression;
 		};
 
-		struct ForStatement : DependentNode
+		struct Return
 		{
-			DependentScope scope;
-			value_ptr<Statement> init_statement;
-			expr::ExpressionTree condition;
-			expr::ExpressionTree end_expression;
+			ExpressionTree returned_expression;
+		};
+
+		struct If
+		{
+			ExpressionTree condition;
+			value_ptr<Statement> then_case;
+			value_ptr<Statement> else_case;
+		};
+
+		struct StatementBlock
+		{
+			Scope scope;
+			std::vector<Statement> statements;
+		};
+
+		struct While
+		{
+			ExpressionTree condition;
 			value_ptr<Statement> body;
 		};
 
-		struct StatementBlock : DependentNode
+		struct For
 		{
-			DependentScope scope;
-			std::vector<stmt::Statement> statements;
+			Scope scope;
+			value_ptr<Statement> init_statement;
+			ExpressionTree condition;
+			ExpressionTree end_expression;
+			value_ptr<Statement> body;
 		};
-	}
 
-	namespace detail
+		struct Break {};
+		struct Continue {};
+
+		namespace detail
+		{
+			using StatementBase = std::variant<
+				VariableDeclaration, ExpressionStatement,
+				If, StatementBlock, While, For,
+				Return, Break, Continue,
+			>;
+		} // namespace detail
+	} // namespace statement
+
+	struct Statement : public statement::detail::StatementBase
 	{
-		using StatementBase = std::variant<
-			VariableDeclarationStatement, ExpressionStatement, 
-			IfStatement, StatementBlock, WhileStatement, ForStatement,
-			ReturnStatement, BreakStatement, ContinueStatement,
-
-			tmp::VariableDeclarationStatement, tmp::ForStatement, tmp::StatementBlock
-		>;
-	}
-
-	struct Statement : public detail::StatementBase
-	{
-		using Base = detail::StatementBase;
+		using Base = statement::detail::StatementBase;
 		using Base::Base;
 		constexpr auto as_variant() noexcept -> Base & { return *this; }
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
 	};
 
-	auto is_dependent(Statement const & statement) noexcept -> bool;
-
-}
+} // namespace incomplete
