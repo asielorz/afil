@@ -61,7 +61,7 @@ namespace incomplete
 			using StatementBase = std::variant<
 				VariableDeclaration, ExpressionStatement,
 				If, StatementBlock, While, For,
-				Return, Break, Continue,
+				Return, Break, Continue
 			>;
 		} // namespace detail
 	} // namespace statement

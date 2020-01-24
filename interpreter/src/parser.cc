@@ -87,6 +87,23 @@ namespace parser
 		declare_unreachable();
 	}
 
+	auto is_unary_operator(lex::Token const & token) noexcept -> bool
+	{
+		return token.type == TokenType::operator_ &&
+			token.source == "-"sv ||
+			token.source == "&"sv ||
+			token.source == "*"sv ||
+			token.source == "not"sv;
+	}
+
+	template <typename T>
+	auto parse_number_literal(std::string_view token_source) noexcept -> T
+	{
+		T value;
+		std::from_chars(token_source.data(), token_source.data() + token_source.size(), value);
+		return value;
+	}
+
 	auto insert_expression(incomplete::ExpressionTree & tree, incomplete::ExpressionTree & new_node) noexcept -> void
 	{
 		using incomplete::expression::OperatorCall;
@@ -139,7 +156,141 @@ namespace parser
 
 	auto parse_expression(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept -> incomplete::ExpressionTree;
 
-	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept -> incomplete::ExpressionTree;
+	auto parse_comma_separated_expression_list(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack,
+		TokenType opener = TokenType::open_parenthesis, TokenType delimiter = TokenType::close_parenthesis) noexcept -> std::vector<incomplete::ExpressionTree>
+	{
+		std::vector<incomplete::ExpressionTree> parsed_expressions;
+
+		raise_syntax_error_if_not(tokens[index].type == opener, "Expected '('.");
+		index++;
+
+		// Check for empty list.
+		if (tokens[index].type == TokenType::close_parenthesis)
+		{
+			index++;
+			return parsed_expressions;
+		}
+
+		for (;;)
+		{
+			// Parse a parameter.
+			parsed_expressions.push_back(parse_expression(tokens, index, scope_stack));
+
+			// If after a parameter we find a delimiter token, end parameter list.
+			if (tokens[index].type == delimiter)
+			{
+				index++;
+				break;
+			}
+			// If we find a comma, parse next parameter.
+			else if (tokens[index].type == TokenType::comma)
+				index++;
+			// Anything else we find is wrong.
+			else
+				raise_syntax_error("Expected ')' or ',' after expression.");
+		}
+
+		return parsed_expressions;
+	}
+
+	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept -> incomplete::ExpressionTree;
+	auto parse_if_expression(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept->incomplete::ExpressionTree;
+	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept->incomplete::ExpressionTree;
+	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept->incomplete::ExpressionTree;
+
+	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept -> incomplete::ExpressionTree
+	{
+		if (tokens[index].source == "fn")
+			return parse_function_expression(tokens, index, scope_stack);
+		else if (tokens[index].source == "if")
+			return parse_if_expression(tokens, index, scope_stack);
+		else if (tokens[index].type == TokenType::open_brace)
+			return parse_statement_block_expression(tokens, index, scope_stack);
+		else if (tokens[index].type == TokenType::literal_int)
+			return incomplete::expression::Literal<int>{parse_number_literal<int>(tokens[index++].source)};
+		else if (tokens[index].type == TokenType::literal_float)
+			return incomplete::expression::Literal<int>{parse_number_literal<float>(tokens[index++].source)};
+		else if (tokens[index].type == TokenType::literal_bool)
+			return incomplete::expression::Literal<bool>{tokens[index++].source[0] == 't'}; // if it starts with t it must be true, and otherwise it must be false.
+		else if (tokens[index].type == TokenType::identifier)
+		{
+			// TODO
+			mark_as_to_do("Identifiers");
+		}
+		else if (tokens[index].type == TokenType::open_parenthesis)
+		{
+			index++;
+			auto expr = parse_expression(tokens, index, scope_stack);
+
+			// Next token must be close parenthesis.
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after parenthesized expression.");
+			index++;
+
+			return expr;
+		}
+		else if (is_unary_operator(tokens[index]))
+			return parse_unary_operator(tokens, index, scope_stack);
+		else
+			raise_syntax_error("Unrecognized token. Expected expression.");
+	}
+
+	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept -> incomplete::ExpressionTree
+	{
+		incomplete::ExpressionTree tree = parse_single_expression(tokens, index, scope_stack);
+
+		while (index < tokens.size())
+		{
+			// Loop to possibly parse chains of member accesses.
+			if (tokens[index].type == TokenType::period)
+			{
+				index++;
+
+				raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected member name after '.'.");
+				std::string_view const member_name = tokens[index].source;
+				index++;
+
+				incomplete::expression::MemberVariable var_node;
+				var_node.name = member_name;
+				var_node.owner = std::make_unique<incomplete::ExpressionTree>(std::move(tree));
+				tree = std::move(var_node);
+			}
+			// Subscript
+			else if (tokens[index].type == TokenType::open_bracket)
+			{
+				std::vector<incomplete::ExpressionTree> params = parse_comma_separated_expression_list(tokens, index, scope_stack, TokenType::open_bracket, TokenType::close_bracket);
+
+				if (params.size() == 1)
+				{
+					incomplete::expression::Subscript node;
+					node.array = std::make_unique<incomplete::ExpressionTree>(std::move(tree));
+					node.index = std::make_unique<incomplete::ExpressionTree>(std::move(params[0]));
+					tree = std::move(node);
+				}
+				else
+				{
+					incomplete::expression::FunctionCall node;
+					node.parameters.reserve(params.size() + 2);
+					node.parameters.push_back(incomplete::expression::OverloadSetNode{"[]"});
+					node.parameters.push_back(std::move(tree));
+					for (auto & param : params)
+						node.parameters.push_back(std::move(param));
+					tree = std::move(node);
+				}
+			}
+			// Function call
+			else if (tokens[index].type == TokenType::open_parenthesis)
+			{
+				std::vector<incomplete::ExpressionTree> params = parse_comma_separated_expression_list(tokens, index, scope_stack, TokenType::open_bracket, TokenType::close_bracket);
+				incomplete::expression::FunctionCall node;
+				node.parameters.reserve(params.size() + 1);
+				node.parameters.push_back(std::move(tree));
+				for (auto & param : params)
+					node.parameters.push_back(std::move(param));
+				tree = std::move(node);
+			}
+			else break;
+		}
+	}
 
 	auto parse_expression(span<lex::Token const> tokens, size_t & index, incomplete::ScopeStack & scope_stack) noexcept -> incomplete::ExpressionTree
 	{

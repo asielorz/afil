@@ -28,8 +28,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\callc.cc" />
+    <ClCompile Include="src\expression.cc" />
     <ClCompile Include="src\main.cc" />
     <ClCompile Include="src\lexer.cc" />
+    <ClCompile Include="src\parser.cc" />
+    <ClCompile Include="src\scope.cc" />
+    <ClCompile Include="src\statement.cc" />
     <ClCompile Include="src\syntax_error.cc" />
     <ClCompile Include="src\unreachable.cc" />
     <ClCompile Include="src\utils.cc" />
@@ -41,13 +45,18 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\callc.hh" />
+    <ClInclude Include="src\expression.hh" />
+    <ClInclude Include="src\function_id.hh" />
     <ClInclude Include="src\function_ptr.hh" />
     <ClInclude Include="src\map.hh" />
     <ClInclude Include="src\multicomparison.hh" />
     <ClInclude Include="src\overload.hh" />
     <ClInclude Include="src\out.hh" />
+    <ClInclude Include="src\parser.hh" />
+    <ClInclude Include="src\scope.hh" />
     <ClInclude Include="src\span.hh" />
     <ClInclude Include="src\lexer.hh" />
+    <ClInclude Include="src\statement.hh" />
     <ClInclude Include="src\string.hh" />
     <ClInclude Include="src\syntax_error.hh" />
     <ClInclude Include="src\unreachable.hh" />

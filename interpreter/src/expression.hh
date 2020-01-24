@@ -2,6 +2,12 @@
 
 #include "scope.hh"
 
+struct OverloadSet
+{
+	std::vector<FunctionId> functions;
+	std::vector<FunctionTemplateId> function_templates;
+};
+
 enum struct Operator
 {
 	add, subtract, multiply, divide, modulo,
@@ -15,13 +21,7 @@ enum struct Operator
 };
 auto precedence(Operator op) noexcept -> int;
 auto operator_function_name(Operator op) noexcept -> std::string_view;
-auto operator_overload_set(Operator op, incomplete::ScopeStackView scope_stack, span<char const> string_pool) -> lookup_result::OverloadSet;
-
-struct OverloadSet
-{
-	std::vector<FunctionId> functions;
-	std::vector<FunctionTemplateId> function_templates;
-};
+auto operator_overload_set(Operator op, incomplete::ScopeStackView scope_stack, span<char const> string_pool) -> OverloadSet;
 
 namespace incomplete
 {
@@ -40,7 +40,7 @@ namespace incomplete
 
 		struct Variable
 		{
-			int variable_offset;
+			std::string name;
 		};
 		struct LocalVariable : Variable {};
 		struct GlobalVariable : Variable {};
@@ -67,12 +67,11 @@ namespace incomplete
 
 		struct OverloadSetNode
 		{
-			OverloadSet overload_set;
+			std::string name;
 		};
 
 		struct FunctionCall
 		{
-			OverloadSet overload_set;
 			std::vector<ExpressionTree> parameters;
 		};
 
