@@ -1,11 +1,12 @@
 #pragma once
 
-namespace incomplete { struct Program; }
+#include "utils/span.hh"
+namespace incomplete { struct Statement; }
 namespace complete { struct Program; }
 
 namespace instantiation
 {
 
-	auto instantiate_templates(incomplete::Program const & program) noexcept -> complete::Program;
+	auto instantiate_templates(span<incomplete::Statement const> program) noexcept -> complete::Program;
 
 } // namespace instantiation

@@ -1,8 +1,7 @@
-#include "syntax_error.hh"
-#include "statement.hh"
 #include "parser.hh"
+#include "incomplete_statement.hh"
+#include "syntax_error.hh"
 #include "lexer.hh"
-#include "program.hh"
 #include "utils/span.hh"
 #include "utils/variant.hh"
 #include "utils/overload.hh"
@@ -968,6 +967,7 @@ namespace parser
 		index++;
 
 		statement.variable_name = var_name;
+		statement.type = type;
 
 		if (tokens[index].type == TokenType::semicolon)
 			return statement;
@@ -1027,10 +1027,10 @@ namespace parser
 		return result;
 	}
 
-	auto parse_source(std::string_view src) noexcept -> incomplete::Program
+	auto parse_source(std::string_view src) noexcept -> std::vector<incomplete::Statement>
 	{
 		auto const tokens = lex::tokenize(src);
-		incomplete::Program program;
+		std::vector<incomplete::Statement> global_initialization_statements;
 
 		std::vector<TypeName> type_names;
 		type_names.reserve(16);
@@ -1043,10 +1043,10 @@ namespace parser
 		{
 			incomplete::Statement statement = parse_statement(tokens, index, type_names);
 			raise_syntax_error_if_not(!has_type<incomplete::statement::ExpressionStatement>(statement), "An expression statement is not allowed at the global scope.");
-			program.global_initialization_statements.push_back(std::move(statement));
+			global_initialization_statements.push_back(std::move(statement));
 		}
 
-		return program;
+		return global_initialization_statements;
 	}
 
 }

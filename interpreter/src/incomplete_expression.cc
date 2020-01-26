@@ -1,4 +1,4 @@
-#include "expression.hh"
+#include "incomplete_expression.hh"
 #include "utils/unreachable.hh"
 
 auto precedence(Operator op) noexcept -> int

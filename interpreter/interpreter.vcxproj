@@ -27,14 +27,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\complete_scope.cc" />
+    <ClCompile Include="src\complete_statement.cc" />
+    <ClCompile Include="src\program.cc" />
     <ClCompile Include="src\template_instantiation.cc" />
     <ClCompile Include="src\utils\callc.cc" />
-    <ClCompile Include="src\expression.cc" />
+    <ClCompile Include="src\incomplete_expression.cc" />
     <ClCompile Include="src\main.cc" />
     <ClCompile Include="src\lexer.cc" />
     <ClCompile Include="src\parser.cc" />
-    <ClCompile Include="src\scope.cc" />
-    <ClCompile Include="src\statement.cc" />
+    <ClCompile Include="src\incomplete_scope.cc" />
+    <ClCompile Include="src\incomplete_statement.cc" />
     <ClCompile Include="src\syntax_error.cc" />
     <ClCompile Include="src\utils\unreachable.cc" />
     <ClCompile Include="src\utils\utils.cc" />
@@ -45,10 +48,13 @@
     <ClCompile Include="tests\variant.tests.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\complete_expression.hh" />
+    <ClInclude Include="src\complete_scope.hh" />
+    <ClInclude Include="src\complete_statement.hh" />
     <ClInclude Include="src\program.hh" />
     <ClInclude Include="src\template_instantiation.hh" />
     <ClInclude Include="src\utils\callc.hh" />
-    <ClInclude Include="src\expression.hh" />
+    <ClInclude Include="src\incomplete_expression.hh" />
     <ClInclude Include="src\function_id.hh" />
     <ClInclude Include="src\utils\function_ptr.hh" />
     <ClInclude Include="src\utils\map.hh" />
@@ -56,10 +62,10 @@
     <ClInclude Include="src\utils\overload.hh" />
     <ClInclude Include="src\utils\out.hh" />
     <ClInclude Include="src\parser.hh" />
-    <ClInclude Include="src\scope.hh" />
+    <ClInclude Include="src\incomplete_scope.hh" />
     <ClInclude Include="src\utils\span.hh" />
     <ClInclude Include="src\lexer.hh" />
-    <ClInclude Include="src\statement.hh" />
+    <ClInclude Include="src\incomplete_statement.hh" />
     <ClInclude Include="src\utils\string.hh" />
     <ClInclude Include="src\syntax_error.hh" />
     <ClInclude Include="src\utils\unreachable.hh" />

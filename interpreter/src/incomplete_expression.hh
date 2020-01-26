@@ -1,6 +1,6 @@
 #pragma once
 
-#include "scope.hh"
+#include "incomplete_scope.hh"
 
 enum struct Operator
 {
@@ -146,12 +146,3 @@ namespace incomplete
 
 } // namespace incomplete
 
-namespace complete
-{
-
-	struct Expression
-	{
-
-	};
-
-} // namespace complete

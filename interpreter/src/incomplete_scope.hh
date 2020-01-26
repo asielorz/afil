@@ -1,8 +1,6 @@
 #pragma once
 
-#include "function_id.hh"
 #include "utils/value_ptr.hh"
-#include "utils/span.hh"
 #include <vector>
 #include <variant>
 #include <optional>
@@ -80,50 +78,3 @@ namespace incomplete
 	};
 
 } // namespace incomplete
-
-namespace complete
-{
-
-	struct TypeId
-	{
-		union
-		{
-			struct
-			{
-				unsigned is_language_reseved : 1;
-				unsigned is_mutable : 1;
-				unsigned is_reference : 1;
-				unsigned index : 29;
-			};
-			unsigned flat_value;
-		};
-
-		static constexpr auto with_index(unsigned index) noexcept -> TypeId { return TypeId{false, false, false, index}; }
-		static constexpr auto zero_initialized() noexcept -> TypeId { return with_index(0); }
-
-		static TypeId const void_; // TODO: Maybe void can be confusing so think of another name?
-		static TypeId const int_;
-		static TypeId const float_;
-		static TypeId const bool_;
-
-		static TypeId const none;
-		static TypeId const function;
-		static TypeId const deduce;
-	};
-
-	constexpr auto operator == (TypeId a, TypeId b) noexcept -> bool { return a.flat_value == b.flat_value; };
-	constexpr auto operator != (TypeId a, TypeId b) noexcept -> bool { return !(a == b); };
-
-	struct Variable
-	{
-		std::string name;
-		TypeId type;
-		int offset;
-	};
-
-	struct Scope
-	{
-
-	};
-
-} // namespace complete
