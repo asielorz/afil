@@ -31,14 +31,14 @@ namespace incomplete
 			T value;
 		};
 
-		struct Variable
+		struct Identifier
 		{
 			std::string name;
 		};
-		struct LocalVariable : Variable {};
-		struct GlobalVariable : Variable {};
-		struct MemberVariable : Variable
+
+		struct MemberVariable
 		{
+			std::string name;
 			value_ptr<Expression> owner;
 		};
 
@@ -68,17 +68,18 @@ namespace incomplete
 			incomplete::FunctionTemplate function_template;
 		};
 
-		struct OverloadSetNode
-		{
-			std::string name;
-		};
-
 		struct FunctionCall
 		{
 			std::vector<Expression> parameters;
 		};
 
-		struct OperatorCall
+		struct UnaryOperatorCall
+		{
+			Operator op;
+			value_ptr<Expression> operand;
+		};
+
+		struct BinaryOperatorCall
 		{
 			Operator op;
 			value_ptr<Expression> left;
@@ -108,8 +109,8 @@ namespace incomplete
 			using ExpressionTreeBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>,
 				Dereference, Addressof, Subscript,
-				LocalVariable, GlobalVariable, MemberVariable,
-				Function, FunctionTemplate,	OverloadSetNode, FunctionCall, OperatorCall,
+				Identifier, MemberVariable,
+				Function, FunctionTemplate,	FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 				If, StatementBlock,
 				Constructor
 			>;

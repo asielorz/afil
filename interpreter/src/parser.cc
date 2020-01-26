@@ -115,16 +115,16 @@ namespace parser
 
 	auto insert_expression(incomplete::Expression & tree, incomplete::Expression & new_node) noexcept -> void
 	{
-		using incomplete::expression::OperatorCall;
-		OperatorCall & tree_op = std::get<OperatorCall>(tree);
-		OperatorCall & new_op = std::get<OperatorCall>(new_node);
+		using incomplete::expression::BinaryOperatorCall;
+		BinaryOperatorCall & tree_op = std::get<BinaryOperatorCall>(tree);
+		BinaryOperatorCall & new_op = std::get<BinaryOperatorCall>(new_node);
 
 		if (precedence(new_op.op) <= precedence(tree_op.op))
 		{
 			new_op.left = std::make_unique<incomplete::Expression>(std::move(tree));
 			tree = std::move(new_node);
 		}
-		else if (!has_type<OperatorCall>(*tree_op.right))
+		else if (!has_type<BinaryOperatorCall>(*tree_op.right))
 		{
 			new_op.left = std::move(tree_op.right);
 			tree_op.right = std::make_unique<incomplete::Expression>(std::move(new_node));
@@ -135,20 +135,22 @@ namespace parser
 
 	auto resolve_operator_precedence(span<incomplete::Expression> operands, span<Operator const> operators) noexcept -> incomplete::Expression
 	{
+		using incomplete::expression::BinaryOperatorCall;
+
 		if (operators.empty())
 		{
 			assert(operands.size() == 1);
 			return std::move(operands[0]);
 		}
 
-		incomplete::Expression root = incomplete::expression::OperatorCall{ operators[0],
+		incomplete::Expression root = BinaryOperatorCall{ operators[0],
 				std::make_unique<incomplete::Expression>(std::move(operands[0])),
 				std::make_unique<incomplete::Expression>(std::move(operands[1]))
 		};
 
 		for (size_t i = 1; i < operators.size(); ++i)
 		{
-			auto new_node = incomplete::Expression(incomplete::expression::OperatorCall{operators[i], nullptr, std::make_unique<incomplete::Expression>(std::move(operands[i + 1]))});
+			auto new_node = incomplete::Expression(BinaryOperatorCall{operators[i], nullptr, std::make_unique<incomplete::Expression>(std::move(operands[i + 1]))});
 			insert_expression(root, new_node);
 		}
 
@@ -559,11 +561,10 @@ namespace parser
 		}
 		else
 		{
-			incomplete::expression::FunctionCall fn_node;
-			fn_node.parameters.reserve(2);
-			fn_node.parameters.push_back(incomplete::expression::OverloadSetNode{std::string(operator_function_name(op))});
-			fn_node.parameters.push_back(std::move(operand));
-			return fn_node;
+			incomplete::expression::UnaryOperatorCall op_node;
+			op_node.op = op;
+			op_node.operand = std::make_unique<incomplete::Expression>(std::move(operand));
+			return op_node;
 		}
 	}
 
@@ -583,8 +584,22 @@ namespace parser
 			return incomplete::expression::Literal<bool>{tokens[index++].source[0] == 't'}; // if it starts with t it must be true, and otherwise it must be false.
 		else if (tokens[index].type == TokenType::identifier)
 		{
-			// TODO
-			mark_as_to_do("Identifiers");
+			// It can be either a constructor call or the naming of a variable/function
+			auto type = parse_type_name(tokens, index, type_names);
+			if (type)
+			{
+				incomplete::expression::Constructor ctor_node;
+				ctor_node.constructed_type = std::move(*type);
+				ctor_node.parameters = parse_comma_separated_expression_list(tokens, index, type_names);
+				return ctor_node;
+			}
+			else
+			{
+				incomplete::expression::Identifier id_node;
+				id_node.name = tokens[index].source;
+				index++;
+				return id_node;
+			}
 		}
 		else if (tokens[index].type == TokenType::open_parenthesis)
 		{
@@ -639,7 +654,7 @@ namespace parser
 				{
 					incomplete::expression::FunctionCall node;
 					node.parameters.reserve(params.size() + 2);
-					node.parameters.push_back(incomplete::expression::OverloadSetNode{"[]"});
+					node.parameters.push_back(incomplete::expression::Identifier{"[]"});
 					node.parameters.push_back(std::move(tree));
 					for (auto & param : params)
 						node.parameters.push_back(std::move(param));

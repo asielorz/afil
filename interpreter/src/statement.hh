@@ -96,7 +96,7 @@ namespace complete
 	{
 		struct VariableDeclaration
 		{
-			std::string variable_name;
+			int variable_offset;
 			Expression assigned_expression;
 		};
 
