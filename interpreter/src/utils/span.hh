@@ -14,6 +14,7 @@ namespace detail
 		using value_type = T;
 		using size_type = size_t;
 		using iterator = T *;
+		using reverse_iterator = std::reverse_iterator<iterator>;
 
 		constexpr span_impl(T data_[], size_t size_) noexcept : data_array(data_), data_size(size_) {}
 
@@ -23,6 +24,8 @@ namespace detail
 		constexpr auto empty() const noexcept -> bool { return size() == 0; }
 		constexpr auto begin() const noexcept -> T * { return data(); }
 		constexpr auto end() const noexcept -> T * { return data() + size(); }
+		constexpr auto rbegin() const noexcept -> reverse_iterator { return reverse_iterator(end()); }
+		constexpr auto rend() const noexcept -> reverse_iterator { return reverse_iterator(begin()); }
 		constexpr auto front() const noexcept -> T & { return data()[0]; }
 		constexpr auto back() const noexcept -> T & { return data()[size() - 1]; }
 		constexpr auto subspan(size_t offset, size_t count) const noexcept -> span<T> { return span<T>(data() + offset, std::min(count, size() - offset)); }

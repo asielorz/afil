@@ -1,7 +1,7 @@
 #include "lexer.hh"
-#include "unreachable.hh"
 #include "syntax_error.hh"
-#include "multicomparison.hh"
+#include "utils/unreachable.hh"
+#include "utils/multicomparison.hh"
 #include <cassert>
 
 using namespace std::literals;

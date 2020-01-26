@@ -2,12 +2,6 @@
 
 #include "scope.hh"
 
-struct OverloadSet
-{
-	std::vector<FunctionId> functions;
-	std::vector<FunctionTemplateId> function_templates;
-};
-
 enum struct Operator
 {
 	add, subtract, multiply, divide, modulo,
@@ -21,13 +15,12 @@ enum struct Operator
 };
 auto precedence(Operator op) noexcept -> int;
 auto operator_function_name(Operator op) noexcept -> std::string_view;
-auto operator_overload_set(Operator op, incomplete::ScopeStackView scope_stack, span<char const> string_pool) -> OverloadSet;
 
 namespace incomplete
 {
 
 	struct Statement;
-	struct ExpressionTree;
+	struct Expression;
 
 	namespace expression
 	{
@@ -46,23 +39,33 @@ namespace incomplete
 		struct GlobalVariable : Variable {};
 		struct MemberVariable : Variable
 		{
-			value_ptr<ExpressionTree> owner;
+			value_ptr<Expression> owner;
 		};
 
 		struct Addressof
 		{
-			value_ptr<ExpressionTree> operand;
+			value_ptr<Expression> operand;
 		};
 
 		struct Dereference
 		{
-			value_ptr<ExpressionTree> operand;
+			value_ptr<Expression> operand;
 		};
 
 		struct Subscript
 		{
-			value_ptr<ExpressionTree> array;
-			value_ptr<ExpressionTree> index;
+			value_ptr<Expression> array;
+			value_ptr<Expression> index;
+		};
+
+		struct Function
+		{
+			incomplete::Function function;
+		};
+
+		struct FunctionTemplate
+		{
+			incomplete::FunctionTemplate function_template;
 		};
 
 		struct OverloadSetNode
@@ -72,33 +75,32 @@ namespace incomplete
 
 		struct FunctionCall
 		{
-			std::vector<ExpressionTree> parameters;
+			std::vector<Expression> parameters;
 		};
 
 		struct OperatorCall
 		{
 			Operator op;
-			value_ptr<ExpressionTree> left;
-			value_ptr<ExpressionTree> right;
+			value_ptr<Expression> left;
+			value_ptr<Expression> right;
 		};
 
 		struct If
 		{
-			value_ptr<ExpressionTree> condition;
-			value_ptr<ExpressionTree> then_case;
-			value_ptr<ExpressionTree> else_case;
+			value_ptr<Expression> condition;
+			value_ptr<Expression> then_case;
+			value_ptr<Expression> else_case;
 		};
 
 		struct StatementBlock
 		{
-			Scope scope;
 			std::vector<incomplete::Statement> statements;
 		};
 
 		struct Constructor
 		{
-			DependentTypeId constructed_type;
-			std::vector<ExpressionTree> parameters;
+			TypeId constructed_type;
+			std::vector<Expression> parameters;
 		};
 
 		namespace detail
@@ -107,7 +109,7 @@ namespace incomplete
 				Literal<int>, Literal<float>, Literal<bool>,
 				Dereference, Addressof, Subscript,
 				LocalVariable, GlobalVariable, MemberVariable,
-				OverloadSetNode, FunctionCall, OperatorCall,
+				Function, FunctionTemplate,	OverloadSetNode, FunctionCall, OperatorCall,
 				If, StatementBlock,
 				Constructor
 			>;
@@ -115,7 +117,7 @@ namespace incomplete
 
 	} // namespace expression
 
-	struct ExpressionTree : public expression::detail::ExpressionTreeBase
+	struct Expression : public expression::detail::ExpressionTreeBase
 	{
 		using Base = expression::detail::ExpressionTreeBase;
 		using Base::Base;
@@ -123,4 +125,32 @@ namespace incomplete
 		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
 	};
 
+	struct MemberVariable
+	{
+		std::string name;
+		TypeId type;
+		std::optional<Expression> initializer_expression;
+	};
+
+	struct Struct
+	{
+		std::string name;
+		std::vector<MemberVariable> member_variables;
+	};
+
+	struct StructTemplate : Struct
+	{
+		std::vector<TemplateParameter> template_parameters;
+	};
+
 } // namespace incomplete
+
+namespace complete
+{
+
+	struct Expression
+	{
+
+	};
+
+} // namespace complete

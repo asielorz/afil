@@ -1,5 +1,5 @@
+#include "utils/variant.hh"
 #include <catch2/catch.hpp>
-#include "variant.hh"
 
 TEST_CASE("variant_union returns the union of two variant types")
 {

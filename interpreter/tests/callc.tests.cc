@@ -1,5 +1,5 @@
-#include "callc.hh"
-#include "function_ptr.hh"
+#include "utils/callc.hh"
+#include "utils/function_ptr.hh"
 #include <catch2/catch.hpp>
 
 TEST_CASE("Function that returns an int")

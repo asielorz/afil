@@ -1,5 +1,5 @@
 #include <catch2/catch.hpp>
-#include "span.hh"
+#include "utils/span.hh"
 
 TEST_CASE("Can construct span from pointer and size")
 {
@@ -49,4 +49,14 @@ TEST_CASE("Range for")
 	for (int i : s)
 		sum += i;
 	REQUIRE(sum == 6);
+}
+
+TEST_CASE("Reverse iterators")
+{
+	int const some_array[] = { 1, 2, 3 };
+	auto const s = span<int const>(some_array);
+
+	int const reversed_array[] = { 3, 2, 1 };
+
+	REQUIRE(std::equal(s.rbegin(), s.rend(), std::begin(reversed_array), std::end(reversed_array)));
 }

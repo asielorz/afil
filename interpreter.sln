@@ -17,16 +17,16 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Debug|x64.ActiveCfg = Debug|x64
 		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Debug|x64.Build.0 = Debug|x64
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Debug|x86.ActiveCfg = Debug|Win32
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Debug|x86.Build.0 = Debug|Win32
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Release|x64.ActiveCfg = Release|x64
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Release|x64.Build.0 = Release|x64
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Release|x86.ActiveCfg = Release|Win32
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Release|x86.Build.0 = Release|Win32
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.UnitTests|x64.ActiveCfg = UnitTests|x64
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.UnitTests|x64.Build.0 = UnitTests|x64
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.UnitTests|x86.ActiveCfg = UnitTests|Win32
-		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.UnitTests|x86.Build.0 = UnitTests|Win32
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Debug|x86.ActiveCfg = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Debug|x86.Build.0 = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Release|x64.ActiveCfg = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Release|x64.Build.0 = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Release|x86.ActiveCfg = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.Release|x86.Build.0 = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.UnitTests|x64.ActiveCfg = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.UnitTests|x64.Build.0 = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.UnitTests|x86.ActiveCfg = Debug|x64
+		{A188849A-EC6C-4DDA-AB59-05B1E12D9060}.UnitTests|x86.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
