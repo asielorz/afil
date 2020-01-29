@@ -72,6 +72,7 @@
     <ClInclude Include="src\utils\utils.hh" />
     <ClInclude Include="src\utils\value_ptr.hh" />
     <ClInclude Include="src\utils\variant.hh" />
+    <ClInclude Include="src\utils\warning_macro.hh" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="span.natvis" />

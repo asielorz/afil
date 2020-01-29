@@ -28,3 +28,9 @@ struct value_ptr : public std::unique_ptr<T>
 		return *this;
 	}
 };
+
+template <typename T>
+auto allocate(T t) -> value_ptr<T>
+{
+	return std::make_unique<T>(std::move(t));
+}

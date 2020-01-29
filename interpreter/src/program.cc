@@ -216,4 +216,9 @@ namespace complete
 			return program.functions[id.index].return_type;
 	}
 
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression
+	{
+		return insert_conversion_node(std::move(tree), expression_type_id(tree, program), to, program);
+	}
+
 } // namespace complete

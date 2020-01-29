@@ -108,6 +108,7 @@ namespace complete
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression;
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression;
 
 } // namespace complete
 

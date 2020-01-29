@@ -8,6 +8,7 @@
 #include "utils/overload.hh"
 #include "utils/utils.hh"
 #include "utils/unreachable.hh"
+#include "utils/warning_macro.hh"
 
 enum struct ScopeType { global, function, block };
 struct CurrentScope
@@ -18,6 +19,25 @@ struct CurrentScope
 };
 using ScopeStack = std::vector<CurrentScope>;
 using ScopeStackView = span<const CurrentScope>;
+
+auto top(ScopeStack & scope_stack) noexcept -> complete::Scope & { return *scope_stack.back().scope; }
+
+template <typename Stack>
+struct StackGuard
+{
+	StackGuard(Stack & s) noexcept : stack(std::addressof(s)) {}
+	StackGuard(StackGuard const &) = delete;
+	StackGuard & operator = (StackGuard const &) = delete;
+	~StackGuard() { stack->pop_back(); }
+
+	Stack * stack;
+};
+auto push_block_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>
+{
+	int const offset = scope_stack.back().scope_offset + top(scope_stack).stack_frame_size;
+	scope_stack.push_back({&scope, ScopeType::block, offset});
+	return StackGuard<ScopeStack>(scope_stack);
+}
 
 template <typename T>
 auto add_variable_to_scope(
@@ -42,8 +62,6 @@ auto add_variable_to_scope(complete::Scope & scope, std::string_view name, compl
 {
 	return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
 }
-
-auto top(ScopeStack & scope_stack) noexcept -> complete::Scope & { return *scope_stack.back().scope; }
 
 auto resolve_dependent_type(span<complete::TypeId const> template_parameters, incomplete::TypeId dependent_type, complete::Program & program) -> complete::TypeId
 {
@@ -104,7 +122,7 @@ namespace instantiation
 	}
 
 	auto instantiate_statement(
-		incomplete::Statement const & incomplete_statement, 
+		incomplete::Statement const & incomplete_statement_, 
 		std::vector<complete::TypeId> & template_parameters, 
 		ScopeStack & scope_stack,
 		out<complete::Program> program
@@ -113,13 +131,12 @@ namespace instantiation
 		(void)(program, template_parameters);
 
 		auto const visitor = overload(
-			[&](incomplete::statement::VariableDeclaration const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::VariableDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
-				complete::Expression expression = instantiate_expression(statement.assigned_expression, template_parameters, scope_stack, program);
+				complete::Expression expression = instantiate_expression(incomplete_statement.assigned_expression, template_parameters, scope_stack, program);
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
-				complete::TypeId const var_type = statement.type.has_value()
-					? resolve_dependent_type(template_parameters, *statement.type, *program)
+				complete::TypeId const var_type = incomplete_statement.type.has_value()
+					? resolve_dependent_type(template_parameters, *incomplete_statement.type, *program)
 					: decay(assigned_expression_type);
 
 				// If it's a function somehow(expression)
@@ -127,42 +144,87 @@ namespace instantiation
 
 				raise_syntax_error_if_not(is_convertible(assigned_expression_type, var_type, *program), "Cannot convert to variable type in variable declaration.");
 
-				int const var_offset = add_variable_to_scope(top(scope_stack), statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
+				int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
 
 				complete::statement::VariableDeclaration complete_statement;
 				complete_statement.variable_offset = var_offset;
 				complete_statement.assigned_expression = insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program);
 				return complete_statement;
 			},
-			[](incomplete::statement::ExpressionStatement const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::ExpressionStatement const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
-				return complete::Statement();
+				complete::statement::ExpressionStatement complete_statement;
+				complete_statement.expression = instantiate_expression(incomplete_statement.expression, template_parameters, scope_stack, program);
+				return complete_statement;
 			},
-			[](incomplete::statement::If const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::If const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
-				return complete::Statement();
+				complete::statement::If complete_statement;
+				complete_statement.condition = insert_conversion_node(
+					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program),
+					complete::TypeId::bool_, *program);
+
+				complete_statement.then_case = allocate(*instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program));
+				complete_statement.else_case = allocate(*instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program));
+
+				return complete_statement;
 			},
-			[](incomplete::statement::StatementBlock const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::StatementBlock const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
-				return complete::Statement();
+				complete::statement::StatementBlock complete_statement;
+				auto const guard = push_block_scope(scope_stack, complete_statement.scope);
+				complete_statement.statements.reserve(incomplete_statement.statements.size());
+
+				for (incomplete::Statement const & incomplete_substatement : incomplete_statement.statements)
+				{
+					auto complete_substatement = instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program);
+					if (complete_substatement.has_value())
+						complete_statement.statements.push_back(std::move(*complete_substatement));
+				}
+
+				return complete_statement;
 			},
-			[](incomplete::statement::While const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::While const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
-				return complete::Statement();
+				complete::statement::While complete_statement;
+
+				complete_statement.condition = insert_conversion_node(
+					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program),
+					complete::TypeId::bool_, *program);
+
+				complete_statement.body = allocate(*instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program));
+
+				return complete_statement;
 			},
-			[](incomplete::statement::For const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::For const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
-				return complete::Statement();
+				complete::statement::For complete_statement;
+				auto const guard = push_block_scope(scope_stack, complete_statement.scope);
+
+				auto init_statement = instantiate_statement(*incomplete_statement.init_statement, template_parameters, scope_stack, program);
+				raise_syntax_error_if_not(init_statement.has_value() && (
+					has_type<complete::statement::VariableDeclaration>(*init_statement) ||
+					has_type<complete::statement::ExpressionStatement>(*init_statement)), 
+					"Only variable declaration or expression statements accepted as init statements of for loops"); TODO("Maybe move this to parser?")
+
+				complete_statement.init_statement = allocate(*init_statement);
+
+				complete_statement.condition = insert_conversion_node(
+					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program),
+					complete::TypeId::bool_, *program);
+
+				complete_statement.end_expression = instantiate_expression(incomplete_statement.end_expression, template_parameters, scope_stack, program);
+				complete_statement.body = allocate(*instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program));
+
+				return complete_statement;
 			},
-			[](incomplete::statement::Return const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::Return const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
-				return complete::Statement();
+				TODO("Return type. Conversion to return type.")
+				complete::statement::Return complete_statement;
+				complete_statement.returned_expression = instantiate_expression(incomplete_statement.returned_expression, template_parameters, scope_stack, program);
+
+				return complete_statement;
 			},
 			[](incomplete::statement::Break const &) -> std::optional<complete::Statement>
 			{
@@ -184,7 +246,7 @@ namespace instantiation
 			}
 		);
 
-		return std::visit(visitor, incomplete_statement.as_variant());
+		return std::visit(visitor, incomplete_statement_.as_variant());
 	}
 
 	auto instantiate_templates(span<incomplete::Statement const> incomplete_program) noexcept -> complete::Program
