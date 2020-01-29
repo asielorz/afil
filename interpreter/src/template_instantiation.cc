@@ -107,17 +107,153 @@ auto resolve_dependent_type(incomplete::TypeId dependent_type, span<complete::Ty
 	return type;
 }
 
+namespace lookup_result
+{
+	struct Nothing {};
+	struct Variable { complete::TypeId variable_type; int variable_offset; };
+	struct GlobalVariable { complete::TypeId variable_type; int variable_offset; };
+	struct OverloadSet : complete::OverloadSet {};
+	struct Type { complete::TypeId type_id; };
+	struct StructTemplate { complete::StructTemplateId template_id; };
+}
+auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
+	-> std::variant<
+		lookup_result::Nothing,
+		lookup_result::Variable,
+		lookup_result::GlobalVariable,
+		lookup_result::OverloadSet,
+		lookup_result::Type,
+		lookup_result::StructTemplate
+	>
+{
+	using namespace complete;
+	lookup_result::OverloadSet overload_set;
+
+	bool stop_looking_for_variables = false;
+
+	// Search the scopes in reverse order.
+	int const start = static_cast<int>(scope_stack.size() - 1);
+	for (int i = start; i >= 0; --i)
+	{
+		Scope const & scope = *scope_stack[i].scope;
+
+		// Search variables and types only if we don't already know this is a function name.
+		if (overload_set.function_ids.empty())
+		{
+			if (scope_stack[i].type == ScopeType::global)
+			{
+				auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), [name](Variable const & var) { return var.name == name; });
+				if (var != scope.variables.end())
+					return lookup_result::GlobalVariable{ var->type, var->offset };
+			}
+			else if (!stop_looking_for_variables)
+			{
+				auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), [name](Variable const & var) { return var.name == name; });
+				if (var != scope.variables.end())
+					return lookup_result::Variable{ var->type, var->offset };
+			}
+
+			auto const type = std::find_if(scope.types.begin(), scope.types.end(), [name](Variable const & var) { return var.name == name; });
+			if (type != scope.types.end())
+				return lookup_result::Type{ type->id };
+
+			auto const struct_template = std::find_if(scope.struct_templates.begin(), scope.struct_templates.end(), [name](Variable const & var) { return var.name == name; });
+			if (struct_template != scope.struct_templates.end())
+				return lookup_result::StructTemplate{ struct_template->id };
+		}
+
+		// Functions.
+		for (FunctionName const & fn : scope.functions)
+			if (fn.name == name)
+				overload_set.function_ids.push_back(fn.id);
+
+		// Function templates.
+		for (FunctionTemplateName const & fn : scope.function_templates)
+			if (fn.name == name)
+				overload_set.function_template_ids.push_back(fn.id);
+
+		// After we leave a function, stop looking for variables.
+		if (i < start && scope_stack[i].type == ScopeType::function)
+			stop_looking_for_variables = true;
+	}
+
+	if (overload_set.function_ids.empty() && overload_set.function_template_ids.empty())
+		return lookup_result::Nothing();
+	else
+		return overload_set;
+}
+
 namespace instantiation
 {
 
 	auto instantiate_expression(
-		incomplete::Expression const & incomplete_expression, 
+		incomplete::Expression const & incomplete_expression_, 
 		std::vector<complete::TypeId> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program
 	) -> complete::Expression
 	{
-		(void)(incomplete_expression, program, template_parameters, scope_stack);
+		auto const visitor = overload(
+			[](incomplete::expression::Literal<int> const & incomplete_expression) -> complete::Expression
+			{
+				return complete::expression::Literal<int>{incomplete_expression.value};
+			},
+			[](incomplete::expression::Literal<float> const & incomplete_expression) -> complete::Expression
+			{
+				return complete::expression::Literal<float>{incomplete_expression.value};
+			},
+			[](incomplete::expression::Literal<bool> const & incomplete_expression) -> complete::Expression
+			{
+				return complete::expression::Literal<bool>{incomplete_expression.value};
+			},
+			[&](incomplete::expression::Identifier const & incomplete_expression) -> complete::Expression
+			{
+				auto const lookup = lookup_name(scope_stack, incomplete_expression.name);
+				auto const lookup_visitor = overload(
+					[](lookup_result::Variable const & var) -> complete::Expression
+					{
+						complete::expression::LocalVariable complete_expression;
+						complete_expression.variable_type = var.variable_type;
+						complete_expression.variable_offset = var.variable_offset;
+						return complete_expression;
+					},
+					[](lookup_result::GlobalVariable const & var) -> complete::Expression
+					{
+						complete::expression::GlobalVariable complete_expression;
+						complete_expression.variable_type = var.variable_type;
+						complete_expression.variable_offset = var.variable_offset;
+						return complete_expression;
+					},
+					[](lookup_result::OverloadSet const & var) -> complete::Expression
+					{
+						complete::expression::OverloadSet complete_expression;
+						complete_expression.overload_set = var; // Move?
+						return complete_expression;
+					},
+					[](auto const &) -> complete::Expression { declare_unreachable(); }
+				);
+				return std::visit(lookup_visitor, lookup);
+			},
+			[&](incomplete::expression::MemberVariable const & incomplete_expression) -> complete::Expression
+			{
+				complete::expression::MemberVariable complete_expression;
+				complete_expression.owner = allocate(instantiate_expression(*incomplete_expression.owner, template_parameters, scope_stack, program));
+				
+				complete::TypeId const owner_type_id = decay(expression_type_id(*complete_expression.owner, *program));
+				complete::Type const & owner_type = type_with_id(*program, owner_type_id);
+				raise_syntax_error_if_not(is_struct(owner_type), "Cannot access member of non struct type.");
+				complete::Struct const & owner_struct = *struct_for_type(*program, owner_type);
+				int const member_index = find_member_variable(owner_struct, incomplete_expression.name);
+				raise_syntax_error_if_not(member_index != -1, "Member not found.");
+
+				complete_expression.variable_offset = owner_struct.member_variables[member_index].offset;
+				complete_expression.variable_type = owner_struct.member_variables[member_index].type;
+
+				return complete_expression;
+			}
+		);
+
+		(void)(incomplete_expression_, program, template_parameters, scope_stack);
 		return {};
 	}
 
@@ -128,8 +264,6 @@ namespace instantiation
 		out<complete::Program> program
 	) -> std::optional<complete::Statement>
 	{
-		(void)(program, template_parameters);
-
 		auto const visitor = overload(
 			[&](incomplete::statement::VariableDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
