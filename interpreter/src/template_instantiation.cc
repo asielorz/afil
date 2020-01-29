@@ -63,7 +63,7 @@ auto add_variable_to_scope(complete::Scope & scope, std::string_view name, compl
 	return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
 }
 
-auto resolve_dependent_type(span<complete::TypeId const> template_parameters, incomplete::TypeId dependent_type, complete::Program & program) -> complete::TypeId
+auto resolve_dependent_type(incomplete::TypeId dependent_type, span<complete::TypeId const> template_parameters, complete::Program & program) -> complete::TypeId
 {
 	auto const visitor = overload(
 		[&](incomplete::TypeId::BaseCase const & base_case)
@@ -82,17 +82,17 @@ auto resolve_dependent_type(span<complete::TypeId const> template_parameters, in
 		},
 		[&](incomplete::TypeId::Pointer const & pointer)
 		{
-			complete::TypeId const pointee = resolve_dependent_type(template_parameters, *pointer.pointee, program);
+			complete::TypeId const pointee = resolve_dependent_type(*pointer.pointee, template_parameters, program);
 			return pointer_type_for(pointee, program);
 		},
 		[&](incomplete::TypeId::Array const & array)
 		{
-			complete::TypeId const value_type = resolve_dependent_type(template_parameters, *array.value_type, program);
+			complete::TypeId const value_type = resolve_dependent_type(*array.value_type, template_parameters, program);
 			return array_type_for(value_type, array.size, program);
 		},
 		[&](incomplete::TypeId::ArrayPointer const & array_pointer)
 		{
-			complete::TypeId const pointee = resolve_dependent_type(template_parameters, *array_pointer.pointee, program);
+			complete::TypeId const pointee = resolve_dependent_type(*array_pointer.pointee, template_parameters, program);
 			return array_pointer_type_for(pointee, program);
 		},
 		[](incomplete::TypeId::TemplateInstantiation const & /*template_instantiation*/) -> complete::TypeId
@@ -136,11 +136,11 @@ namespace instantiation
 				complete::Expression expression = instantiate_expression(incomplete_statement.assigned_expression, template_parameters, scope_stack, program);
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
 				complete::TypeId const var_type = incomplete_statement.type.has_value()
-					? resolve_dependent_type(template_parameters, *incomplete_statement.type, *program)
+					? resolve_dependent_type(*incomplete_statement.type, template_parameters, *program)
 					: decay(assigned_expression_type);
 
 				// If it's a function somehow(expression)
-				// TODO
+				TODO("Function declaration statements");
 
 				raise_syntax_error_if_not(is_convertible(assigned_expression_type, var_type, *program), "Cannot convert to variable type in variable declaration.");
 
@@ -234,15 +234,51 @@ namespace instantiation
 			{
 				return complete::statement::Continue();
 			},
-			[](incomplete::statement::StructDeclaration const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::StructDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
+				complete::Type new_type;
+				new_type.size = 0;
+				new_type.alignment = 1;
+
+				complete::Struct new_struct;
+				new_struct.member_variables.reserve(incomplete_statement.declared_struct.member_variables.size());
+
+				for (incomplete::MemberVariable const & member_variable : incomplete_statement.declared_struct.member_variables)
+				{
+					complete::TypeId const member_type = resolve_dependent_type(member_variable.type, template_parameters, *program);
+					raise_syntax_error_if_not(is_data_type(member_type), "Member variable cannot be void.");
+					raise_syntax_error_if_not(!member_type.is_reference, "Member variable cannot be reference.");
+					raise_syntax_error_if_not(!member_type.is_mutable, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
+
+					add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, member_variable.name, member_type, 0, *program);
+
+					complete::MemberVariable & new_variable = new_struct.member_variables.back();
+					if (member_variable.initializer_expression.has_value())
+					{
+						new_variable.initializer_expression = insert_conversion_node(
+							instantiate_expression(*member_variable.initializer_expression, template_parameters, scope_stack, program),
+							member_type, *program
+						);
+					}
+					else if (is_default_constructible(member_type, *program))
+					{
+						new_variable.initializer_expression = synthesize_default_constructor(member_type, *program);
+					}
+				}
+
+				new_type.extra_data = complete::Type::Struct{static_cast<int>(program->structs.size())};
+				complete::TypeId const new_type_id = add_type(*program, std::move(new_type));
+				program->structs.push_back(std::move(new_struct));
+				top(scope_stack).types.push_back({incomplete_statement.declared_struct.name, new_type_id});
+
 				return std::nullopt;
 			},
 			[](incomplete::statement::StructTemplateDeclaration const & statement) -> std::optional<complete::Statement>
 			{
 				(void)(statement);
-				return std::nullopt;
+				TODO("Struct templates");
+				mark_as_to_do("Struct templates");
+				//return std::nullopt;
 			}
 		);
 
