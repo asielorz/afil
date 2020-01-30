@@ -352,6 +352,44 @@ namespace instantiation
 					complete_expression.parameters.push_back(std::move(params[1]));
 					return complete_expression;
 				}
+			},
+			[&](incomplete::expression::Function const &) -> complete::Expression
+			{
+				mark_as_to_do("Instantiation of functions");
+			},
+			[&](incomplete::expression::FunctionTemplate const &) -> complete::Expression
+			{
+				mark_as_to_do("Instantiation of function templates");
+			},
+			[&](incomplete::expression::FunctionCall const & incomplete_expression) -> complete::Expression
+			{
+				std::vector<complete::Expression> parameters;
+				parameters.reserve(incomplete_expression.parameters.size());
+				for (incomplete::Expression const & incomplete_param : incomplete_expression.parameters)
+					parameters.push_back(instantiate_expression(incomplete_param, template_parameters, scope_stack, program));
+
+				if (has_type<complete::expression::OverloadSet>(parameters[0]))
+				{
+					std::vector<complete::TypeId> parameter_types;
+					parameter_types.reserve(parameters.size() - 1);
+					for (size_t i = 1; i < parameters.size(); ++i)
+						parameter_types.push_back(expression_type_id(parameters[i], *program));
+
+					FunctionId const function = resolve_function_overloading_and_insert_conversions(
+						try_get<complete::expression::OverloadSet>(parameters[0])->overload_set,
+						{&parameters[1], parameter_types.size()}, parameter_types, *program);
+
+					raise_syntax_error_if_not(function != invalid_function_id, "Overload not found.");
+					complete::expression::FunctionCall complete_expression;
+					complete_expression.function_id = function;
+					complete_expression.parameters = std::move(parameters);
+					complete_expression.parameters.erase(complete_expression.parameters.begin());
+					return complete_expression;
+				}
+				else
+				{
+					mark_as_to_do("Overload of operator function call");
+				}
 			}
 		);
 
