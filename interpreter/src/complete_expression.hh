@@ -39,12 +39,27 @@ namespace complete
 			complete::OverloadSet overload_set;
 		};
 
+		struct ReinterpretCast
+		{
+			value_ptr<Expression> operand;
+			complete::TypeId return_type;
+		};
+
+		struct Subscript
+		{
+			value_ptr<Expression> array;
+			value_ptr<Expression> index;
+			complete::TypeId return_type;
+		};
+
 		namespace detail
 		{
 			using ExpressionTreeBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>,
 				LocalVariable, GlobalVariable, MemberVariable,
-				OverloadSet
+				OverloadSet,
+				ReinterpretCast,
+				Subscript
 			>;
 		} // namespace detail
 	} // namespace expression

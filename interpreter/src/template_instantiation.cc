@@ -250,6 +250,62 @@ namespace instantiation
 				complete_expression.variable_type = owner_struct.member_variables[member_index].type;
 
 				return complete_expression;
+			},
+			[&](incomplete::expression::Addressof const & incomplete_expression) -> complete::Expression
+			{
+				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program);
+				complete::TypeId const operand_type = expression_type_id(operand, *program);
+				raise_syntax_error_if_not(operand_type.is_reference, "Attempted to take address of temporary.");
+				complete::TypeId const pointer_type = pointer_type_for(remove_reference(operand_type), *program);
+
+				complete::expression::ReinterpretCast complete_expression;
+				complete_expression.operand = allocate(std::move(operand));
+				complete_expression.return_type = pointer_type;
+				return complete_expression;
+			},
+			[&](incomplete::expression::Dereference const & incomplete_expression) -> complete::Expression
+			{
+				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program);
+				complete::TypeId const operand_type_id = expression_type_id(operand, *program);
+				complete::Type const operand_type = type_with_id(*program, operand_type_id);
+
+				if (is_pointer(operand_type))
+				{
+					complete::TypeId pointee_type = try_get<complete::Type::Pointer>(operand_type.extra_data)->value_type;
+					pointee_type.is_reference = true;
+
+					complete::expression::ReinterpretCast complete_expression;
+					complete_expression.return_type = pointee_type;
+					complete_expression.operand = allocate(std::move(operand));
+				}
+				else
+				{
+					mark_as_to_do("Overload dereference.");
+				}
+			},
+			[&](incomplete::expression::Subscript const & incomplete_expression) -> complete::Expression
+			{
+				complete::Expression array = instantiate_expression(*incomplete_expression.array, template_parameters, scope_stack, program);
+				complete::TypeId const array_type_id = expression_type_id(array, *program);
+				complete::Type const array_type = type_with_id(*program, array_type_id);
+
+				if (is_array(array_type))
+				{
+					complete::TypeId value_type = try_get<complete::Type::Array>(array_type.extra_data)->value_type;
+					value_type.is_reference = array_type_id.is_reference;
+
+					complete::Expression index = instantiate_expression(*incomplete_expression.index, template_parameters, scope_stack, program);
+
+					complete::expression::Subscript complete_expression;
+					complete_expression.return_type = value_type;
+					complete_expression.array = allocate(std::move(array));
+					complete_expression.index = allocate(insert_conversion_node(std::move(index), complete::TypeId::int_, *program));
+					return complete_expression;
+				}
+				else
+				{
+					mark_as_to_do("Overload dereference.");
+				}
 			}
 		);
 
