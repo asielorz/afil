@@ -390,6 +390,74 @@ namespace instantiation
 				{
 					mark_as_to_do("Overload of operator function call");
 				}
+			},
+			[&](incomplete::expression::UnaryOperatorCall & incomplete_expression) -> complete::Expression
+			{
+				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program);
+				complete::TypeId const operand_type = expression_type_id(operand, *program);
+				FunctionId const function = resolve_function_overloading_and_insert_conversions(
+					operator_overload_set(incomplete_expression.op), {&operand, 1}, {&operand_type, 1}, *program);
+
+				raise_syntax_error_if_not(function != invalid_function_id, "Operator overload not found.");
+
+				complete::expression::FunctionCall complete_expression;
+				complete_expression.function_id = function;
+				complete_expression.parameters.push_back(std::move(operand));
+				return complete_expression;
+			},
+			[&](incomplete::expression::BinaryOperatorCall & incomplete_expression) -> complete::Expression
+			{
+				complete::Expression operands[] = { 
+					instantiate_expression(*incomplete_expression.left, template_parameters, scope_stack, program),
+					instantiate_expression(*incomplete_expression.right, template_parameters, scope_stack, program)
+				};
+				complete::TypeId const operand_types[] = { expression_type_id(operands[0], *program),expression_type_id(operands[1], *program) };
+				FunctionId const function = resolve_function_overloading_and_insert_conversions(operator_overload_set(incomplete_expression.op), operands, operand_types, *program);
+				
+				raise_syntax_error_if_not(function != invalid_function_id, "Operator overload not found.");
+
+				Operator const op = incomplete_expression.op;
+				if (op == Operator::not_equal || op == Operator::less_equal || op == Operator::greater || op == Operator::greater_equal)
+				{
+					complete::expression::RelationalOperatorCall complete_expression;
+					complete_expression.op = op;
+					complete_expression.function_id = function;
+					complete_expression.parameters.reserve(2);
+					complete_expression.parameters.push_back(std::move(operands[0]));
+					complete_expression.parameters.push_back(std::move(operands[1]));
+					return complete_expression;
+				}
+				else
+				{
+					complete::expression::FunctionCall complete_expression;
+					complete_expression.function_id = function;
+					complete_expression.parameters.reserve(2);
+					complete_expression.parameters.push_back(std::move(operands[0]));
+					complete_expression.parameters.push_back(std::move(operands[1]));
+					return complete_expression;
+				}
+			},
+			[&](incomplete::expression::If & incomplete_expression) -> complete::Expression
+			{
+				complete::Expression condition = insert_conversion_node(
+					instantiate_expression(*incomplete_expression.condition, template_parameters, scope_stack, program),
+					complete::TypeId::bool_, *program);
+
+				complete::Expression then_case = instantiate_expression(*incomplete_expression.then_case, template_parameters, scope_stack, program);
+				complete::Expression else_case = instantiate_expression(*incomplete_expression.else_case, template_parameters, scope_stack, program);
+
+				complete::TypeId const then_type = expression_type_id(then_case, *program);
+				complete::TypeId const else_type = expression_type_id(else_case, *program);
+				complete::TypeId const return_type = common_type(then_type, else_type, *program);
+
+				then_case = insert_conversion_node(std::move(then_case), then_type, return_type, *program);
+				else_case = insert_conversion_node(std::move(else_case), else_type, return_type, *program);
+
+				complete::expression::If complete_expression;
+				complete_expression.condition = allocate(std::move(condition));
+				complete_expression.then_case = allocate(std::move(then_case));
+				complete_expression.else_case = allocate(std::move(else_case));
+				return complete_expression;
 			}
 		);
 

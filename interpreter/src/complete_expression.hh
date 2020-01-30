@@ -45,6 +45,13 @@ namespace complete
 			std::vector<Expression> parameters;
 		};
 
+		struct RelationalOperatorCall
+		{
+			Operator op;
+			FunctionId function_id;
+			std::vector<Expression> parameters;
+		};
+
 		struct ReinterpretCast
 		{
 			value_ptr<Expression> operand;
@@ -58,14 +65,22 @@ namespace complete
 			complete::TypeId return_type;
 		};
 
+		struct If
+		{
+			value_ptr<Expression> condition;
+			value_ptr<Expression> then_case;
+			value_ptr<Expression> else_case;
+		};
+
 		namespace detail
 		{
 			using ExpressionTreeBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>,
 				LocalVariable, GlobalVariable, MemberVariable,
-				OverloadSet, FunctionCall,
+				OverloadSet, FunctionCall, RelationalOperatorCall,
 				ReinterpretCast,
-				Subscript
+				Subscript,
+				If
 			>;
 		} // namespace detail
 	} // namespace expression
