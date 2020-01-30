@@ -110,5 +110,19 @@ namespace complete
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression;
 	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression;
 
+	struct OverloadSetView
+	{
+		constexpr OverloadSetView() noexcept = default;
+		OverloadSetView(OverloadSet const & lookup_overload_set) noexcept
+			: function_ids(lookup_overload_set.function_ids)
+			, function_template_ids(lookup_overload_set.function_template_ids)
+		{}
+
+		span<FunctionId const> function_ids;
+		span<FunctionTemplateId const> function_template_ids;
+	};
+	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
+	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept -> FunctionId;
+
 } // namespace complete
 

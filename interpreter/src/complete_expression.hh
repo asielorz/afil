@@ -39,6 +39,12 @@ namespace complete
 			complete::OverloadSet overload_set;
 		};
 
+		struct FunctionCall
+		{
+			FunctionId function_id;
+			std::vector<Expression> parameters;
+		};
+
 		struct ReinterpretCast
 		{
 			value_ptr<Expression> operand;
@@ -57,7 +63,7 @@ namespace complete
 			using ExpressionTreeBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>,
 				LocalVariable, GlobalVariable, MemberVariable,
-				OverloadSet,
+				OverloadSet, FunctionCall,
 				ReinterpretCast,
 				Subscript
 			>;

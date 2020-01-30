@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClCompile Include="src\complete_scope.cc" />
     <ClCompile Include="src\complete_statement.cc" />
+    <ClCompile Include="src\operator.cc" />
     <ClCompile Include="src\program.cc" />
     <ClCompile Include="src\template_instantiation.cc" />
     <ClCompile Include="src\utils\callc.cc" />
@@ -51,6 +52,7 @@
     <ClInclude Include="src\complete_expression.hh" />
     <ClInclude Include="src\complete_scope.hh" />
     <ClInclude Include="src\complete_statement.hh" />
+    <ClInclude Include="src\operator.hh" />
     <ClInclude Include="src\program.hh" />
     <ClInclude Include="src\template_instantiation.hh" />
     <ClInclude Include="src\utils\callc.hh" />

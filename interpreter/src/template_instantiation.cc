@@ -10,6 +10,8 @@
 #include "utils/unreachable.hh"
 #include "utils/warning_macro.hh"
 
+using namespace std::literals;
+
 enum struct ScopeType { global, function, block };
 struct CurrentScope
 {
@@ -183,6 +185,29 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		return overload_set;
 }
 
+complete::OverloadSet named_overload_set(std::string_view name, ScopeStackView scope_stack)
+{
+	auto const visitor = overload(
+		[](lookup_result::Nothing const &) -> complete::OverloadSet
+		{
+			return {};
+		},
+			[](lookup_result::OverloadSet const & overload_set) -> complete::OverloadSet
+		{
+			return overload_set;
+		},
+			[](auto const &) -> complete::Expression { declare_unreachable(); }
+		);
+
+	auto lookup = lookup_name(scope_stack, name);
+	return std::visit(visitor, lookup);
+}
+
+complete::OverloadSet operator_overload_set(Operator op, ScopeStackView scope_stack)
+{
+	return named_overload_set(operator_function_name(op), scope_stack);
+}
+
 namespace instantiation
 {
 
@@ -280,7 +305,14 @@ namespace instantiation
 				}
 				else
 				{
-					mark_as_to_do("Overload dereference.");
+					FunctionId const function = resolve_function_overloading_and_insert_conversions(
+						operator_overload_set(Operator::dereference, scope_stack), {&operand, 1}, {&operand_type_id, 1}, *program);
+					raise_syntax_error_if_not(function != invalid_function_id, "Overload not found for dereference operator.");
+
+					complete::expression::FunctionCall complete_expression;
+					complete_expression.function_id = function;
+					complete_expression.parameters.push_back(std::move(operand));
+					return complete_expression;
 				}
 			},
 			[&](incomplete::expression::Subscript const & incomplete_expression) -> complete::Expression
@@ -304,13 +336,26 @@ namespace instantiation
 				}
 				else
 				{
-					mark_as_to_do("Overload dereference.");
+					complete::Expression index = instantiate_expression(*incomplete_expression.index, template_parameters, scope_stack, program);
+					complete::TypeId const index_type_id = expression_type_id(index, *program);
+
+					complete::TypeId const param_types[] = {array_type_id, index_type_id};
+					complete::Expression params[] = {std::move(array), std::move(index)};
+
+					FunctionId const function = resolve_function_overloading_and_insert_conversions(named_overload_set("[]"sv, scope_stack), params, param_types, *program);
+					raise_syntax_error_if_not(function != invalid_function_id, "Overload not found for subscript operator.");
+
+					complete::expression::FunctionCall complete_expression;
+					complete_expression.function_id = function;
+					complete_expression.parameters.reserve(2);
+					complete_expression.parameters.push_back(std::move(params[0]));
+					complete_expression.parameters.push_back(std::move(params[1]));
+					return complete_expression;
 				}
 			}
 		);
 
-		(void)(incomplete_expression_, program, template_parameters, scope_stack);
-		return {};
+		return std::visit(visitor, incomplete_expression_);
 	}
 
 	auto instantiate_statement(
