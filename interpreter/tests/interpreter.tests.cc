@@ -70,3 +70,106 @@ TEST_CASE("Main function that calls another function.")
 	int const j = fib(8);
 	REQUIRE(parse_and_run(src) == difference(i, j));
 }
+
+TEST_CASE("C++ comments")
+{
+	auto const src = R"(
+		// Fibonacci function. Computes the ith number of the Fibonacci sequence.
+		let fib = fn (int i) -> int
+		{
+			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
+		};		
+
+		// Main function. Computes the difference between the 8th and the 5th Fibonacci numbers.
+		let main = fn () -> int
+		{
+			let i = fib(5);
+			let j = fib(8);
+
+			// Returns the absolute value of the subtraction of i and j.
+			let difference = fn (int i, int j) -> int
+			{
+				return 
+					if (i > j)
+						i - j
+					else
+						j - i;
+			};
+
+			return difference(i, j);
+		};
+	)"sv;
+
+	auto const difference = [](int i, int j)
+	{
+		if (i > j)
+			return i - j;
+		else
+			return j - i;
+	};
+
+	int const i = fib(5);
+	int const j = fib(8);
+	REQUIRE(parse_and_run(src) == difference(i, j));
+}
+
+TEST_CASE("C comments")
+{
+	auto const src = R"(
+		/* Fibonacci function. Computes the ith number of the Fibonacci sequence. */
+		let fib = fn (int i) -> int
+		{
+			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
+		};		
+
+		/* Main function. Computes the
+		   difference between the 8th
+		   and the 5th Fibonacci numbers. */
+		let main = fn () -> int
+		{
+			let i = fib(5);
+			let j = fib(8);
+
+			/* Returns the absolute value of the subtraction of i and j. */
+			let difference = fn (int i, int j) -> int
+			{
+				return 
+					if (i > /* Comments here just because I can */j)
+						i - j
+					else
+						j - i;
+			};
+
+			return difference( /* Comments*/ /*here*/ /*just*/ //because 
+
+		/*I*/   /*can*/ i, j);
+		};
+	)"sv;
+
+	auto const difference = [](int i, int j)
+	{
+		if (i > j)
+			return i - j;
+		else
+			return j - i;
+	};
+
+	int const i = fib(5);
+	int const j = fib(8);
+	REQUIRE(parse_and_run(src) == difference(i, j));
+}
+
+TEST_CASE("Accessing global variables from main function")
+{
+	auto const src = R"(
+		let i = 5;		
+		
+		let main = fn () -> int
+		{
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
+
