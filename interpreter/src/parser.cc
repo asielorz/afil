@@ -665,7 +665,7 @@ namespace parser
 			// Function call
 			else if (tokens[index].type == TokenType::open_parenthesis)
 			{
-				std::vector<incomplete::Expression> params = parse_comma_separated_expression_list(tokens, index, type_names, TokenType::open_bracket, TokenType::close_bracket);
+				std::vector<incomplete::Expression> params = parse_comma_separated_expression_list(tokens, index, type_names);
 				incomplete::expression::FunctionCall node;
 				node.parameters.reserve(params.size() + 1);
 				node.parameters.push_back(std::move(tree));

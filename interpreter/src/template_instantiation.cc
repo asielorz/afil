@@ -220,6 +220,46 @@ namespace instantiation
 		optional_out<complete::TypeId> current_scope_return_type
 	) -> std::optional<complete::Statement>;
 
+	auto instantiate_function_prototype(
+		incomplete::Function const & incomplete_function, 
+		span<complete::TypeId const> template_parameters, 
+		out<complete::Program> program,
+		out<complete::Function> function
+	) -> void
+	{
+		for (incomplete::FunctionParameter const & parameter : incomplete_function.parameters)
+			add_variable_to_scope(*function, parameter.name, resolve_dependent_type(parameter.type, template_parameters, *program), 0, *program);
+
+		function->parameter_count = static_cast<int>(incomplete_function.parameters.size());
+		function->parameter_size = function->stack_frame_size;
+
+		if (incomplete_function.return_type.has_value())
+			function->return_type = resolve_dependent_type(*incomplete_function.return_type, template_parameters, *program);
+		else
+			function->return_type = complete::TypeId::deduce;
+	}
+
+	auto instantiate_function_body(
+		incomplete::Function const & incomplete_function,
+		std::vector<complete::TypeId> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program,
+		out<complete::Function> function
+	) -> void
+	{
+		scope_stack.push_back({&*function, ScopeType::function, 0});
+
+		function->statements.reserve(incomplete_function.statements.size());
+		for (incomplete::Statement const & substatment : incomplete_function.statements)
+		{
+			auto complete_substatement = instantiate_statement(substatment, template_parameters, scope_stack, program, out(function->return_type));
+			if (complete_substatement.has_value())
+				function->statements.push_back(std::move(*complete_substatement));
+		}
+
+		scope_stack.pop_back();
+	}
+
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,
 		std::vector<complete::TypeId> & template_parameters,
@@ -229,25 +269,8 @@ namespace instantiation
 	{
 		complete::Function function;
 
-		for (incomplete::FunctionParameter const & parameter : incomplete_function.parameters)
-			add_variable_to_scope(function, parameter.name, resolve_dependent_type(parameter.type, template_parameters, *program), 0, *program);
-
-		if (incomplete_function.return_type.has_value())
-			function.return_type = resolve_dependent_type(*incomplete_function.return_type, template_parameters, *program);
-		else
-			function.return_type = complete::TypeId::deduce;
-
-		scope_stack.push_back({ &function, ScopeType::function, 0 });
-
-		function.statements.reserve(incomplete_function.statements.size());
-		for (incomplete::Statement const & substatment : incomplete_function.statements)
-		{
-			auto complete_substatement = instantiate_statement(substatment, template_parameters, scope_stack, program, out(function.return_type));
-			if (complete_substatement.has_value())
-				function.statements.push_back(std::move(*complete_substatement));
-		}
-
-		scope_stack.pop_back();
+		instantiate_function_prototype(incomplete_function, template_parameters, program, out(function));
+		instantiate_function_body(incomplete_function, template_parameters, scope_stack, program, out(function));
 
 		return function;
 	}
@@ -466,7 +489,7 @@ namespace instantiation
 				raise_syntax_error_if_not(function != invalid_function_id, "Operator overload not found.");
 
 				Operator const op = incomplete_expression.op;
-				if (op == Operator::not_equal || op == Operator::less_equal || op == Operator::greater || op == Operator::greater_equal)
+				if (op == Operator::not_equal || op == Operator::less || op == Operator::less_equal || op == Operator::greater || op == Operator::greater_equal)
 				{
 					complete::expression::RelationalOperatorCall complete_expression;
 					complete_expression.op = op;
@@ -588,6 +611,24 @@ namespace instantiation
 		auto const visitor = overload(
 			[&](incomplete::statement::VariableDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
+				// Hack for recursive functions
+				if (has_type<incomplete::expression::Function>(incomplete_statement.assigned_expression) && incomplete_statement.variable_name != "main")
+				{
+					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(incomplete_statement.assigned_expression)->function;
+
+					complete::Function function;
+					instantiate_function_prototype(incomplete_function, template_parameters, program, out(function));
+
+					program->functions.push_back(function);
+					FunctionId const function_id = FunctionId{ 0, static_cast<unsigned>(program->functions.size() - 1) };
+					top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
+
+					instantiate_function_body(incomplete_function, template_parameters, scope_stack, program, out(function));
+					program->functions[function_id.index] = std::move(function);
+
+					return std::nullopt;
+				}
+
 				complete::Expression expression = instantiate_expression(incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
 				complete::TypeId const var_type = incomplete_statement.type.has_value()
