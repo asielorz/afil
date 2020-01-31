@@ -18,7 +18,7 @@ auto precedence(Operator op) noexcept -> int
 		case Operator::equal:				return 3;
 		case Operator::not_equal:			return 3;
 		case Operator::and_:				return 2;
-		case Operator::not:					return 2;
+		case Operator::not_:				return 2;
 		case Operator::xor_:				return 1;
 		case Operator::or_:					return 0;
 		case Operator::assign:				return -1;
@@ -45,7 +45,7 @@ auto operator_function_name(Operator op) noexcept -> std::string_view
 		case Operator::and_:				return "and";
 		case Operator::or_:					return "or";
 		case Operator::xor_:				return "xor";
-		case Operator::not:					return "not";
+		case Operator::not_:				return "not";
 		case Operator::assign:				return "=";
 		case Operator::addressof:			return "&";
 	}

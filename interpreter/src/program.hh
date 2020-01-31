@@ -1,11 +1,13 @@
 #pragma once
 
 #include "complete_statement.hh"
+#include "incomplete_statement.hh"
 #include "complete_scope.hh"
 #include "complete_expression.hh"
 #include "function_id.hh"
 #include "utils/callc.hh"
 #include <optional>
+#include <map>
 
 namespace complete
 {
@@ -54,6 +56,24 @@ namespace complete
 		void const * function_pointer;
 	};
 
+	struct MemcmpRanges
+	{
+		using is_transparent = std::true_type;
+
+		template <typename T, typename U>
+		[[nodiscard]] constexpr auto operator () (T const & a, U const & b) const noexcept -> bool
+		{
+			return memcmp(a.data(), b.data(), a.size() * sizeof(*a.data())) < 0;
+		}
+	};
+
+	struct FunctionTemplate
+	{
+		int template_parameter_count;
+		incomplete::Function incomplete_function;
+		std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
+	};
+
 	struct MemberVariable : Variable
 	{
 		std::optional<Expression> initializer_expression;
@@ -65,12 +85,14 @@ namespace complete
 
 	struct Program
 	{
+		Program();
+
 		std::vector<Type> types;
 		std::vector<Struct> structs;
 		//std::vector<StructTemplate> struct_templates;
 		std::vector<Function> functions;
 		std::vector<ExternFunction> extern_functions;
-		//std::vector<FunctionTemplate> function_templates;
+		std::vector<FunctionTemplate> function_templates;
 		std::vector<Statement> global_initialization_statements;
 		Scope global_scope;
 		FunctionId main_function = invalid_function_id;
@@ -104,8 +126,10 @@ namespace complete
 	auto is_array_pointer(Type const & type) noexcept -> bool;
 	auto array_pointer_type_for(TypeId value_type, Program & program) noexcept -> TypeId;
 
-	auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>;
+	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>;
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
+
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId;
 
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression;
 	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression;
@@ -123,6 +147,12 @@ namespace complete
 	};
 	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept -> FunctionId;
+
+	auto insert_conversions(
+		span<Expression> parameters,
+		span<TypeId const> parsed_parameter_types,
+		span<TypeId const> target_parameter_types,
+		Program const & program) noexcept -> void;
 
 } // namespace complete
 

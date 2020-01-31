@@ -36,7 +36,7 @@ template <typename T>
 struct function_pointer_type
 	: public detail::function_pointer_type_base<decltype(&T::operator())>
 {
-	static_assert(std::is_convertible_v<T, type>);
+	static_assert(std::is_convertible_v<T, typename function_pointer_type::type>);
 };
 
 template <typename Ret, typename... Args>

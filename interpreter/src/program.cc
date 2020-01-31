@@ -1,10 +1,120 @@
 #include "program.hh"
-#include "utils/variant.hh"
 #include "utils/unreachable.hh"
+#include "syntax_error.hh"
+#include "utils/callc.hh"
+#include "utils/function_ptr.hh"
+#include "utils/variant.hh"
 #include <cassert>
+
+using namespace std::literals;
 
 namespace complete
 {
+
+	auto built_in_types() noexcept -> std::vector<std::pair<std::string_view, Type>>
+	{
+		return {
+			{"void",  {0, 1}},
+			{"int",   {4, 4}},
+			{"float", {4, 4}},
+			{"bool",  {1, 1}},
+		};
+	}
+
+	template <typename T> struct index_for_type {};
+	template <> struct index_for_type<void> { static constexpr unsigned value = 0; };
+	template <> struct index_for_type<int> { static constexpr unsigned value = 1; };
+	template <> struct index_for_type<float> { static constexpr unsigned value = 2; };
+	template <> struct index_for_type<bool> { static constexpr unsigned value = 3; };
+	template <typename T> constexpr unsigned index_for_type_v = index_for_type<T>::value;
+
+	using mpl::BoxedType;
+	using mpl::box;
+
+	template <typename T>
+	constexpr auto id_for(BoxedType<T>) noexcept -> TypeId
+	{
+		return TypeId::with_index(index_for_type_v<T>);
+	}
+	template <typename T>
+	constexpr auto id_for(BoxedType<T &>) noexcept -> TypeId
+	{
+		return make_mutable(make_reference(TypeId::with_index(index_for_type_v<T>)));
+	}
+	template <typename T>
+	constexpr auto id_for(BoxedType<T const &>) noexcept -> TypeId
+	{
+		return make_reference(TypeId::with_index(index_for_type_v<T>));
+	}
+
+	template <typename R, typename ... Args>
+	auto extern_function_descriptor(auto (*fn)(Args...) noexcept -> R) noexcept -> ExternFunction
+	{
+		return ExternFunction{
+			static_cast<int>(sizeof(std::tuple<Args...>)),
+			static_cast<int>(alignof(std::tuple<Args...>)),
+			id_for(box<R>),
+			{id_for(box<Args>)...},
+			callc::c_function_caller(fn),
+			fn
+		};
+	}
+
+	auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_view, ExternFunction>>
+	{
+		return {
+			{"+"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a + b; })},
+			{"-"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
+			{"*"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a * b; })},
+			{"/"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a / b; })},
+			{"%"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a % b; })},
+			{"=="sv,	extern_function_descriptor(+[](int a, int b) noexcept -> bool { return a == b; })},
+			{"<=>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
+			{"-"sv,		extern_function_descriptor(+[](int a) noexcept -> int { return -a; })},
+
+			{"+"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a + b; })},
+			{"-"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
+			{"*"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a * b; })},
+			{"/"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a / b; })},
+			{"=="sv,	extern_function_descriptor(+[](float a, float b) noexcept -> bool { return a == b; })},
+			{"<=>"sv,	extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
+			{"-"sv,		extern_function_descriptor(+[](float a) noexcept -> float { return -a; })},
+
+			{"and"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a && b; })},
+			{"or"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a || b; })},
+			{"xor"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a != b; })},
+			{"not"sv,	extern_function_descriptor(+[](bool a) noexcept -> bool { return !a; })},
+			{"=="sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a == b; })},
+		};
+	}
+
+	Program::Program()
+	{
+		auto const built_in_types_to_add = built_in_types();
+
+		types.reserve(built_in_types_to_add.size());
+		global_scope.types.reserve(built_in_types_to_add.size());
+
+		for (auto const type : built_in_types_to_add)
+		{
+			global_scope.types.push_back({std::string(type.first), {false, false, false, static_cast<unsigned>(types.size())}});
+			types.push_back(type.second);
+		}
+
+		//*******************************************************************
+
+		auto const extern_functions_to_add = default_extern_functions();
+
+		extern_functions.reserve(extern_functions_to_add.size());
+		global_scope.functions.reserve(extern_functions_to_add.size());
+
+		for (auto const fn : extern_functions_to_add)
+		{
+			global_scope.functions.push_back({std::string(fn.first), {true, static_cast<unsigned>(extern_functions.size())}});
+			extern_functions.push_back(fn.second);
+		}
+	}
+
 
 	auto add_type(Program & program, Type new_type) noexcept -> TypeId
 	{
@@ -192,7 +302,7 @@ namespace complete
 		return add_type(program, std::move(new_type));
 	}
 
-	auto parameter_types(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
+	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
 	{
 		if (id.is_extern)
 		{
@@ -216,9 +326,208 @@ namespace complete
 			return program.functions[id.index].return_type;
 	}
 
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId;
+
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression
+	{
+		if (from.index == to.index)
+		{
+			// From reference to reference and value to value there is no conversion. A pointer is a pointer, regardless of constness.
+			if (from.is_reference == to.is_reference)
+				return tree;
+
+			if (from.is_reference && !to.is_reference)
+			{
+				expression::Dereference deref_node;
+				deref_node.expression = std::make_unique<Expression>(std::move(tree));
+				deref_node.return_type = to;
+				return deref_node;
+			}
+			else
+			{
+				raise_syntax_error_if_not(!to.is_mutable, "Can't bind a temporary to a mutable reference.");
+				mark_as_to_do("Address of temporaries");
+			}
+		}
+		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
+		{
+			return std::move(tree);
+		}
+		raise_syntax_error("Conversion between types does not exist.");
+	}
+
 	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression
 	{
 		return insert_conversion_node(std::move(tree), expression_type_id(tree, program), to, program);
+	}
+
+	auto check_type_validness_as_overload_candidate(TypeId param_type, TypeId parsed_type, Program const & program, int & conversions) noexcept -> bool
+	{
+		if (param_type == parsed_type)
+			return true;
+
+		if (is_convertible(parsed_type, param_type, program))
+		{
+			conversions++;
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId
+	{
+		struct Candidate
+		{
+			int conversions;
+			FunctionId function_id;
+		};
+		Candidate candidates[64];
+		int candidate_count = 0;
+
+		struct TemplateCandidate
+		{
+			int conversions;
+			FunctionTemplateId id;
+		};
+		TemplateCandidate template_candidates[64];
+		int template_candidate_count = 0;
+
+		for (FunctionId function_id : overload_set.function_ids)
+		{
+			auto const param_types = parameter_types_of(program, function_id);
+			if (param_types.size() == parameters.size())
+			{
+				int conversions = 0;
+				bool discard = false;
+				for (size_t i = 0; i < param_types.size(); ++i)
+				{
+					if (!check_type_validness_as_overload_candidate(param_types[i], parameters[i], program, conversions))
+					{
+						discard = true;
+						break;
+					}
+				}
+
+				if (!discard)
+				{
+					candidates[candidate_count++] = Candidate{ conversions, function_id };
+				}
+			}
+		}
+
+		TypeId resolved_dependent_types[32];
+		size_t dependent_type_count = 0;
+
+#if 0
+		for (FunctionTemplateId template_id : overload_set.function_template_ids)
+		{
+			FunctionTemplate const & fn = program.function_templates[template_id.index];
+			span<FunctionTemplate::Parameter const> template_params = fn.parameters;
+			if (template_params.size() == parameters.size())
+			{
+				dependent_type_count = fn.template_parameter_count;
+				std::fill(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none);
+
+				int conversions = 0;
+				bool discard = false;
+				for (size_t i = 0; i < template_params.size(); ++i)
+				{
+					if (!template_params[i].is_dependent)
+					{
+						if (!check_type_validness_as_overload_candidate(fn.scope.variables[template_params[i].index].type, parameters[i], program, conversions))
+						{
+							discard = true;
+							break;
+						}
+					}
+					else
+					{
+						DependentTypeId const dependent_type = fn.scope.dependent_variables[template_params[i].index].type;
+						TypeId const expected_type = expected_type_according_to_pattern(parameters[i], dependent_type, resolved_dependent_types, program);
+						if (expected_type == TypeId::none)
+						{
+							discard = true;
+							break;
+						}
+
+						if (!check_type_validness_as_overload_candidate(expected_type, parameters[i], program, conversions))
+						{
+							discard = true;
+							break;
+						}
+					}
+				}
+
+				if (!discard)
+				{
+					template_candidates[template_candidate_count++] = TemplateCandidate{ conversions, template_id };
+				}
+			}
+		}
+#endif
+		if (candidate_count == 0 && template_candidate_count == 0)
+		{
+			return invalid_function_id;
+		}
+		else
+		{
+			Candidate best_candidate;
+			TemplateCandidate best_template_candidate;
+
+			if (candidate_count > 1)
+			{
+				std::partial_sort(candidates, candidates + 2, candidates + candidate_count, [](Candidate a, Candidate b) { return a.conversions < b.conversions; });
+				assert(candidates[0].conversions < candidates[1].conversions); // Ambiguous call.
+			}
+			best_candidate = candidates[0];
+
+			if (template_candidate_count > 1)
+			{
+				std::partial_sort(template_candidates, template_candidates + 2, template_candidates + template_candidate_count,
+					[](TemplateCandidate a, TemplateCandidate b) { return a.conversions < b.conversions; });
+				assert(template_candidates[0].conversions < template_candidates[1].conversions); // Ambiguous call.
+			}
+			best_template_candidate = template_candidates[0];
+
+			if (template_candidate_count == 0 || candidate_count > 0 && best_candidate.conversions < best_template_candidate.conversions)
+				return best_candidate.function_id;
+			else
+			{
+				// Ensure that all template parameters have been resolved.
+				assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
+				mark_as_to_do("Instantiate function template.");
+				//return instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
+			}
+		}
+	}
+
+	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept -> FunctionId
+	{
+		FunctionId const function_id = resolve_function_overloading(overload_set, parameter_types, program);
+		if (function_id == invalid_function_id)
+			return invalid_function_id;
+
+		// If any conversion is needed in order to call the function, perform the conversion.
+		auto const target_parameter_types = parameter_types_of(program, function_id);
+		insert_conversions(parameters, parameter_types, target_parameter_types, program);
+
+		return function_id;
+	}
+
+	auto insert_conversions(
+		span<Expression> parameters,
+		span<TypeId const> parsed_parameter_types,
+		span<TypeId const> target_parameter_types,
+		Program const & program) noexcept -> void
+	{
+		for (size_t i = 0; i < target_parameter_types.size(); ++i)
+		{
+			if (parsed_parameter_types[i] != target_parameter_types[i])
+				parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program);
+		}
 	}
 
 } // namespace complete

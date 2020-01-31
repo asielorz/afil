@@ -9,6 +9,7 @@
 #include "utils/utils.hh"
 #include "utils/unreachable.hh"
 #include "utils/warning_macro.hh"
+#include <cassert>
 
 using namespace std::literals;
 
@@ -155,11 +156,11 @@ auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 					return lookup_result::Variable{ var->type, var->offset };
 			}
 
-			auto const type = std::find_if(scope.types.begin(), scope.types.end(), [name](Variable const & var) { return var.name == name; });
+			auto const type = std::find_if(scope.types.begin(), scope.types.end(), [name](TypeName const & var) { return var.name == name; });
 			if (type != scope.types.end())
 				return lookup_result::Type{ type->id };
 
-			auto const struct_template = std::find_if(scope.struct_templates.begin(), scope.struct_templates.end(), [name](Variable const & var) { return var.name == name; });
+			auto const struct_template = std::find_if(scope.struct_templates.begin(), scope.struct_templates.end(), [name](StructTemplateName const & var) { return var.name == name; });
 			if (struct_template != scope.struct_templates.end())
 				return lookup_result::StructTemplate{ struct_template->id };
 		}
@@ -192,11 +193,11 @@ complete::OverloadSet named_overload_set(std::string_view name, ScopeStackView s
 		{
 			return {};
 		},
-			[](lookup_result::OverloadSet const & overload_set) -> complete::OverloadSet
+		[](lookup_result::OverloadSet const & overload_set) -> complete::OverloadSet
 		{
 			return overload_set;
 		},
-			[](auto const &) -> complete::Expression { declare_unreachable(); }
+		[](auto const &) -> complete::OverloadSet { declare_unreachable(); }
 		);
 
 	auto lookup = lookup_name(scope_stack, name);
@@ -211,11 +212,52 @@ complete::OverloadSet operator_overload_set(Operator op, ScopeStackView scope_st
 namespace instantiation
 {
 
+	auto instantiate_statement(
+		incomplete::Statement const & incomplete_statement_,
+		std::vector<complete::TypeId> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program,
+		optional_out<complete::TypeId> current_scope_return_type
+	) -> std::optional<complete::Statement>;
+
+	auto instantiate_function_template(
+		incomplete::Function const & incomplete_function,
+		std::vector<complete::TypeId> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program
+	) -> complete::Function
+	{
+		complete::Function function;
+
+		for (incomplete::FunctionParameter const & parameter : incomplete_function.parameters)
+			add_variable_to_scope(function, parameter.name, resolve_dependent_type(parameter.type, template_parameters, *program), 0, *program);
+
+		if (incomplete_function.return_type.has_value())
+			function.return_type = resolve_dependent_type(*incomplete_function.return_type, template_parameters, *program);
+		else
+			function.return_type = complete::TypeId::deduce;
+
+		scope_stack.push_back({ &function, ScopeType::function, 0 });
+
+		function.statements.reserve(incomplete_function.statements.size());
+		for (incomplete::Statement const & substatment : incomplete_function.statements)
+		{
+			auto complete_substatement = instantiate_statement(substatment, template_parameters, scope_stack, program, out(function.return_type));
+			if (complete_substatement.has_value())
+				function.statements.push_back(std::move(*complete_substatement));
+		}
+
+		scope_stack.pop_back();
+
+		return function;
+	}
+
 	auto instantiate_expression(
 		incomplete::Expression const & incomplete_expression_, 
 		std::vector<complete::TypeId> & template_parameters,
 		ScopeStack & scope_stack,
-		out<complete::Program> program
+		out<complete::Program> program,
+		optional_out<complete::TypeId> current_scope_return_type
 	) -> complete::Expression
 	{
 		auto const visitor = overload(
@@ -262,7 +304,7 @@ namespace instantiation
 			[&](incomplete::expression::MemberVariable const & incomplete_expression) -> complete::Expression
 			{
 				complete::expression::MemberVariable complete_expression;
-				complete_expression.owner = allocate(instantiate_expression(*incomplete_expression.owner, template_parameters, scope_stack, program));
+				complete_expression.owner = allocate(instantiate_expression(*incomplete_expression.owner, template_parameters, scope_stack, program, current_scope_return_type));
 				
 				complete::TypeId const owner_type_id = decay(expression_type_id(*complete_expression.owner, *program));
 				complete::Type const & owner_type = type_with_id(*program, owner_type_id);
@@ -278,7 +320,7 @@ namespace instantiation
 			},
 			[&](incomplete::expression::Addressof const & incomplete_expression) -> complete::Expression
 			{
-				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program);
+				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const operand_type = expression_type_id(operand, *program);
 				raise_syntax_error_if_not(operand_type.is_reference, "Attempted to take address of temporary.");
 				complete::TypeId const pointer_type = pointer_type_for(remove_reference(operand_type), *program);
@@ -290,7 +332,7 @@ namespace instantiation
 			},
 			[&](incomplete::expression::Dereference const & incomplete_expression) -> complete::Expression
 			{
-				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program);
+				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const operand_type_id = expression_type_id(operand, *program);
 				complete::Type const operand_type = type_with_id(*program, operand_type_id);
 
@@ -302,6 +344,7 @@ namespace instantiation
 					complete::expression::ReinterpretCast complete_expression;
 					complete_expression.return_type = pointee_type;
 					complete_expression.operand = allocate(std::move(operand));
+					return complete_expression;
 				}
 				else
 				{
@@ -317,7 +360,7 @@ namespace instantiation
 			},
 			[&](incomplete::expression::Subscript const & incomplete_expression) -> complete::Expression
 			{
-				complete::Expression array = instantiate_expression(*incomplete_expression.array, template_parameters, scope_stack, program);
+				complete::Expression array = instantiate_expression(*incomplete_expression.array, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const array_type_id = expression_type_id(array, *program);
 				complete::Type const array_type = type_with_id(*program, array_type_id);
 
@@ -326,7 +369,7 @@ namespace instantiation
 					complete::TypeId value_type = try_get<complete::Type::Array>(array_type.extra_data)->value_type;
 					value_type.is_reference = array_type_id.is_reference;
 
-					complete::Expression index = instantiate_expression(*incomplete_expression.index, template_parameters, scope_stack, program);
+					complete::Expression index = instantiate_expression(*incomplete_expression.index, template_parameters, scope_stack, program, current_scope_return_type);
 
 					complete::expression::Subscript complete_expression;
 					complete_expression.return_type = value_type;
@@ -336,7 +379,7 @@ namespace instantiation
 				}
 				else
 				{
-					complete::Expression index = instantiate_expression(*incomplete_expression.index, template_parameters, scope_stack, program);
+					complete::Expression index = instantiate_expression(*incomplete_expression.index, template_parameters, scope_stack, program, current_scope_return_type);
 					complete::TypeId const index_type_id = expression_type_id(index, *program);
 
 					complete::TypeId const param_types[] = {array_type_id, index_type_id};
@@ -353,12 +396,18 @@ namespace instantiation
 					return complete_expression;
 				}
 			},
-			[&](incomplete::expression::Function const &) -> complete::Expression
+			[&](incomplete::expression::Function const & incomplete_expression) -> complete::Expression
 			{
-				mark_as_to_do("Instantiation of functions");
+				program->functions.push_back(instantiate_function_template(incomplete_expression.function, template_parameters, scope_stack, program));
+				FunctionId const func_id = FunctionId{0, static_cast<unsigned>(program->functions.size() - 1)};
+
+				complete::expression::OverloadSet complete_expression;
+				complete_expression.overload_set.function_ids.push_back(func_id);
+				return complete_expression;
 			},
-			[&](incomplete::expression::FunctionTemplate const &) -> complete::Expression
+			[&](incomplete::expression::FunctionTemplate const & incomplete_expression) -> complete::Expression
 			{
+				(void)(incomplete_expression);
 				mark_as_to_do("Instantiation of function templates");
 			},
 			[&](incomplete::expression::FunctionCall const & incomplete_expression) -> complete::Expression
@@ -366,7 +415,7 @@ namespace instantiation
 				std::vector<complete::Expression> parameters;
 				parameters.reserve(incomplete_expression.parameters.size());
 				for (incomplete::Expression const & incomplete_param : incomplete_expression.parameters)
-					parameters.push_back(instantiate_expression(incomplete_param, template_parameters, scope_stack, program));
+					parameters.push_back(instantiate_expression(incomplete_param, template_parameters, scope_stack, program, current_scope_return_type));
 
 				if (has_type<complete::expression::OverloadSet>(parameters[0]))
 				{
@@ -391,12 +440,12 @@ namespace instantiation
 					mark_as_to_do("Overload of operator function call");
 				}
 			},
-			[&](incomplete::expression::UnaryOperatorCall & incomplete_expression) -> complete::Expression
+			[&](incomplete::expression::UnaryOperatorCall const & incomplete_expression) -> complete::Expression
 			{
-				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program);
+				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const operand_type = expression_type_id(operand, *program);
 				FunctionId const function = resolve_function_overloading_and_insert_conversions(
-					operator_overload_set(incomplete_expression.op), {&operand, 1}, {&operand_type, 1}, *program);
+					operator_overload_set(incomplete_expression.op, scope_stack), {&operand, 1}, {&operand_type, 1}, *program);
 
 				raise_syntax_error_if_not(function != invalid_function_id, "Operator overload not found.");
 
@@ -405,14 +454,14 @@ namespace instantiation
 				complete_expression.parameters.push_back(std::move(operand));
 				return complete_expression;
 			},
-			[&](incomplete::expression::BinaryOperatorCall & incomplete_expression) -> complete::Expression
+			[&](incomplete::expression::BinaryOperatorCall const & incomplete_expression) -> complete::Expression
 			{
 				complete::Expression operands[] = { 
-					instantiate_expression(*incomplete_expression.left, template_parameters, scope_stack, program),
-					instantiate_expression(*incomplete_expression.right, template_parameters, scope_stack, program)
+					instantiate_expression(*incomplete_expression.left, template_parameters, scope_stack, program, current_scope_return_type),
+					instantiate_expression(*incomplete_expression.right, template_parameters, scope_stack, program, current_scope_return_type)
 				};
-				complete::TypeId const operand_types[] = { expression_type_id(operands[0], *program),expression_type_id(operands[1], *program) };
-				FunctionId const function = resolve_function_overloading_and_insert_conversions(operator_overload_set(incomplete_expression.op), operands, operand_types, *program);
+				complete::TypeId const operand_types[] = { expression_type_id(operands[0], *program), expression_type_id(operands[1], *program) };
+				FunctionId const function = resolve_function_overloading_and_insert_conversions(operator_overload_set(incomplete_expression.op, scope_stack), operands, operand_types, *program);
 				
 				raise_syntax_error_if_not(function != invalid_function_id, "Operator overload not found.");
 
@@ -437,14 +486,14 @@ namespace instantiation
 					return complete_expression;
 				}
 			},
-			[&](incomplete::expression::If & incomplete_expression) -> complete::Expression
+			[&](incomplete::expression::If const & incomplete_expression) -> complete::Expression
 			{
 				complete::Expression condition = insert_conversion_node(
-					instantiate_expression(*incomplete_expression.condition, template_parameters, scope_stack, program),
+					instantiate_expression(*incomplete_expression.condition, template_parameters, scope_stack, program, current_scope_return_type),
 					complete::TypeId::bool_, *program);
 
-				complete::Expression then_case = instantiate_expression(*incomplete_expression.then_case, template_parameters, scope_stack, program);
-				complete::Expression else_case = instantiate_expression(*incomplete_expression.else_case, template_parameters, scope_stack, program);
+				complete::Expression then_case = instantiate_expression(*incomplete_expression.then_case, template_parameters, scope_stack, program, current_scope_return_type);
+				complete::Expression else_case = instantiate_expression(*incomplete_expression.else_case, template_parameters, scope_stack, program, current_scope_return_type);
 
 				complete::TypeId const then_type = expression_type_id(then_case, *program);
 				complete::TypeId const else_type = expression_type_id(else_case, *program);
@@ -458,55 +507,154 @@ namespace instantiation
 				complete_expression.then_case = allocate(std::move(then_case));
 				complete_expression.else_case = allocate(std::move(else_case));
 				return complete_expression;
+			},
+			[&](incomplete::expression::StatementBlock const & incomplete_expression) -> complete::Expression
+			{
+				complete::expression::StatementBlock complete_expression;
+				auto const guard = push_block_scope(scope_stack, complete_expression.scope);
+				complete_expression.statements.reserve(incomplete_expression.statements.size());
+				for (incomplete::Statement const & incomplete_substatement : incomplete_expression.statements)
+					complete_expression.statements.push_back(*instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program, out(complete_expression.return_type)));
+
+				return complete_expression;
+			},
+			[&](incomplete::expression::Constructor const & incomplete_expression) -> complete::Expression
+			{
+				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, *program);
+
+				if (incomplete_expression.parameters.size() == 0) // Default constructor
+				{
+					raise_syntax_error_if_not(is_default_constructible(constructed_type_id, *program), "Incorrect number of arguments for struct constructor.");
+					return synthesize_default_constructor(constructed_type_id, *program);
+				}
+
+				complete::expression::Constructor complete_expression;
+				complete_expression.constructed_type = constructed_type_id;
+
+				complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
+				if (is_struct(constructed_type))
+				{
+					complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
+
+					raise_syntax_error_if_not(constructed_struct.member_variables.size() == incomplete_expression.parameters.size(), "Incorrect number of arguments for struct constructor.");
+
+					size_t const n = incomplete_expression.parameters.size();
+					complete_expression.parameters.reserve(n);
+					for (size_t i = 0; i < n; ++i)
+					{
+						complete_expression.parameters.push_back(insert_conversion_node(
+							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type),
+							constructed_struct.member_variables[i].type, *program));
+					}
+				}
+				else if (is_array(constructed_type))
+				{
+					complete::Type::Array const & constructed_array = std::get<complete::Type::Array>(constructed_type.extra_data);
+					complete::TypeId const array_type = constructed_array.value_type;
+					int const array_size = constructed_array.size;
+
+					raise_syntax_error_if_not(
+						incomplete_expression.parameters.size() == 1 || incomplete_expression.parameters.size() == size_t(array_size),
+						"Incorrect number of arguments for array constructor.");
+
+					complete_expression.parameters.reserve(array_size);
+					for (int i = 0; i < array_size; ++i)
+					{
+						complete_expression.parameters.push_back(insert_conversion_node(
+							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type),
+							array_type, *program));
+					}
+				}
+				else
+				{
+					declare_unreachable();
+				}
+
+				return complete_expression;
 			}
 		);
 
-		return std::visit(visitor, incomplete_expression_);
+		return std::visit(visitor, incomplete_expression_.as_variant());
 	}
 
 	auto instantiate_statement(
 		incomplete::Statement const & incomplete_statement_, 
 		std::vector<complete::TypeId> & template_parameters, 
 		ScopeStack & scope_stack,
-		out<complete::Program> program
+		out<complete::Program> program,
+		optional_out<complete::TypeId> current_scope_return_type
 	) -> std::optional<complete::Statement>
 	{
 		auto const visitor = overload(
 			[&](incomplete::statement::VariableDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				complete::Expression expression = instantiate_expression(incomplete_statement.assigned_expression, template_parameters, scope_stack, program);
+				complete::Expression expression = instantiate_expression(incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
 				complete::TypeId const var_type = incomplete_statement.type.has_value()
 					? resolve_dependent_type(*incomplete_statement.type, template_parameters, *program)
 					: decay(assigned_expression_type);
 
-				// If it's a function somehow(expression)
-				TODO("Function declaration statements");
+				// Main function, which is somewhat special.
+				if (incomplete_statement.variable_name == "main"sv)
+				{
+					auto const * const overload_set = try_get<complete::expression::OverloadSet>(expression);
+					raise_syntax_error_if_not(overload_set, "Attempted to use name \"main\" to name something other than a function.");
+					raise_syntax_error_if_not(overload_set->overload_set.function_template_ids.size() == 0, "main cannot be a function template.");
+					raise_syntax_error_if_not(overload_set->overload_set.function_ids.size() == 1, "main function cannot be overloaded.");
+					FunctionId const main_function_id = overload_set->overload_set.function_ids[0];
 
-				raise_syntax_error_if_not(is_convertible(assigned_expression_type, var_type, *program), "Cannot convert to variable type in variable declaration.");
+					// Main must not take parameters and return int.
+					complete::Function const & main_function = program->functions[main_function_id.index];
+					raise_syntax_error_if_not(main_function.return_type == complete::TypeId::int_, "Main must return int.");
+					raise_syntax_error_if_not(main_function.parameter_count == 0, "Main cannot take parameters.");
 
-				int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
+					// There can only be one main function.
+					raise_syntax_error_if_not(program->main_function == invalid_function_id, "Redefinition of main function. There can only be one main function.");
 
-				complete::statement::VariableDeclaration complete_statement;
-				complete_statement.variable_offset = var_offset;
-				complete_statement.assigned_expression = insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program);
-				return complete_statement;
+					// Bind the function as the program's main function.
+					program->main_function = main_function_id;
+
+					return std::nullopt;
+				}
+				else if (auto const * const overload_set = try_get<complete::expression::OverloadSet>(expression))
+				{
+					raise_syntax_error_if_not(!incomplete_statement.type.has_value(), "A function must be declared with a let statement.");
+
+					for (FunctionId const function_id : overload_set->overload_set.function_ids)
+						top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
+
+					for (FunctionTemplateId const template_id : overload_set->overload_set.function_template_ids)
+						top(scope_stack).function_templates.push_back({incomplete_statement.variable_name, template_id});
+
+					return std::nullopt;
+				}
+				else
+				{
+					raise_syntax_error_if_not(is_convertible(assigned_expression_type, var_type, *program), "Cannot convert to variable type in variable declaration.");
+
+					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
+
+					complete::statement::VariableDeclaration complete_statement;
+					complete_statement.variable_offset = var_offset;
+					complete_statement.assigned_expression = insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program);
+					return complete_statement;
+				}
 			},
 			[&](incomplete::statement::ExpressionStatement const & incomplete_statement) -> std::optional<complete::Statement>
 			{
 				complete::statement::ExpressionStatement complete_statement;
-				complete_statement.expression = instantiate_expression(incomplete_statement.expression, template_parameters, scope_stack, program);
+				complete_statement.expression = instantiate_expression(incomplete_statement.expression, template_parameters, scope_stack, program, current_scope_return_type);
 				return complete_statement;
 			},
 			[&](incomplete::statement::If const & incomplete_statement) -> std::optional<complete::Statement>
 			{
 				complete::statement::If complete_statement;
 				complete_statement.condition = insert_conversion_node(
-					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program),
+					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type),
 					complete::TypeId::bool_, *program);
 
-				complete_statement.then_case = allocate(*instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program));
-				complete_statement.else_case = allocate(*instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program));
+				complete_statement.then_case = allocate(*instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
+				complete_statement.else_case = allocate(*instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
 
 				return complete_statement;
 			},
@@ -518,7 +666,7 @@ namespace instantiation
 
 				for (incomplete::Statement const & incomplete_substatement : incomplete_statement.statements)
 				{
-					auto complete_substatement = instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program);
+					auto complete_substatement = instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program, current_scope_return_type);
 					if (complete_substatement.has_value())
 						complete_statement.statements.push_back(std::move(*complete_substatement));
 				}
@@ -530,10 +678,10 @@ namespace instantiation
 				complete::statement::While complete_statement;
 
 				complete_statement.condition = insert_conversion_node(
-					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program),
+					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type),
 					complete::TypeId::bool_, *program);
 
-				complete_statement.body = allocate(*instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program));
+				complete_statement.body = allocate(*instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program, current_scope_return_type));
 
 				return complete_statement;
 			},
@@ -542,28 +690,32 @@ namespace instantiation
 				complete::statement::For complete_statement;
 				auto const guard = push_block_scope(scope_stack, complete_statement.scope);
 
-				auto init_statement = instantiate_statement(*incomplete_statement.init_statement, template_parameters, scope_stack, program);
-				raise_syntax_error_if_not(init_statement.has_value() && (
-					has_type<complete::statement::VariableDeclaration>(*init_statement) ||
-					has_type<complete::statement::ExpressionStatement>(*init_statement)), 
-					"Only variable declaration or expression statements accepted as init statements of for loops"); TODO("Maybe move this to parser?")
-
+				auto init_statement = instantiate_statement(*incomplete_statement.init_statement, template_parameters, scope_stack, program, current_scope_return_type);
+				assert(init_statement.has_value());
 				complete_statement.init_statement = allocate(*init_statement);
 
 				complete_statement.condition = insert_conversion_node(
-					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program),
+					instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type),
 					complete::TypeId::bool_, *program);
 
-				complete_statement.end_expression = instantiate_expression(incomplete_statement.end_expression, template_parameters, scope_stack, program);
-				complete_statement.body = allocate(*instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program));
+				complete_statement.end_expression = instantiate_expression(incomplete_statement.end_expression, template_parameters, scope_stack, program, current_scope_return_type);
+				complete_statement.body = allocate(*instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program, current_scope_return_type));
 
 				return complete_statement;
 			},
 			[&](incomplete::statement::Return const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				TODO("Return type. Conversion to return type.")
+				raise_syntax_error_if_not(scope_stack.back().type != ScopeType::global, "A return statement cannot appear at the global scope.");
+
 				complete::statement::Return complete_statement;
-				complete_statement.returned_expression = instantiate_expression(incomplete_statement.returned_expression, template_parameters, scope_stack, program);
+				complete_statement.returned_expression = instantiate_expression(incomplete_statement.returned_expression, template_parameters, scope_stack, program, current_scope_return_type);
+				complete::TypeId const returned_expression_type = expression_type_id(complete_statement.returned_expression, *program);
+
+				complete::TypeId const return_type = (*current_scope_return_type == complete::TypeId::deduce)
+					? decay(returned_expression_type)
+					: *current_scope_return_type;
+
+				complete_statement.returned_expression = insert_conversion_node(std::move(complete_statement.returned_expression), returned_expression_type, return_type, *program);
 
 				return complete_statement;
 			},
@@ -597,7 +749,7 @@ namespace instantiation
 					if (member_variable.initializer_expression.has_value())
 					{
 						new_variable.initializer_expression = insert_conversion_node(
-							instantiate_expression(*member_variable.initializer_expression, template_parameters, scope_stack, program),
+							instantiate_expression(*member_variable.initializer_expression, template_parameters, scope_stack, program, current_scope_return_type),
 							member_type, *program
 						);
 					}
@@ -635,7 +787,7 @@ namespace instantiation
 
 		for (incomplete::Statement const & incomplete_statement : incomplete_program)
 		{
-			auto complete_statement = instantiate_statement(incomplete_statement, template_parameters, scope_stack, out(complete_program));
+			auto complete_statement = instantiate_statement(incomplete_statement, template_parameters, scope_stack, out(complete_program), nullptr);
 			if (complete_statement)
 			{
 				raise_syntax_error_if_not(

@@ -78,7 +78,7 @@ namespace parser
 		if (token_source == "and"sv) return Operator::and_;
 		if (token_source == "or"sv) return Operator::or_;
 		if (token_source == "xor"sv) return Operator::xor_;
-		if (token_source == "not"sv) return Operator::not;
+		if (token_source == "not"sv) return Operator::not_;
 
 		switch (token_source[0])
 		{
@@ -397,13 +397,15 @@ namespace parser
 		// Parse arguments.
 		while (tokens[index].type == TokenType::identifier)
 		{
-			incomplete::Variable var;
-			var.type = parse_type_name(tokens, index, type_names);
+			incomplete::FunctionParameter var;
+			auto type = parse_type_name(tokens, index, type_names);
+			raise_syntax_error_if_not(type.has_value(), "Parameter type not found.");
+			var.type = std::move(*type);
 
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after function parameter type.");
 			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as function parameter name.");
 			var.name = tokens[index].source;
-			function->parameter_count++;
+			function->parameters.push_back(std::move(var));
 			index++;
 
 			if (tokens[index].type == TokenType::close_parenthesis)
@@ -1034,6 +1036,7 @@ namespace parser
 
 		std::vector<TypeName> type_names;
 		type_names.reserve(16);
+		type_names.push_back({"void",  TypeName::Type::type});
 		type_names.push_back({"int",   TypeName::Type::type});
 		type_names.push_back({"float", TypeName::Type::type});
 		type_names.push_back({"bool",  TypeName::Type::type});

@@ -65,11 +65,16 @@ namespace incomplete
 	};
 
 	struct Statement;
+	struct FunctionParameter
+	{
+		std::string name;
+		TypeId type;
+	};
+
 	struct Function
 	{
-		//Scope scope;
+		std::vector<FunctionParameter> parameters;
 		std::vector<Statement> statements;
-		int parameter_count;
 		std::optional<TypeId> return_type;
 	};
 	struct FunctionTemplate : Function 

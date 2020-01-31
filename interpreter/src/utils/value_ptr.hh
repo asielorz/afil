@@ -16,14 +16,14 @@ struct value_ptr : public std::unique_ptr<T>
 	value_ptr(value_ptr const & other)
 	{
 		if (other)
-			reset(new T(*other));
+			this->reset(new T(*other));
 	}
 	value_ptr & operator = (value_ptr const & other)
 	{
 		if (other)
-			reset(new T(*other));
+			this->reset(new T(*other));
 		else
-			reset(nullptr);
+			this->reset(nullptr);
 
 		return *this;
 	}
