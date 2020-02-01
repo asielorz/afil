@@ -71,6 +71,7 @@ namespace complete
 	{
 		int template_parameter_count;
 		incomplete::Function incomplete_function;
+		std::vector<TypeId> scope_template_parameters;
 		std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
 	};
 
@@ -126,6 +127,8 @@ namespace complete
 	auto is_array_pointer(Type const & type) noexcept -> bool;
 	auto array_pointer_type_for(TypeId value_type, Program & program) noexcept -> TypeId;
 
+	auto add_function(Program & program, Function new_function) noexcept -> FunctionId;
+	auto add_function_template(Program & program, FunctionTemplate new_function_template) noexcept -> FunctionTemplateId;
 	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>;
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 

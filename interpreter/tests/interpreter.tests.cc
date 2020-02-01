@@ -737,7 +737,6 @@ TEST_CASE("Conversion from immutable pointer to mutable pointer")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
-#if 0
 TEST_CASE("A function template lets the user define generic functions")
 {
 	auto const src = R"(
@@ -752,9 +751,10 @@ TEST_CASE("A function template lets the user define generic functions")
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src) == 1);
+	REQUIRE(tests::parse_and_run(src) == -3 + 4);
 }
 
+#if 0
 TEST_CASE("A template parameter may be a reference or mutable")
 {
 	auto const src = R"(

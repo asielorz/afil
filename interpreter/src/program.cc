@@ -1,8 +1,9 @@
 #include "program.hh"
-#include "utils/unreachable.hh"
 #include "syntax_error.hh"
+#include "template_instantiation.hh"
 #include "utils/callc.hh"
 #include "utils/function_ptr.hh"
+#include "utils/unreachable.hh"
 #include "utils/variant.hh"
 #include "utils/warning_macro.hh"
 #include <cassert>
@@ -317,6 +318,20 @@ namespace complete
 		return add_type(program, std::move(new_type));
 	}
 
+	auto add_function(Program & program, Function new_function) noexcept -> FunctionId
+	{
+		FunctionId const function_id = FunctionId{0, static_cast<unsigned>(program.functions.size())};
+		program.functions.push_back(std::move(new_function));
+		return function_id;
+	}
+
+	auto add_function_template(Program & program, FunctionTemplate new_function_template) noexcept -> FunctionTemplateId
+	{
+		FunctionTemplateId const function_template_id = FunctionTemplateId{static_cast<unsigned>(program.function_templates.size())};
+		program.function_templates.push_back(std::move(new_function_template));
+		return function_template_id;
+	}
+
 	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
 	{
 		if (id.is_extern)
@@ -341,7 +356,31 @@ namespace complete
 			return program.functions[id.index].return_type;
 	}
 
-	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId;
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId
+	{
+		FunctionTemplate & function_template = program.function_templates[template_id.index];
+
+		auto const cached_instantiation = function_template.cached_instantiations.find(parameters);
+		if (cached_instantiation != function_template.cached_instantiations.end())
+			return cached_instantiation->second;
+
+		std::vector<TypeId> all_template_parameters;
+		all_template_parameters.reserve(function_template.scope_template_parameters.size() + parameters.size());
+		for (TypeId const id : function_template.scope_template_parameters) all_template_parameters.push_back(id);
+		for (TypeId const id : parameters) all_template_parameters.push_back(id);
+
+		TODO("The complete scope stack.");
+		instantiation::ScopeStack scope_stack;
+		scope_stack.push_back({&program.global_scope, instantiation::ScopeType::global, 0});
+
+		Function instantiated_function = instantiation::instantiate_function_template(function_template.incomplete_function, all_template_parameters, scope_stack, out(program));
+		FunctionId const instantiated_function_id = add_function(program, std::move(instantiated_function));
+
+		auto parameters_to_insert = std::vector<TypeId>(parameters.begin(), parameters.end());
+		function_template.cached_instantiations.emplace(std::move(parameters_to_insert), instantiated_function_id);
+
+		return instantiated_function_id;
+	}
 
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression
 	{
@@ -513,9 +552,7 @@ namespace complete
 			{
 				// Ensure that all template parameters have been resolved.
 				assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
-				mark_as_to_do("Instantiate function template.");
-				//return instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
-				TODO("Instantiation of function templates");
+				return instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
 			}
 		}
 	}
