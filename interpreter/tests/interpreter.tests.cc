@@ -621,3 +621,916 @@ TEST_CASE("Designated initializers")
 
 	REQUIRE(tests::parse_and_run(src) == 7 - 3);
 }
+
+TEST_CASE("Default values for struct members")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+
+		let main = fn() -> int
+		{
+			let v = ivec2(.y = 5);
+			return v.x - v.y;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 0 - 5);
+}
+
+TEST_CASE("Default constructor for structs that have a default value for all members")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+
+		let main = fn() -> int
+		{
+			let v = ivec2();
+			return v.x + v.y;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 0 + 0);
+}
+
+TEST_CASE("Structs with default constructor do not need a default value for the type that contains them to be default constructible")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+		struct aabb
+		{
+			// aabb is default constructible because ivec2 is.
+			ivec2 min;
+			ivec2 max;
+		}
+
+		let main = fn() -> int
+		{
+			let box = aabb();
+			return box.min.x;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 0);
+}
+
+TEST_CASE("Operator overloading")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+		let (+) = fn(ivec2 a, ivec2 b)
+		{
+			return ivec2(a.x + b.x, a.y + b.y);
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec2(4, 5) + ivec2(-1, 3);
+			return v.y;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 8);
+}
+
+TEST_CASE("Pointers")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			int mut i = 5;
+			int mut * pi = &i;
+			*pi = 6;
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 6);
+}
+
+TEST_CASE("Conversion from immutable pointer to mutable pointer")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			int mut i = 5;
+			int * pi = &i;
+			return *pi;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
+#if 0
+TEST_CASE("A function template lets the user define generic functions")
+{
+	auto const src = R"(
+		let add = fn<T>(T a, T b) 
+		{ 
+			return a + b; 
+		};
+
+		let main = fn() -> int
+		{
+			return add(-3, 4);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
+TEST_CASE("A template parameter may be a reference or mutable")
+{
+	auto const src = R"(
+		let assign = fn<T>(T mut & a, T b) 
+		{ 
+			a = b; 
+		};
+
+		let main = fn() -> int
+		{
+			int mut i = 5;
+			assign(i, -225);
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -225);
+}
+
+TEST_CASE("A structure template lets the user define generic structures")
+{
+	auto const src = R"(
+		struct<T, U> pair
+		{
+			T first;
+			U second;
+		}
+		
+		let main = fn() -> int
+		{
+			let p = pair<int, int>(3, 4);
+			return p.first + p.second;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 + 4);
+}
+
+TEST_CASE("A structure may contain a variable of a template type")
+{
+	auto const src = R"(
+		struct<T> tvec2
+		{
+			T x;
+			T y;
+		}
+		
+		struct aabb
+		{
+			tvec2<int> min = tvec2<int>(0, 0);
+			tvec2<int> max = tvec2<int>(0, 0);
+		}
+		
+		let main = fn() -> int
+		{
+			aabb box;
+			return box.min.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+#endif
+
+TEST_CASE("Statement block in the default value of a member variable")
+{
+	auto const src = R"(
+		struct test
+		{
+			int x = {
+				int i = 3;
+				int j = 4;
+				return i * i + j * j;
+			};
+		}
+		
+		let main = fn() -> int
+		{
+			test t;
+			return t.x;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3 * 3 + 4 * 4);
+}
+
+#if 0
+TEST_CASE("Function template refactor: variable nodes")
+{
+	auto const src = R"(
+		let identity = fn<T>(T x) 
+		{ 
+			return x; 
+		};
+
+		let main = fn() -> int
+		{
+			return identity(1024);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 1024);
+}
+
+TEST_CASE("Function template refactor: function call nodes")
+{
+	auto const src = R"(
+		let add = fn<T>(T a, T b) 
+		{ 
+			return a + b; 
+		};
+
+		let main = fn() -> int
+		{
+			return add(3, 6);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 9);
+}
+
+TEST_CASE("Function template refactor: operator call nodes")
+{
+	auto const src = R"(
+		let eq = fn<T>(T a, T b) 
+		{ 
+			return a == b; 
+		};
+
+		let main = fn() -> int
+		{
+			if (eq(3, 4))
+				return 5;
+			else
+				return -5;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -5);
+}
+
+TEST_CASE("Function template refactor: relational operator call nodes")
+{
+	auto const src = R"(
+		let less = fn<T>(T a, T b) 
+		{ 
+			return a < b; 
+		};
+
+		let main = fn() -> int
+		{
+			if (less(3, 4))
+				return 5;
+			else
+				return -5;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
+
+TEST_CASE("Function template refactor: if expression")
+{
+	auto const src = R"(
+		let difference = fn<T>(T a, T b) 
+		{ 
+			return 
+				if (a < b)
+					b - a
+				else
+					a - b;
+		};
+
+		let main = fn() -> int
+		{
+			return difference(-4, 10);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 14);
+}
+
+TEST_CASE("Function template refactor: if statement")
+{
+	auto const src = R"(
+		let difference = fn<T>(T a, T b) 
+		{ 
+			if (a < b)
+				return b - a;
+			else
+				return a - b;
+		};
+
+		let main = fn() -> int
+		{
+			return difference(-4, 10);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 14);
+}
+
+TEST_CASE("Function template refactor: variable declaration statement of a non dependent type")
+{
+	auto const src = R"(
+		let difference = fn<T>(T a, T b) 
+		{ 
+			bool less = a < b;
+			if (less)
+				return b - a;
+			else
+				return a - b;
+		};
+
+		let main = fn() -> int
+		{
+			return difference(-4, 10);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 14);
+}
+
+TEST_CASE("Function template refactor: variable declaration statement of a non dependent type, round 2")
+{
+	auto const src = R"(
+		let difference = fn<T>(T a, T b) 
+		{ 
+			bool less = a < b;
+			if (less)
+				return b - a;
+			else
+				return a - b;
+		};
+
+		let main = fn() -> int
+		{
+			return difference(10, -4);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 14);
+}
+
+TEST_CASE("Function template refactor: variable declaration of dependent type")
+{
+	auto const src = R"(
+		let midpoint = fn<T>(T a, T b) 
+		{ 
+			T m = (a + b) / 2;
+			return m;
+		};
+
+		let main = fn() -> int
+		{
+			return midpoint(0, 10);
+		};
+	)"sv;
+
+	auto const midpoint = [](auto a, auto b)
+	{
+		return (a + b) / 2;
+	};
+
+	REQUIRE(parse_and_run(src) == midpoint(0, 10));
+}
+
+TEST_CASE("Function template refactor: synthesizing default constructor for variable declaration of dependent type")
+{
+	auto const src = R"(
+		let return_default = fn<T>(T ignored) 
+		{ 
+			T default_constructed;
+			return default_constructed;
+		};
+
+		struct DefaultConstructible
+		{
+			int value = 5;
+		}		
+
+		let main = fn() -> int
+		{
+			let x = DefaultConstructible(7);
+			let y = return_default(x);
+			return y.value;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
+
+TEST_CASE("Function template refactor: struct constructor of non-dependent type")
+{
+	auto const src = R"(
+		struct ivec3
+		{
+			int x;
+			int y;
+			int z;
+		}
+		
+		let make_vector = fn<T>(T x, T y, T z) 
+		{ 
+			return ivec3(x, y, z);
+		};
+
+		let main = fn() -> int
+		{
+			let v = make_vector(1, 2, 3);
+			return v.y;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 2);
+}
+#endif
+
+TEST_CASE("Structs are assignable by default")
+{
+	auto const src = R"(
+		struct Foo
+		{
+			int x;
+		}
+
+		let main = fn() -> int
+		{
+			Foo mut f = Foo(5);
+			f = Foo(6);
+			return f.x;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 6);
+}
+
+#if 0
+TEST_CASE("Function template refactor: Member access to dependent type")
+{
+	auto const src = R"(
+		struct Foo
+		{
+			int x;
+		}
+		struct ivec3
+		{
+			int x;
+			int y;
+			int z;
+		}
+
+		let get_x = fn<T>(T t)
+		{
+			return t.x;
+		};
+
+		let main = fn() -> int
+		{
+			let f = Foo(6);
+			let v = ivec3(1, 2, 3);
+			return get_x(f) - get_x(v);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 5);
+}
+
+TEST_CASE("Member default initializer for struct templates")
+{
+	auto const src = R"(
+		struct<T, U> test_pair
+		{
+			T first = -4;
+			U second = -3;
+		}
+
+		let main = fn() -> int
+		{
+			let p = test_pair<int, int>();
+			return p.first + p.second;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -7);
+}
+
+TEST_CASE("Default construct struct template without let = syntax")
+{
+	auto const src = R"(
+		struct<T, U> test_pair
+		{
+			T first = -4;
+			U second = -3;
+		}
+
+		let main = fn() -> int
+		{
+			test_pair<int, int> p;
+			return p.first + p.second;
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == -7);
+}
+
+TEST_CASE("For loops in dependent contexts")
+{
+	auto const src = R"(
+		let some_sum = fn<T>(T first, T last, T step)
+		{
+			T mut sum = first;
+			for (T mut i = first + step; i < last; i = i + step)
+				sum = sum + i;
+			return sum;
+		};
+
+		let main = fn() -> int
+		{
+			return some_sum(0, 10, 1);
+		};
+	)"sv;
+
+	auto const some_sum = [](auto first, auto last, auto step)
+	{
+		auto sum = first;
+		for (auto i = first + step; i < last; i = i + step)
+			sum = sum + i;
+		return sum;
+	};
+
+	REQUIRE(parse_and_run(src) == some_sum(0, 10, 1));
+}
+
+TEST_CASE("Statement blocks in dependent contexts")
+{
+	auto const src = R"(
+		let add = fn<T>(T a, T b)
+		{
+			{
+				return a + b;
+			}
+		};
+
+		let main = fn() -> int
+		{
+			return add(3, 5);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 + 5);
+}
+
+TEST_CASE("Statement block expressions in dependent contexts")
+{
+	auto const src = R"(
+		let add = fn<T>(T a, T b)
+		{
+			return {
+				T needless_copy_1 = a;
+				T needless_copy_2 = b;
+				return needless_copy_1 + needless_copy_2;
+			};
+		};
+
+		let main = fn() -> int
+		{
+			return add(3, 5);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 3 + 5);
+}
+
+TEST_CASE("Recursive dependent types")
+{
+	auto const src = R"(
+		let dereference = fn<T>(T * p)
+		{
+			return *p;
+		};
+
+		let main = fn() -> int
+		{
+			int x = 25;
+			return dereference(&x);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 25);
+}
+#endif
+
+TEST_CASE("Declaring an array")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let a = int[4](1, 2, 3, 4);
+			return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 0);
+}
+
+TEST_CASE("Default constructed array")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+
+		let main = fn() -> int
+		{
+			ivec2[4] a;
+			return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 0);
+}
+
+TEST_CASE("User can overload subscript operator for their type")
+{
+	auto const src = R"(
+		struct ivec4
+		{
+			int x = 0;
+			int y = 0;
+			int z = 0;
+			int w = 0;
+		}
+
+		let ([]) = fn(ivec4 v, int i)
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec4(1, 3, 5, 7);
+			return v[3] - v[1];
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
+}
+
+TEST_CASE("Can overload based on mutability")
+{
+	auto const src = R"(
+		struct ivec4
+		{
+			int x = 0;
+			int y = 0;
+			int z = 0;
+			int w = 0;
+		}
+
+		let ([]) = fn(ivec4 & v, int i) -> int &
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let ([]) = fn(ivec4 mut & v, int i) -> int mut &
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec4(1, 3, 5, 7);
+			let mut mv = ivec4();
+
+			for (int mut i = 0; i < 4; i = i + 1)
+				mv[i] = v[i];
+
+			return mv[3] - mv[1];
+		};
+
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
+}
+
+TEST_CASE("Can overload based on mutability independent of order")
+{
+	auto const src = R"(
+		struct ivec4
+		{
+			int x = 0;
+			int y = 0;
+			int z = 0;
+			int w = 0;
+		}
+
+		let ([]) = fn(ivec4 mut & v, int i) -> int mut &
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let ([]) = fn(ivec4 & v, int i) -> int &
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec4(1, 3, 5, 7);
+			let mut mv = ivec4();
+
+			for (int mut i = 0; i < 4; i = i + 1)
+				mv[i] = v[i];
+
+			return mv[3] - mv[1];
+		};
+
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
+}
+
+#if 0
+TEST_CASE("Subscript on dependent types")
+{
+	auto const src = R"(
+		struct ivec4
+		{
+			int x = 0;
+			int y = 0;
+			int z = 0;
+			int w = 0;
+		}
+
+		let ([]) = fn(ivec4 v, int i)
+		{
+			if (i == 0) return v.x;
+			if (i == 1) return v.y;
+			if (i == 2) return v.z;
+			return v.w;
+		};
+
+		let subscript = fn<T>(T & array, int i)
+		{
+			return array[i];
+		};
+
+		let main = fn() -> int
+		{
+			let v = ivec4(1, 3, 5, 7);
+			return subscript(v, 3) - subscript(v, 0);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 6);
+}
+#endif
+
+TEST_CASE("Multiple argument subscript")
+{
+	auto const src = R"(
+		struct foo
+		{
+			int value;
+		}
+
+		let ([]) = fn(foo f, int i, int j)
+		{
+			return f.value + i + j;
+		};
+
+		let main = fn() -> int
+		{
+			let f = foo(3);
+			return f[4, 2];
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3 + 4 + 2);
+}
+
+#if 0
+TEST_CASE("Array of dependent type")
+{
+	auto const src = R"(
+		let foo = fn<T>(T a, T b)
+		{
+			let results = T[4](a + b, a - b, a * b, a / b);
+			return 0;
+		};
+
+		let main = fn() -> int
+		{
+			return foo(8, 4);
+		};
+	)"sv;
+
+	REQUIRE(parse_and_run(src) == 0);
+}
+
+TEST_CASE("Array pointer type")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let a = int[4](1, 2, 3, 4);
+			int[] pa = data(a);
+			return pa[2];
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("Function template that takes array of pointer type")
+{
+	auto const src = R"(
+		let subscript = fn<T>(T[] array, int i)
+		{
+			return array[i];
+		};
+	
+		let main = fn() -> int
+		{
+			let a = int[4](1, 2, 3, 4);
+			int[] pa = data(a);
+			return subscript(pa, 2);
+		};
+	)"sv;
+
+	REQUIRE(parser::parse_and_run(src) == 3);
+}
+
+TEST_CASE("Subscripting array types")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let a = int[4](1, 2, 3, 4);
+			return a[0] + a[1] + a[2] + a[3];
+		};
+	)"sv;
+
+	REQUIRE(parser::parse_and_run(src) == 10);
+}
+#endif
+
+
+/*****************************************************************
+Backlog
+- templates
+	- struct declaration that contains dependent types
+	- function declaration with dependent types
+- arrays (depends on pointers)
+- strings (depends on arrays)
+- importing other files
+- importing functions in C
+- contracts
+- concepts (depends on templates)
+- errors
+*****************************************************************/

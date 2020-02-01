@@ -372,7 +372,7 @@ namespace instantiation
 
 					complete::expression::ReinterpretCast complete_expression;
 					complete_expression.return_type = pointee_type;
-					complete_expression.operand = allocate(std::move(operand));
+					complete_expression.operand = allocate(insert_conversion_node(std::move(operand), operand_type_id, decay(operand_type_id), *program));
 					return complete_expression;
 				}
 				else
@@ -670,10 +670,24 @@ namespace instantiation
 		auto const visitor = overload(
 			[&](incomplete::statement::VariableDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				// Hack for recursive functions
-				if (has_type<incomplete::expression::Function>(incomplete_statement.assigned_expression) && incomplete_statement.variable_name != "main")
+				// Case in which nothing is assigned to the DECLARATION. Must be a variable of a default constructible type.
+				if (!incomplete_statement.assigned_expression.has_value())
 				{
-					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(incomplete_statement.assigned_expression)->function;
+					complete::TypeId const var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, *program);
+					raise_syntax_error_if_not(is_default_constructible(var_type, *program), "A function must be declared with a let statement.");
+
+					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
+
+					complete::statement::VariableDeclaration complete_statement;
+					complete_statement.variable_offset = var_offset;
+					complete_statement.assigned_expression = synthesize_default_constructor(var_type, *program);
+					return complete_statement;
+				}
+
+				// Hack for recursive functions
+				if (has_type<incomplete::expression::Function>(*incomplete_statement.assigned_expression) && incomplete_statement.variable_name != "main")
+				{
+					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(*incomplete_statement.assigned_expression)->function;
 
 					complete::Function function;
 					instantiate_function_prototype(incomplete_function, template_parameters, program, out(function));
@@ -688,7 +702,7 @@ namespace instantiation
 					return std::nullopt;
 				}
 
-				complete::Expression expression = instantiate_expression(incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type);
+				complete::Expression expression = instantiate_expression(*incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
 				complete::TypeId var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, *program);
 				if (decay(var_type) == complete::TypeId::deduce)

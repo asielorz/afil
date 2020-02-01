@@ -159,22 +159,36 @@ namespace complete
 			return false;
 	}
 
-	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> Expression
+	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> expression::Constructor
 	{
-		(void)(type_id, struct_data);
-		mark_as_to_do("synthesize_default_constructor");
+		expression::Constructor default_constructor_node;
+		default_constructor_node.constructed_type = type_id;
+		default_constructor_node.parameters.reserve(struct_data.member_variables.size());
+		for (MemberVariable const & var : struct_data.member_variables)
+			default_constructor_node.parameters.push_back(*var.initializer_expression);
+		return default_constructor_node;
 	}
 
-	auto synthesize_default_constructor(TypeId type_id, Type::Array array_data, Program const & program) noexcept -> Expression
+	auto synthesize_default_constructor(TypeId type_id, Type::Array array_data, Program const & program) noexcept -> expression::Constructor
 	{
-		(void)(type_id, array_data, program);
-		mark_as_to_do("synthesize_default_constructor");
+		expression::Constructor default_constructor_node;
+		default_constructor_node.constructed_type = type_id;
+		default_constructor_node.parameters.reserve(array_data.size);
+		default_constructor_node.parameters.push_back(synthesize_default_constructor(array_data.value_type, program));
+		for (int i = 1; i < array_data.size; ++i)
+			default_constructor_node.parameters.push_back(default_constructor_node.parameters[0]);
+		return default_constructor_node;
 	}
 
-	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> Expression
+	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expression::Constructor
 	{
-		(void)(type_id, program);
-		mark_as_to_do("synthesize_default_constructor");
+		Type const & type = type_with_id(program, type_id);
+		if (is_struct(type))
+			return synthesize_default_constructor(type_id, *struct_for_type(program, type));
+		else if (is_array(type))
+			return synthesize_default_constructor(type_id, std::get<Type::Array>(type.extra_data), program);
+
+		declare_unreachable();
 	}
 
 	auto is_struct(Type const & type) noexcept -> bool

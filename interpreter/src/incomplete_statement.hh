@@ -12,7 +12,7 @@ namespace incomplete
 		struct VariableDeclaration
 		{
 			std::string variable_name;
-			Expression assigned_expression;
+			std::optional<Expression> assigned_expression;
 			incomplete::TypeId type;
 		};
 
