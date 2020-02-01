@@ -4,6 +4,7 @@
 #include "utils/callc.hh"
 #include "utils/function_ptr.hh"
 #include "utils/variant.hh"
+#include "utils/warning_macro.hh"
 #include <cassert>
 
 using namespace std::literals;
@@ -500,6 +501,7 @@ namespace complete
 				assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
 				mark_as_to_do("Instantiate function template.");
 				//return instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
+				TODO("Instantiation of function templates");
 			}
 		}
 	}

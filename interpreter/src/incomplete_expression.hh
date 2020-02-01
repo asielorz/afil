@@ -8,6 +8,7 @@ namespace incomplete
 
 	struct Statement;
 	struct Expression;
+	struct DesignatedInitializer;
 
 	namespace expression
 	{
@@ -91,6 +92,12 @@ namespace incomplete
 			std::vector<Expression> parameters;
 		};
 
+		struct DesignatedInitializerConstructor
+		{
+			TypeId constructed_type;
+			std::vector<DesignatedInitializer> parameters;
+		};
+
 		namespace detail
 		{
 			using ExpressionTreeBase = std::variant<
@@ -99,7 +106,7 @@ namespace incomplete
 				Identifier, MemberVariable,
 				Function, FunctionTemplate,	FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 				If, StatementBlock,
-				Constructor
+				Constructor, DesignatedInitializerConstructor
 			>;
 		}
 
@@ -129,6 +136,12 @@ namespace incomplete
 	struct StructTemplate : Struct
 	{
 		std::vector<TemplateParameter> template_parameters;
+	};
+
+	struct DesignatedInitializer
+	{
+		std::string member_name;
+		Expression assigned_expression;
 	};
 
 } // namespace incomplete

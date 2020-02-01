@@ -33,7 +33,8 @@ namespace complete
 			[](expression::ReinterpretCast const & deref_node) { return deref_node.return_type; },
 			[](expression::Subscript const & subscript_node) { return subscript_node.return_type; },
 			[&](expression::If const & if_node) { return expression_type_id(*if_node.then_case, program); },
-			[](expression::StatementBlock const & block_node) { return block_node.return_type; }
+			[](expression::StatementBlock const & block_node) { return block_node.return_type; },
+			[](expression::Assignment const &) { return TypeId::void_; }
 		);
 		return std::visit(visitor, tree.as_variant());
 	}

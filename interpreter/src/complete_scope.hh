@@ -47,6 +47,7 @@ namespace complete
 	auto remove_reference(TypeId type) noexcept->TypeId;
 	auto decay(TypeId type) noexcept->TypeId;
 	auto common_type(TypeId a, TypeId b, Program const & program) noexcept->TypeId; // Returns TypeID::none if there is no common type.
+	auto assign_without_qualifiers(TypeId & dst, TypeId src) noexcept -> void;
 
 	struct Variable
 	{

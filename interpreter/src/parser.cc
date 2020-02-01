@@ -229,6 +229,20 @@ namespace parser
 		return type;
 	}
 
+	auto parse_mutable_pointer_array_and_reference(span<lex::Token const> tokens, size_t & index, incomplete::TypeId type) noexcept -> incomplete::TypeId
+	{
+		type = parse_mutable_pointer_and_array(tokens, index, std::move(type));
+
+		// Look for reference qualifier.
+		if (tokens[index].source == "&"sv)
+		{
+			type.is_reference = true;
+			index++;
+		}
+
+		return type;
+	}
+
 	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, span<TypeName const> type_names) noexcept -> std::vector<incomplete::TypeId>
 	{
 		raise_syntax_error_if_not(tokens[index].source == "<", "Expected '<' after template name.");
@@ -280,7 +294,7 @@ namespace parser
 				type.is_reference = false;
 				type.value = base_case;
 
-				return parse_mutable_pointer_and_array(tokens, index, type);
+				return parse_mutable_pointer_array_and_reference(tokens, index, type);
 			}
 			case TypeName::Type::struct_template:
 			{
@@ -292,7 +306,7 @@ namespace parser
 				type.is_reference = false;
 				type.value = std::move(template_instantiation);
 
-				return parse_mutable_pointer_and_array(tokens, index, std::move(type));
+				return parse_mutable_pointer_array_and_reference(tokens, index, std::move(type));
 			}
 			case TypeName::Type::template_parameter:
 			{
@@ -305,7 +319,7 @@ namespace parser
 				type.is_reference = false;
 				type.value = base_case;
 
-				return parse_mutable_pointer_and_array(tokens, index, type);
+				return parse_mutable_pointer_array_and_reference(tokens, index, type);
 			}
 		}
 
@@ -386,6 +400,54 @@ namespace parser
 		}
 
 		return parsed_expressions;
+	}
+
+	auto parse_designated_initializer_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) 
+		-> std::vector<incomplete::DesignatedInitializer>
+	{
+		// Parameter list starts with (
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after type name in struct constructor.");
+		index++;
+
+		std::vector<incomplete::DesignatedInitializer> initializers;
+
+		for (;;)
+		{
+			// A member initializer by name starts with a period.
+			raise_syntax_error_if_not(tokens[index].type == TokenType::period, "Expected '.' in designated initializer.");
+			index++;
+
+			incomplete::DesignatedInitializer parameter;
+
+			// Find the member to initialize.
+			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected member name after '.' in designated initializer.");
+			parameter.member_name = tokens[index].source;
+			index++;
+
+			// Next token must be =
+			raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' after member name in designated initializer.");
+			index++;
+
+			// Parse a parameter.
+			parameter.assigned_expression = parse_expression(tokens, index, type_names);
+
+			initializers.push_back(std::move(parameter));
+
+			// If after a parameter we find a close parenthesis, end parameter list.
+			if (tokens[index].type == TokenType::close_parenthesis)
+			{
+				index++;
+				break;
+			}
+			// If we find a comma, parse next parameter.
+			else if (tokens[index].type == TokenType::comma)
+				index++;
+			// Anything else we find is wrong.
+			else
+				raise_syntax_error("Expected ')' or ',' after designated initializer.");
+		}
+
+		return initializers;
 	}
 
 	auto parse_function(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> void
@@ -587,12 +649,22 @@ namespace parser
 		{
 			// It can be either a constructor call or the naming of a variable/function
 			auto type = parse_type_name(tokens, index, type_names);
-			if (type)
+			if (type.has_value())
 			{
-				incomplete::expression::Constructor ctor_node;
-				ctor_node.constructed_type = std::move(*type);
-				ctor_node.parameters = parse_comma_separated_expression_list(tokens, index, type_names);
-				return ctor_node;
+				if (tokens[index + 1].type == TokenType::period)
+				{
+					incomplete::expression::DesignatedInitializerConstructor ctor_node;
+					ctor_node.constructed_type = std::move(*type);
+					ctor_node.parameters = parse_designated_initializer_list(tokens, index, type_names);
+					return ctor_node;
+				}
+				else
+				{
+					incomplete::expression::Constructor ctor_node;
+					ctor_node.constructed_type = std::move(*type);
+					ctor_node.parameters = parse_comma_separated_expression_list(tokens, index, type_names);
+					return ctor_node;
+				}
 			}
 			else
 			{
@@ -712,11 +784,19 @@ namespace parser
 		index++;
 
 		bool is_mutable = false;
+		bool is_reference = false;
 
 		// Look for mutable qualifier.
-		if (tokens[index].source == "mut")
+		if (tokens[index].source == "mut"sv)
 		{
 			is_mutable = true;
+			index++;
+		}
+
+		// Look for mutable qualifier.
+		if (tokens[index].source == "&"sv)
+		{
+			is_reference = true;
 			index++;
 		}
 
@@ -760,6 +840,9 @@ namespace parser
 		incomplete::statement::VariableDeclaration statement;
 		statement.variable_name = name;
 		statement.assigned_expression = expression;
+		statement.type.value = incomplete::TypeId::Deduce();
+		statement.type.is_mutable = is_mutable;
+		statement.type.is_reference = is_reference;
 		return statement;
 	}
 

@@ -66,7 +66,7 @@ auto add_variable_to_scope(complete::Scope & scope, std::string_view name, compl
 	return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
 }
 
-auto resolve_dependent_type(incomplete::TypeId dependent_type, span<complete::TypeId const> template_parameters, complete::Program & program) -> complete::TypeId
+auto resolve_dependent_type(incomplete::TypeId const & dependent_type, span<complete::TypeId const> template_parameters, complete::Program & program) -> complete::TypeId
 {
 	auto const visitor = overload(
 		[&](incomplete::TypeId::BaseCase const & base_case)
@@ -101,6 +101,10 @@ auto resolve_dependent_type(incomplete::TypeId dependent_type, span<complete::Ty
 		[](incomplete::TypeId::TemplateInstantiation const & /*template_instantiation*/) -> complete::TypeId
 		{
 			mark_as_to_do("Dependent template instantiations");
+		},
+		[](incomplete::TypeId::Deduce const &) -> complete::TypeId
+		{
+			return complete::TypeId::deduce;
 		}
 	);
 
@@ -338,6 +342,8 @@ namespace instantiation
 
 				complete_expression.variable_offset = owner_struct.member_variables[member_index].offset;
 				complete_expression.variable_type = owner_struct.member_variables[member_index].type;
+				complete_expression.variable_type.is_reference = owner_type_id.is_reference;
+				complete_expression.variable_type.is_mutable = owner_type_id.is_mutable;
 
 				return complete_expression;
 			},
@@ -479,16 +485,28 @@ namespace instantiation
 			},
 			[&](incomplete::expression::BinaryOperatorCall const & incomplete_expression) -> complete::Expression
 			{
+				Operator const op = incomplete_expression.op;
+
 				complete::Expression operands[] = { 
 					instantiate_expression(*incomplete_expression.left, template_parameters, scope_stack, program, current_scope_return_type),
 					instantiate_expression(*incomplete_expression.right, template_parameters, scope_stack, program, current_scope_return_type)
 				};
 				complete::TypeId const operand_types[] = { expression_type_id(operands[0], *program), expression_type_id(operands[1], *program) };
-				FunctionId const function = resolve_function_overloading_and_insert_conversions(operator_overload_set(incomplete_expression.op, scope_stack), operands, operand_types, *program);
+				FunctionId const function = resolve_function_overloading_and_insert_conversions(operator_overload_set(op, scope_stack), operands, operand_types, *program);
 				
+				// Special case for built in assignment.
+				if (function == invalid_function_id && op == Operator::assign)
+				{
+					raise_syntax_error_if_not(operand_types[0].is_reference, "Cannot assign to a temporary.");
+					raise_syntax_error_if_not(operand_types[0].is_mutable, "Cannot assign to a constant.");
+					complete::expression::Assignment complete_expression;
+					complete_expression.destination = allocate(std::move(operands[0]));
+					complete_expression.source = allocate(insert_conversion_node(std::move(operands[1]), operand_types[1], decay(operand_types[0]), *program));
+					return complete_expression;
+				}
+
 				raise_syntax_error_if_not(function != invalid_function_id, "Operator overload not found.");
 
-				Operator const op = incomplete_expression.op;
 				if (op == Operator::not_equal || op == Operator::less || op == Operator::less_equal || op == Operator::greater || op == Operator::greater_equal)
 				{
 					complete::expression::RelationalOperatorCall complete_expression;
@@ -534,6 +552,7 @@ namespace instantiation
 			[&](incomplete::expression::StatementBlock const & incomplete_expression) -> complete::Expression
 			{
 				complete::expression::StatementBlock complete_expression;
+				complete_expression.return_type = complete::TypeId::deduce;
 				auto const guard = push_block_scope(scope_stack, complete_expression.scope);
 				complete_expression.statements.reserve(incomplete_expression.statements.size());
 				for (incomplete::Statement const & incomplete_substatement : incomplete_expression.statements)
@@ -594,6 +613,46 @@ namespace instantiation
 				}
 
 				return complete_expression;
+			},
+			[&](incomplete::expression::DesignatedInitializerConstructor const & incomplete_expression) -> complete::Expression
+			{
+				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, *program);
+				complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
+
+				raise_syntax_error_if_not(is_struct(constructed_type), "Designated initializers may only be used on structs.");
+				raise_syntax_error_if_not(!constructed_type_id.is_reference, "Designated initializers cannot be used to initialize a reference.");
+
+				complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
+
+				size_t const member_count = constructed_struct.member_variables.size();
+				auto complete_parameters = std::vector<complete::Expression>(member_count);
+				auto expression_initialized = std::vector<bool>(member_count, false);
+
+				for (incomplete::DesignatedInitializer const & initializer : incomplete_expression.parameters)
+				{
+					int const member_variable_index = find_member_variable(constructed_struct, initializer.member_name);
+					raise_syntax_error_if_not(member_variable_index != -1, "Expected member name after '.' in designated initializer.");
+					raise_syntax_error_if_not(!expression_initialized[member_variable_index], "Same member initialized twice in designated initializer.");
+
+					complete_parameters[member_variable_index] = instantiate_expression(initializer.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type);
+					expression_initialized[member_variable_index] = true;
+				}
+
+				// For any value that is not given an initializer, use the default if available or fail to parse.
+				for (size_t i = 0; i < member_count; ++i)
+				{
+					if (!expression_initialized[i])
+					{
+						complete::MemberVariable const & variable = constructed_struct.member_variables[i];
+						raise_syntax_error_if_not(variable.initializer_expression.has_value(), "Uninitialized member is not default constructible in designated initializer.");
+						complete_parameters[i] = *variable.initializer_expression;
+					}
+				}
+
+				complete::expression::Constructor complete_expression;
+				complete_expression.constructed_type = constructed_type_id;
+				complete_expression.parameters = std::move(complete_parameters);
+				return complete_expression;
 			}
 		);
 
@@ -631,9 +690,9 @@ namespace instantiation
 
 				complete::Expression expression = instantiate_expression(incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
-				complete::TypeId const var_type = incomplete_statement.type.has_value()
-					? resolve_dependent_type(*incomplete_statement.type, template_parameters, *program)
-					: decay(assigned_expression_type);
+				complete::TypeId var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, *program);
+				if (decay(var_type) == complete::TypeId::deduce)
+					assign_without_qualifiers(var_type, assigned_expression_type);
 
 				// Main function, which is somewhat special.
 				if (incomplete_statement.variable_name == "main"sv)
@@ -659,7 +718,7 @@ namespace instantiation
 				}
 				else if (auto const * const overload_set = try_get<complete::expression::OverloadSet>(expression))
 				{
-					raise_syntax_error_if_not(!incomplete_statement.type.has_value(), "A function must be declared with a let statement.");
+					raise_syntax_error_if_not(var_type == complete::TypeId::function, "A function must be declared with a let statement.");
 
 					for (FunctionId const function_id : overload_set->overload_set.function_ids)
 						top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
@@ -695,7 +754,8 @@ namespace instantiation
 					complete::TypeId::bool_, *program);
 
 				complete_statement.then_case = allocate(*instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
-				complete_statement.else_case = allocate(*instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
+				if (incomplete_statement.else_case != nullptr)
+					complete_statement.else_case = allocate(*instantiate_statement(*incomplete_statement.else_case, template_parameters, scope_stack, program, current_scope_return_type));
 
 				return complete_statement;
 			},
@@ -757,6 +817,9 @@ namespace instantiation
 					: *current_scope_return_type;
 
 				complete_statement.returned_expression = insert_conversion_node(std::move(complete_statement.returned_expression), returned_expression_type, return_type, *program);
+
+				if (*current_scope_return_type == complete::TypeId::deduce)
+					*current_scope_return_type = return_type;
 
 				return complete_statement;
 			},

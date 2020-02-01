@@ -39,8 +39,9 @@ namespace incomplete
 			int template_index;
 			std::vector<TypeId> parameters;
 		};
+		struct Deduce{};
 
-		std::variant<BaseCase, Pointer, Array, ArrayPointer, TemplateInstantiation> value;
+		std::variant<BaseCase, Pointer, Array, ArrayPointer, TemplateInstantiation, Deduce> value;
 		bool is_mutable : 1;
 		bool is_reference : 1;
 

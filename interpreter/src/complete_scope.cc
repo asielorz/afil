@@ -98,4 +98,10 @@ namespace complete
 		return TypeId::none;
 	}
 
+	auto assign_without_qualifiers(TypeId & dst, TypeId src) noexcept -> void
+	{
+		dst.is_language_reseved = src.is_language_reseved;
+		dst.index = src.index;
+	}
+
 } // namespace complete

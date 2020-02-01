@@ -86,6 +86,12 @@ namespace complete
 			value_ptr<Expression> else_case;
 		};
 
+		struct Assignment
+		{
+			value_ptr<Expression> destination;
+			value_ptr<Expression> source;
+		};
+
 		struct StatementBlock
 		{
 			Scope scope;
@@ -98,9 +104,9 @@ namespace complete
 			using ExpressionTreeBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>,
 				LocalVariable, GlobalVariable, MemberVariable,
-				OverloadSet, FunctionCall, RelationalOperatorCall, Constructor,
-				Dereference, ReinterpretCast,
-				Subscript,
+				OverloadSet, FunctionCall, RelationalOperatorCall, Assignment,
+				Constructor,
+				Dereference, ReinterpretCast, Subscript,
 				If, StatementBlock
 			>;
 		} // namespace detail

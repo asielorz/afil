@@ -13,7 +13,7 @@ namespace incomplete
 		{
 			std::string variable_name;
 			Expression assigned_expression;
-			std::optional<incomplete::TypeId> type;
+			incomplete::TypeId type;
 		};
 
 		struct ExpressionStatement
