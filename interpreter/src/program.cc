@@ -193,6 +193,13 @@ namespace complete
 		declare_unreachable();
 	}
 
+	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId
+	{
+		StructTemplateId const template_id = StructTemplateId{static_cast<unsigned>(program.struct_templates.size())};
+		program.struct_templates.push_back(std::move(new_template));
+		return template_id;
+	}
+
 	auto is_struct(Type const & type) noexcept -> bool
 	{
 		return has_type<Type::Struct>(type.extra_data);
@@ -385,6 +392,52 @@ namespace complete
 		function_template.cached_instantiations.emplace(std::move(parameters_to_insert), instantiated_function_id);
 
 		return instantiated_function_id;
+	}
+
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> TypeId
+	{
+		StructTemplate & struct_template = program.struct_templates[template_id.index];
+
+		if (auto const it = struct_template.cached_instantiations.find(parameters);
+			it != struct_template.cached_instantiations.end())
+			return it->second;
+
+		Type new_type;
+		new_type.size = 0;
+		new_type.alignment = 1;
+		Struct new_struct;
+
+		std::vector<ResolvedTemplateParameter> all_template_parameters;
+		all_template_parameters.reserve(struct_template.scope_template_parameters.size() + parameters.size());
+		for (ResolvedTemplateParameter const id : struct_template.scope_template_parameters)
+			all_template_parameters.push_back(id);
+
+		for (size_t i = 0; i < parameters.size(); ++i)
+			all_template_parameters.push_back({struct_template.incomplete_struct.template_parameters[i].name, parameters[i]});
+
+		TODO("The complete scope stack.");
+		instantiation::ScopeStack scope_stack;
+		scope_stack.push_back({&program.global_scope, instantiation::ScopeType::global, 0});
+
+		// Magic
+		for (incomplete::MemberVariable const & var_template : struct_template.incomplete_struct.member_variables)
+		{
+			TypeId const var_type = instantiation::resolve_dependent_type(var_template.type, all_template_parameters, scope_stack, program);
+
+			add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, var_template.name, var_type, 0, program);
+			if (var_template.initializer_expression)
+			{
+				new_struct.member_variables.back().initializer_expression = instantiation::instantiate_expression(
+					*var_template.initializer_expression, all_template_parameters, scope_stack, out(program), nullptr);
+			}
+		}
+
+		new_type.extra_data = Type::Struct{static_cast<int>(program.structs.size())};
+		program.structs.push_back(std::move(new_struct));
+		TypeId const new_type_id = TypeId::with_index(static_cast<unsigned>(program.types.size()));
+		program.types.push_back(std::move(new_type));
+		struct_template.cached_instantiations.emplace(std::vector<TypeId>(parameters.begin(), parameters.end()), new_type_id);
+		return new_type_id;
 	}
 
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression

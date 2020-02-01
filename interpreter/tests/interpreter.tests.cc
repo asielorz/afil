@@ -754,7 +754,6 @@ TEST_CASE("A function template lets the user define generic functions")
 	REQUIRE(tests::parse_and_run(src) == -3 + 4);
 }
 
-#if 0
 TEST_CASE("A template parameter may be a reference or mutable")
 {
 	auto const src = R"(
@@ -771,7 +770,7 @@ TEST_CASE("A template parameter may be a reference or mutable")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == -225);
+	REQUIRE(tests::parse_and_run(src) == -225);
 }
 
 TEST_CASE("A structure template lets the user define generic structures")
@@ -790,9 +789,10 @@ TEST_CASE("A structure template lets the user define generic structures")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 3 + 4);
+	REQUIRE(tests::parse_and_run(src) == 3 + 4);
 }
 
+#if 0
 TEST_CASE("A structure may contain a variable of a template type")
 {
 	auto const src = R"(

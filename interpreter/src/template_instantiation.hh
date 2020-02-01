@@ -28,6 +28,14 @@ namespace instantiation
 		out<complete::Program> program
 	) -> complete::Function;
 
+	auto instantiate_expression(
+		incomplete::Expression const & incomplete_expression_,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program,
+		optional_out<complete::TypeId> current_scope_return_type
+	) -> complete::Expression;
+
 	namespace lookup_result
 	{
 		struct Nothing {};
@@ -46,7 +54,14 @@ namespace instantiation
 			lookup_result::Type,
 			lookup_result::StructTemplate
 		>;
-	auto type_with_name(std::string_view name, ScopeStackView scope_stack) noexcept->complete::TypeId;
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> complete::TypeId;
 	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept -> complete::TypeId;
+
+	auto resolve_dependent_type(
+		incomplete::TypeId const & dependent_type,
+		span<complete::ResolvedTemplateParameter const> template_parameters,
+		ScopeStackView scope_stack,
+		complete::Program & program)
+		-> complete::TypeId;
 
 } // namespace instantiation

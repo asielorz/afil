@@ -104,4 +104,9 @@ namespace complete
 		dst.index = src.index;
 	}
 
+	auto add_variable_to_scope(complete::Scope & scope, std::string_view name, complete::TypeId type_id, int scope_offset, complete::Program const & program) -> int
+	{
+		return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
+	}
+
 } // namespace complete

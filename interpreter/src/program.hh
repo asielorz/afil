@@ -125,13 +125,20 @@ namespace complete
 		std::vector<MemberVariable> member_variables;
 	};
 
+	struct StructTemplate
+	{
+		incomplete::StructTemplate incomplete_struct;
+		std::vector<ResolvedTemplateParameter> scope_template_parameters;
+		std::map<std::vector<TypeId>, TypeId, MemcmpRanges> cached_instantiations;
+	};
+
 	struct Program
 	{
 		Program();
 
 		std::vector<Type> types;
 		std::vector<Struct> structs;
-		//std::vector<StructTemplate> struct_templates;
+		std::vector<StructTemplate> struct_templates;
 		std::vector<Function> functions;
 		std::vector<ExternFunction> extern_functions;
 		std::vector<FunctionTemplate> function_templates;
@@ -139,7 +146,6 @@ namespace complete
 		Scope global_scope;
 		FunctionId main_function = invalid_function_id;
 	};
-
 
 	auto add_type(Program & program, Type new_type) noexcept -> TypeId;
 	auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
@@ -150,6 +156,7 @@ namespace complete
 	auto synthesize_default_constructor(TypeId type_id, Type::Array array_data, Program const & program) noexcept -> expression::Constructor;
 	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expression::Constructor;
 
+	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId;
 	auto is_struct(Type const & type) noexcept -> bool;
 	auto struct_for_type(Program const & program, Type const & type) noexcept -> Struct const *;
 	auto struct_for_type(Program const & program, TypeId type) noexcept -> Struct const *;
@@ -174,6 +181,7 @@ namespace complete
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId;
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> TypeId;
 
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression;
 	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression;

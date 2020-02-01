@@ -970,13 +970,9 @@ namespace parser
 		return Stmt();
 	}
 
-	auto parse_struct_declaration(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Statement
+	auto parse_struct(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Struct
 	{
-		// Skip struct token.
-		index++;
-
-		//if (tokens[index].source == "<"sv)
-		//	return parse_template_struct_declaration(tokens, index, p);
+		incomplete::Struct declared_struct;
 
 		// Parse name
 		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after struct.");
@@ -988,8 +984,7 @@ namespace parser
 		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' after struct name.");
 		index++;
 
-		incomplete::Struct str;
-		str.name = type_name;
+		declared_struct.name = type_name;
 
 		// Parse member variables.
 		while (tokens[index].type != TokenType::close_brace)
@@ -1003,7 +998,7 @@ namespace parser
 
 			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name in member variable declaration.");
 			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as member variable name.");
-			raise_syntax_error_if_not(!is_name_locally_taken(tokens[index].source, str.member_variables), "More than one member variable with the same name.");
+			raise_syntax_error_if_not(!is_name_locally_taken(tokens[index].source, declared_struct.member_variables), "More than one member variable with the same name.");
 			var.name = tokens[index].source;
 			index++;
 
@@ -1015,16 +1010,45 @@ namespace parser
 			}
 
 			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "");
-			str.member_variables.push_back(std::move(var));
+			declared_struct.member_variables.push_back(std::move(var));
 			index++;
 		}
 
 		// Skip } token.
 		index++;
 
-		type_names.push_back({str.name, TypeName::Type::type});
+		return declared_struct;
+	}
 
-		return incomplete::statement::StructDeclaration{std::move(str)};
+	auto parse_struct_template_declaration(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::statement::StructTemplateDeclaration
+	{
+		incomplete::StructTemplate struct_template;
+		struct_template.template_parameters = parse_template_parameter_list(tokens, index);
+
+		size_t const type_name_stack_size = type_names.size();
+		for (incomplete::TemplateParameter const & param : struct_template.template_parameters)
+			type_names.push_back({param.name, TypeName::Type::template_parameter});
+
+		static_cast<incomplete::Struct &>(struct_template) = parse_struct(tokens, index, type_names);
+
+		type_names.resize(type_name_stack_size);
+
+		type_names.push_back({struct_template.name, TypeName::Type::struct_template});
+
+		return incomplete::statement::StructTemplateDeclaration{struct_template};
+	}
+
+	auto parse_struct_declaration(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Statement
+	{
+		// Skip struct token.
+		index++;
+
+		if (tokens[index].source == "<"sv)
+			return parse_struct_template_declaration(tokens, index, type_names);
+
+		incomplete::Struct declared_struct = parse_struct(tokens, index, type_names);
+		type_names.push_back({ declared_struct.name, TypeName::Type::type});
+		return incomplete::statement::StructDeclaration{std::move(declared_struct)};
 	}
 
 	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept -> incomplete::statement::VariableDeclaration

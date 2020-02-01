@@ -1,6 +1,7 @@
 #pragma once
 
 #include "function_id.hh"
+#include "utils/utils.hh"
 #include <vector>
 #include <string>
 
@@ -91,5 +92,40 @@ namespace complete
 		std::vector<FunctionTemplateName> function_templates;
 		std::vector<StructTemplateName> struct_templates;
 	};
+
+	template <typename T>
+	auto add_variable_to_scope(
+		std::vector<T> & variables, int & scope_size, int & scope_alignment,
+		std::string_view name, complete::TypeId type_id, int scope_offset, complete::Program const & program) -> int;
+
+	auto add_variable_to_scope(complete::Scope & scope, std::string_view name, complete::TypeId type_id, int scope_offset, complete::Program const & program) -> int;
+
+} // namespace complete
+
+//************************************************************************************************************************
+
+namespace complete
+{
+	struct Type;
+	auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
+
+	template <typename T>
+	auto add_variable_to_scope(
+		std::vector<T> & variables, int & scope_size, int & scope_alignment,
+		std::string_view name, complete::TypeId type_id, int scope_offset, complete::Program const & program) -> int
+	{
+		complete::Type const & type = type_with_id(program, type_id);
+		int const size = type_id.is_reference ? sizeof(void *) : type.size;
+		int const alignment = type_id.is_reference ? alignof(void *) : type.alignment;
+
+		T var;
+		var.name = name;
+		var.type = type_id;
+		var.offset = scope_offset + align(scope_size, alignment);
+		scope_size = var.offset + size;
+		scope_alignment = std::max(scope_alignment, alignment);
+		variables.push_back(std::move(var));
+		return var.offset;
+	}
 
 } // namespace complete

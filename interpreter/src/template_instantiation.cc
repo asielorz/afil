@@ -34,30 +34,6 @@ namespace instantiation
 		return StackGuard<ScopeStack>(scope_stack);
 	}
 
-	template <typename T>
-	auto add_variable_to_scope(
-		std::vector<T> & variables, int & scope_size, int & scope_alignment,
-		std::string_view name, complete::TypeId type_id, int scope_offset, complete::Program const & program) -> int
-	{
-		complete::Type const & type = type_with_id(program, type_id);
-		int const size = type_id.is_reference ? sizeof(void *) : type.size;
-		int const alignment = type_id.is_reference ? alignof(void *) : type.alignment;
-
-		T var;
-		var.name = name;
-		var.type = type_id;
-		var.offset = scope_offset + align(scope_size, alignment);
-		scope_size = var.offset + size;
-		scope_alignment = std::max(scope_alignment, alignment);
-		variables.push_back(std::move(var));
-		return var.offset;
-	}
-
-	auto add_variable_to_scope(complete::Scope & scope, std::string_view name, complete::TypeId type_id, int scope_offset, complete::Program const & program) -> int
-	{
-		return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
-	}
-
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type, 
 		span<complete::ResolvedTemplateParameter const> template_parameters,
@@ -87,9 +63,22 @@ namespace instantiation
 				complete::TypeId const pointee = resolve_dependent_type(*array_pointer.pointee, template_parameters, scope_stack, program);
 				return array_pointer_type_for(pointee, program);
 			},
-			[](incomplete::TypeId::TemplateInstantiation const & /*template_instantiation*/) -> complete::TypeId
+			[&](incomplete::TypeId::TemplateInstantiation const & template_instantiation) -> complete::TypeId
 			{
-				mark_as_to_do("Dependent template instantiations");
+				auto const visitor = overload(
+					[](lookup_result::StructTemplate result) -> complete::StructTemplateId { return result.template_id; },
+					[](auto const &) -> complete::StructTemplateId { declare_unreachable(); }
+				);
+
+				auto lookup = lookup_name(scope_stack, template_instantiation.template_name);
+				complete::StructTemplateId const template_id = std::visit(visitor, lookup);
+
+				std::vector<complete::TypeId> parameters;
+				parameters.reserve(template_instantiation.parameters.size());
+				for (incomplete::TypeId const & parameter : template_instantiation.parameters)
+					parameters.push_back(resolve_dependent_type(parameter, template_parameters, scope_stack, program));
+
+				return instantiate_struct_template(program, template_id, parameters);
 			},
 			[](incomplete::TypeId::Deduce const &) -> complete::TypeId
 			{
@@ -967,12 +956,15 @@ namespace instantiation
 
 				return std::nullopt;
 			},
-			[](incomplete::statement::StructTemplateDeclaration const & statement) -> std::optional<complete::Statement>
+			[&](incomplete::statement::StructTemplateDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				(void)(statement);
-				TODO("Struct templates");
-				mark_as_to_do("Struct templates");
-				//return std::nullopt;
+				complete::StructTemplate new_template;
+				new_template.incomplete_struct = incomplete_statement.declared_struct_template;
+				new_template.scope_template_parameters = template_parameters;
+				auto const id = add_struct_template(*program, std::move(new_template));
+				top(scope_stack).struct_templates.push_back({incomplete_statement.declared_struct_template.name, id});
+
+				return std::nullopt;
 			}
 		);
 
