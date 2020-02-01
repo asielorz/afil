@@ -67,11 +67,52 @@ namespace complete
 		}
 	};
 
+	struct ResolvedTemplateParameter
+	{
+		std::string name;
+		complete::TypeId type;
+	};
+
+	struct FunctionTemplateParameterType
+	{
+	#pragma warning (disable : 4201)
+		struct BaseCase
+		{
+			TypeId type;
+		};
+		struct TemplateParameter
+		{
+			int index;
+		};
+		struct Pointer
+		{
+			value_ptr<FunctionTemplateParameterType> pointee;
+		};
+		struct Array
+		{
+			value_ptr<FunctionTemplateParameterType> value_type;
+			int size;
+		};
+		struct ArrayPointer
+		{
+			value_ptr<FunctionTemplateParameterType> pointee;
+		};
+		struct TemplateInstantiation
+		{
+			StructTemplateId template_id;
+			std::vector<FunctionTemplateParameterType> parameters;
+		};
+
+		std::variant<BaseCase, TemplateParameter, Pointer, Array, ArrayPointer, TemplateInstantiation> value;
+		bool is_mutable : 1;
+		bool is_reference : 1;
+	};
+
 	struct FunctionTemplate
 	{
-		int template_parameter_count;
-		incomplete::Function incomplete_function;
-		std::vector<TypeId> scope_template_parameters;
+		incomplete::FunctionTemplate incomplete_function;
+		std::vector<FunctionTemplateParameterType> parameter_types;
+		std::vector<ResolvedTemplateParameter> scope_template_parameters;
 		std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
 	};
 

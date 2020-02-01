@@ -284,11 +284,10 @@ namespace parser
 		switch (it->type)
 		{
 			case TypeName::Type::type:
+			case TypeName::Type::template_parameter:
 			{
 				TypeId::BaseCase base_case;
-				base_case.index = found_index;
-				base_case.is_language_reserved = false;
-				base_case.is_dependent = false;
+				base_case.name = name_to_look_up;
 				TypeId type;
 				type.is_mutable = false;
 				type.is_reference = false;
@@ -299,7 +298,7 @@ namespace parser
 			case TypeName::Type::struct_template:
 			{
 				TypeId::TemplateInstantiation template_instantiation;
-				template_instantiation.template_index = found_index;
+				template_instantiation.template_name = name_to_look_up;
 				template_instantiation.parameters = parse_template_instantiation_parameter_list(tokens, index, type_names);
 				TypeId type;
 				type.is_mutable = false;
@@ -307,19 +306,6 @@ namespace parser
 				type.value = std::move(template_instantiation);
 
 				return parse_mutable_pointer_array_and_reference(tokens, index, std::move(type));
-			}
-			case TypeName::Type::template_parameter:
-			{
-				TypeId::BaseCase base_case;
-				base_case.index = found_index;
-				base_case.is_language_reserved = false;
-				base_case.is_dependent = true;
-				TypeId type;
-				type.is_mutable = false;
-				type.is_reference = false;
-				type.value = base_case;
-
-				return parse_mutable_pointer_array_and_reference(tokens, index, type);
 			}
 		}
 

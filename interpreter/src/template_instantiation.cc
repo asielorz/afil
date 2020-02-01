@@ -58,36 +58,33 @@ namespace instantiation
 		return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);
 	}
 
-	auto resolve_dependent_type(incomplete::TypeId const & dependent_type, span<complete::TypeId const> template_parameters, complete::Program & program) -> complete::TypeId
+	auto resolve_dependent_type(
+		incomplete::TypeId const & dependent_type, 
+		span<complete::ResolvedTemplateParameter const> template_parameters,
+		ScopeStackView scope_stack,
+		complete::Program & program) 
+		-> complete::TypeId
 	{
 		auto const visitor = overload(
 			[&](incomplete::TypeId::BaseCase const & base_case)
 			{
-				if (base_case.is_dependent)
-				{
-					return template_parameters[base_case.index];
-				}
-				else
-				{
-					complete::TypeId type;
-					type.index = base_case.index;
-					type.is_language_reseved = base_case.is_language_reserved;
-					return type;
-				}
+				complete::TypeId const type = type_with_name(base_case.name, scope_stack, template_parameters);
+				raise_syntax_error_if_not(type != complete::TypeId::none, "Type not found.");
+				return type;
 			},
 			[&](incomplete::TypeId::Pointer const & pointer)
 			{
-				complete::TypeId const pointee = resolve_dependent_type(*pointer.pointee, template_parameters, program);
+				complete::TypeId const pointee = resolve_dependent_type(*pointer.pointee, template_parameters, scope_stack, program);
 				return pointer_type_for(pointee, program);
 			},
 			[&](incomplete::TypeId::Array const & array)
 			{
-				complete::TypeId const value_type = resolve_dependent_type(*array.value_type, template_parameters, program);
+				complete::TypeId const value_type = resolve_dependent_type(*array.value_type, template_parameters, scope_stack, program);
 				return array_type_for(value_type, array.size, program);
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer)
 			{
-				complete::TypeId const pointee = resolve_dependent_type(*array_pointer.pointee, template_parameters, program);
+				complete::TypeId const pointee = resolve_dependent_type(*array_pointer.pointee, template_parameters, scope_stack, program);
 				return array_pointer_type_for(pointee, program);
 			},
 			[](incomplete::TypeId::TemplateInstantiation const & /*template_instantiation*/) -> complete::TypeId
@@ -106,15 +103,65 @@ namespace instantiation
 		return type;
 	}
 
-	namespace lookup_result
+	auto resolve_function_template_parameter_type(
+		incomplete::TypeId const & dependent_type,
+		span<complete::ResolvedTemplateParameter const> resolved_template_parameters,
+		span<incomplete::TemplateParameter const> unresolved_template_parameters, 
+		ScopeStackView scope_stack)
+		-> complete::FunctionTemplateParameterType
 	{
-		struct Nothing {};
-		struct Variable { complete::TypeId variable_type; int variable_offset; };
-		struct GlobalVariable { complete::TypeId variable_type; int variable_offset; };
-		struct OverloadSet : complete::OverloadSet {};
-		struct Type { complete::TypeId type_id; };
-		struct StructTemplate { complete::StructTemplateId template_id; };
+		auto const visitor = overload(
+			[&](incomplete::TypeId::BaseCase const & base_case) -> complete::FunctionTemplateParameterType
+			{
+				complete::TypeId const type = type_with_name(base_case.name, scope_stack, resolved_template_parameters);
+				if (type != complete::TypeId::none)
+					return {complete::FunctionTemplateParameterType::BaseCase{type}, false, false};
+
+				auto const it = std::find_if(unresolved_template_parameters.begin(), unresolved_template_parameters.end(), [&](incomplete::TemplateParameter const & param)
+				{
+					return param.name == base_case.name;
+				});
+				
+				if (it != unresolved_template_parameters.end())
+					return {complete::FunctionTemplateParameterType::TemplateParameter{static_cast<int>(it - unresolved_template_parameters.begin())}, false, false};
+
+				declare_unreachable();
+			},
+			[&](incomplete::TypeId::Pointer const & pointer) -> complete::FunctionTemplateParameterType
+			{
+				complete::FunctionTemplateParameterType::Pointer pointer_type;
+				pointer_type.pointee = allocate(resolve_function_template_parameter_type(*pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack));
+				return {pointer_type, false, false};
+			},
+			[&](incomplete::TypeId::Array const & array) -> complete::FunctionTemplateParameterType
+			{
+				complete::FunctionTemplateParameterType::Array array_type;
+				array_type.value_type = allocate(resolve_function_template_parameter_type(*array.value_type, resolved_template_parameters, unresolved_template_parameters, scope_stack));
+				array_type.size = array.size;
+				return {array_type, false, false};
+			},
+			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> complete::FunctionTemplateParameterType
+			{
+				complete::FunctionTemplateParameterType::ArrayPointer array_pointer_type;
+				array_pointer_type.pointee = allocate(resolve_function_template_parameter_type(*array_pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack));
+				return {array_pointer_type, false, false};
+			},
+			[](incomplete::TypeId::TemplateInstantiation const & /*template_instantiation*/) -> complete::FunctionTemplateParameterType
+			{
+				mark_as_to_do("Dependent template instantiations");
+			},
+			[](incomplete::TypeId::Deduce const &) -> complete::FunctionTemplateParameterType
+			{
+				declare_unreachable();
+			}
+		);
+
+		complete::FunctionTemplateParameterType type = std::visit(visitor, dependent_type.value);
+		type.is_reference = dependent_type.is_reference;
+		type.is_mutable = dependent_type.is_mutable;
+		return type;
 	}
+
 	auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		->std::variant<
 		lookup_result::Nothing,
@@ -143,13 +190,13 @@ namespace instantiation
 				{
 					auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), [name](Variable const & var) { return var.name == name; });
 					if (var != scope.variables.end())
-						return lookup_result::GlobalVariable{ var->type, var->offset };
+						return lookup_result::GlobalVariable{var->type, var->offset};
 				}
 				else if (!stop_looking_for_variables)
 				{
 					auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), [name](Variable const & var) { return var.name == name; });
 					if (var != scope.variables.end())
-						return lookup_result::Variable{ var->type, var->offset };
+						return lookup_result::Variable{var->type, var->offset};
 				}
 
 				auto const type = std::find_if(scope.types.begin(), scope.types.end(), [name](TypeName const & var) { return var.name == name; });
@@ -182,7 +229,7 @@ namespace instantiation
 			return overload_set;
 	}
 
-	complete::OverloadSet named_overload_set(std::string_view name, ScopeStackView scope_stack)
+	auto named_overload_set(std::string_view name, ScopeStackView scope_stack) -> complete::OverloadSet
 	{
 		auto const visitor = overload(
 			[](lookup_result::Nothing const &) -> complete::OverloadSet
@@ -200,14 +247,47 @@ namespace instantiation
 		return std::visit(visitor, lookup);
 	}
 
-	complete::OverloadSet operator_overload_set(Operator op, ScopeStackView scope_stack)
+	auto operator_overload_set(Operator op, ScopeStackView scope_stack) noexcept -> complete::OverloadSet
 	{
 		return named_overload_set(operator_function_name(op), scope_stack);
 	}
 
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> complete::TypeId
+	{
+		auto const visitor = overload(
+			[](lookup_result::Type const & type) -> complete::TypeId
+			{
+				return type.type_id;
+			},
+			[](auto const &) -> complete::TypeId
+			{
+				return complete::TypeId::none;
+			}
+		);
+
+		auto lookup = lookup_name(scope_stack, name);
+		return std::visit(visitor, lookup);
+	}
+
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept -> complete::TypeId
+	{
+		complete::TypeId const type = type_with_name(name, scope_stack);
+		if (type != complete::TypeId::none)
+			return type;
+
+		auto const it = std::find_if(template_parameters.begin(), template_parameters.end(), [name](complete::ResolvedTemplateParameter const & param)
+		{
+			return param.name == name;
+		});
+		if (it != template_parameters.end())
+			return it->type;
+
+		return complete::TypeId::none;
+	}
+
 	auto instantiate_statement(
 		incomplete::Statement const & incomplete_statement_,
-		std::vector<complete::TypeId> & template_parameters,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		optional_out<complete::TypeId> current_scope_return_type
@@ -215,26 +295,27 @@ namespace instantiation
 
 	auto instantiate_function_prototype(
 		incomplete::Function const & incomplete_function,
-		span<complete::TypeId const> template_parameters,
+		span<complete::ResolvedTemplateParameter const> template_parameters,
+		ScopeStackView scope_stack,
 		out<complete::Program> program,
 		out<complete::Function> function
 	) -> void
 	{
 		for (incomplete::FunctionParameter const & parameter : incomplete_function.parameters)
-			add_variable_to_scope(*function, parameter.name, resolve_dependent_type(parameter.type, template_parameters, *program), 0, *program);
+			add_variable_to_scope(*function, parameter.name, resolve_dependent_type(parameter.type, template_parameters, scope_stack, *program), 0, *program);
 
 		function->parameter_count = static_cast<int>(incomplete_function.parameters.size());
 		function->parameter_size = function->stack_frame_size;
 
 		if (incomplete_function.return_type.has_value())
-			function->return_type = resolve_dependent_type(*incomplete_function.return_type, template_parameters, *program);
+			function->return_type = resolve_dependent_type(*incomplete_function.return_type, template_parameters, scope_stack, *program);
 		else
 			function->return_type = complete::TypeId::deduce;
 	}
 
 	auto instantiate_function_body(
 		incomplete::Function const & incomplete_function,
-		std::vector<complete::TypeId> & template_parameters,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		out<complete::Function> function
@@ -255,14 +336,14 @@ namespace instantiation
 
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,
-		std::vector<complete::TypeId> & template_parameters,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program
 	) -> complete::Function
 	{
 		complete::Function function;
 
-		instantiate_function_prototype(incomplete_function, template_parameters, program, out(function));
+		instantiate_function_prototype(incomplete_function, template_parameters, scope_stack, program, out(function));
 		instantiate_function_body(incomplete_function, template_parameters, scope_stack, program, out(function));
 
 		return function;
@@ -270,7 +351,7 @@ namespace instantiation
 
 	auto instantiate_expression(
 		incomplete::Expression const & incomplete_expression_,
-		std::vector<complete::TypeId> & template_parameters,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		optional_out<complete::TypeId> current_scope_return_type
@@ -294,25 +375,25 @@ namespace instantiation
 				auto const lookup = lookup_name(scope_stack, incomplete_expression.name);
 				auto const lookup_visitor = overload(
 					[](lookup_result::Variable const & var) -> complete::Expression
-				{
-					complete::expression::LocalVariable complete_expression;
-					complete_expression.variable_type = var.variable_type;
-					complete_expression.variable_offset = var.variable_offset;
-					return complete_expression;
-				},
+					{
+						complete::expression::LocalVariable complete_expression;
+						complete_expression.variable_type = var.variable_type;
+						complete_expression.variable_offset = var.variable_offset;
+						return complete_expression;
+					},
 					[](lookup_result::GlobalVariable const & var) -> complete::Expression
-				{
-					complete::expression::GlobalVariable complete_expression;
-					complete_expression.variable_type = var.variable_type;
-					complete_expression.variable_offset = var.variable_offset;
-					return complete_expression;
-				},
+					{
+						complete::expression::GlobalVariable complete_expression;
+						complete_expression.variable_type = var.variable_type;
+						complete_expression.variable_offset = var.variable_offset;
+						return complete_expression;
+					},
 					[](lookup_result::OverloadSet const & var) -> complete::Expression
-				{
-					complete::expression::OverloadSet complete_expression;
-					complete_expression.overload_set = var; // Move?
-					return complete_expression;
-				},
+					{
+						complete::expression::OverloadSet complete_expression;
+						complete_expression.overload_set = var; // Move?
+						return complete_expression;
+					},
 					[](auto const &) -> complete::Expression { declare_unreachable(); }
 				);
 				return std::visit(lookup_visitor, lookup);
@@ -426,8 +507,15 @@ namespace instantiation
 			{
 				complete::FunctionTemplate new_function_template;
 				new_function_template.scope_template_parameters = template_parameters;
-				new_function_template.template_parameter_count = static_cast<int>(incomplete_expression.function_template.parameters.size());
 				new_function_template.incomplete_function = incomplete_expression.function_template;
+				new_function_template.parameter_types.reserve(incomplete_expression.function_template.parameters.size());
+				for (incomplete::FunctionParameter const & param : incomplete_expression.function_template.parameters)
+					new_function_template.parameter_types.push_back(resolve_function_template_parameter_type(
+						param.type,
+						template_parameters, 
+						incomplete_expression.function_template.template_parameters,
+						scope_stack
+					));
 
 				FunctionTemplateId const template_id =  add_function_template(*program, std::move(new_function_template));
 
@@ -451,7 +539,7 @@ namespace instantiation
 
 					FunctionId const function = resolve_function_overloading_and_insert_conversions(
 						try_get<complete::expression::OverloadSet>(parameters[0])->overload_set,
-						{ &parameters[1], parameter_types.size() }, parameter_types, *program);
+						{&parameters[1], parameter_types.size()}, parameter_types, *program);
 
 					raise_syntax_error_if_not(function != invalid_function_id, "Overload not found.");
 					complete::expression::FunctionCall complete_expression;
@@ -558,7 +646,7 @@ namespace instantiation
 			},
 			[&](incomplete::expression::Constructor const & incomplete_expression) -> complete::Expression
 			{
-				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, *program);
+				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, *program);
 
 				if (incomplete_expression.parameters.size() == 0) // Default constructor
 				{
@@ -612,7 +700,7 @@ namespace instantiation
 			},
 			[&](incomplete::expression::DesignatedInitializerConstructor const & incomplete_expression) -> complete::Expression
 			{
-				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, *program);
+				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, *program);
 				complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
 
 				raise_syntax_error_if_not(is_struct(constructed_type), "Designated initializers may only be used on structs.");
@@ -657,7 +745,7 @@ namespace instantiation
 
 	auto instantiate_statement(
 		incomplete::Statement const & incomplete_statement_,
-		std::vector<complete::TypeId> & template_parameters,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		optional_out<complete::TypeId> current_scope_return_type
@@ -669,7 +757,7 @@ namespace instantiation
 				// Case in which nothing is assigned to the DECLARATION. Must be a variable of a default constructible type.
 				if (!incomplete_statement.assigned_expression.has_value())
 				{
-					complete::TypeId const var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, *program);
+					complete::TypeId const var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, *program);
 					raise_syntax_error_if_not(is_default_constructible(var_type, *program), "A function must be declared with a let statement.");
 
 					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
@@ -686,7 +774,7 @@ namespace instantiation
 					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(*incomplete_statement.assigned_expression)->function;
 
 					complete::Function function;
-					instantiate_function_prototype(incomplete_function, template_parameters, program, out(function));
+					instantiate_function_prototype(incomplete_function, template_parameters, scope_stack, program, out(function));
 
 					FunctionId const function_id = add_function(*program, function);
 					top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
@@ -699,7 +787,7 @@ namespace instantiation
 
 				complete::Expression expression = instantiate_expression(*incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
-				complete::TypeId var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, *program);
+				complete::TypeId var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, *program);
 				if (decay(var_type) == complete::TypeId::deduce)
 					assign_without_qualifiers(var_type, assigned_expression_type);
 
@@ -851,7 +939,7 @@ namespace instantiation
 
 				for (incomplete::MemberVariable const & member_variable : incomplete_statement.declared_struct.member_variables)
 				{
-					complete::TypeId const member_type = resolve_dependent_type(member_variable.type, template_parameters, *program);
+					complete::TypeId const member_type = resolve_dependent_type(member_variable.type, template_parameters, scope_stack, *program);
 					raise_syntax_error_if_not(is_data_type(member_type), "Member variable cannot be void.");
 					raise_syntax_error_if_not(!member_type.is_reference, "Member variable cannot be reference.");
 					raise_syntax_error_if_not(!member_type.is_mutable, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
@@ -894,7 +982,7 @@ namespace instantiation
 	auto instantiate_templates(span<incomplete::Statement const> incomplete_program) noexcept -> complete::Program
 	{
 		complete::Program complete_program;
-		std::vector<complete::TypeId> template_parameters;
+		std::vector<complete::ResolvedTemplateParameter> template_parameters;
 		ScopeStack scope_stack;
 		scope_stack.push_back({ &complete_program.global_scope, ScopeType::global, 0 });
 

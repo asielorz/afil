@@ -3,6 +3,7 @@
 #include "template_instantiation.hh"
 #include "utils/callc.hh"
 #include "utils/function_ptr.hh"
+#include "utils/overload.hh"
 #include "utils/unreachable.hh"
 #include "utils/variant.hh"
 #include "utils/warning_macro.hh"
@@ -359,15 +360,19 @@ namespace complete
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId
 	{
 		FunctionTemplate & function_template = program.function_templates[template_id.index];
+		assert(parameters.size() == function_template.incomplete_function.template_parameters.size());
 
 		auto const cached_instantiation = function_template.cached_instantiations.find(parameters);
 		if (cached_instantiation != function_template.cached_instantiations.end())
 			return cached_instantiation->second;
 
-		std::vector<TypeId> all_template_parameters;
+		std::vector<ResolvedTemplateParameter> all_template_parameters;
 		all_template_parameters.reserve(function_template.scope_template_parameters.size() + parameters.size());
-		for (TypeId const id : function_template.scope_template_parameters) all_template_parameters.push_back(id);
-		for (TypeId const id : parameters) all_template_parameters.push_back(id);
+		for (ResolvedTemplateParameter const id : function_template.scope_template_parameters) 
+			all_template_parameters.push_back(id);
+
+		for (size_t i = 0; i < parameters.size(); ++i) 
+			all_template_parameters.push_back({function_template.incomplete_function.template_parameters[i].name, parameters[i]});
 
 		TODO("The complete scope stack.");
 		instantiation::ScopeStack scope_stack;
@@ -431,6 +436,77 @@ namespace complete
 		}
 	}
 
+	// Checks if a type satisfies a pattern, and resolves missing dependent types.
+	auto expected_type_according_to_pattern(
+		TypeId given_parameter, 
+		FunctionTemplateParameterType const & expected_pattern,
+		span<TypeId> resolved_dependent_types, 
+		Program & program) -> TypeId
+	{
+		auto const visitor = overload(
+			[](FunctionTemplateParameterType::BaseCase const & base_case)
+			{
+				return base_case.type;
+			},
+			[&](FunctionTemplateParameterType::TemplateParameter const & param)
+			{
+				TypeId const expected_type = decay(given_parameter);
+				if (resolved_dependent_types[param.index] == TypeId::none)
+				{
+					resolved_dependent_types[param.index] = expected_type;
+					return expected_type;
+				}
+				else if (resolved_dependent_types[param.index] == expected_type)
+					return expected_type;
+				else
+					return TypeId::none;
+			},
+			[&](FunctionTemplateParameterType::Pointer const & pointer)
+			{
+				Type const & type = type_with_id(program, given_parameter);
+
+				if (!is_pointer(type))
+					return TypeId::none; // Does not satisfy the pattern
+
+				TypeId const pointee = pointee_type(type);
+				TypeId const expected_pointee = expected_type_according_to_pattern(pointee, *pointer.pointee, resolved_dependent_types, program);
+
+				if (expected_pointee == TypeId::none)
+					return TypeId::none;
+				else
+					return pointer_type_for(expected_pointee, program);
+			},
+			[](FunctionTemplateParameterType::Array const & /*array*/) -> TypeId
+			{
+				mark_as_to_do("Dependent array types");
+			},
+			[&](FunctionTemplateParameterType::ArrayPointer const & pointer)
+			{
+				Type const & type = type_with_id(program, given_parameter);
+
+				if (!is_array_pointer(type))
+					return TypeId::none; // Does not satisfy the pattern
+
+				TypeId const pointee = pointee_type(type);
+				TypeId const expected_pointee = expected_type_according_to_pattern(pointee, *pointer.pointee, resolved_dependent_types, program);
+
+				if (expected_pointee == TypeId::none)
+					return TypeId::none;
+				else
+					return array_pointer_type_for(expected_pointee, program);
+			},
+			[](FunctionTemplateParameterType::TemplateInstantiation const & /*template_instantiation*/) -> TypeId
+			{
+				mark_as_to_do("Dependent template instantiations");
+			}
+		);
+
+		TypeId expected_type = std::visit(visitor, expected_pattern.value);
+		expected_type.is_reference = expected_pattern.is_reference;
+		expected_type.is_mutable = expected_pattern.is_mutable;
+		return expected_type;
+	}
+
 	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId
 	{
 		struct Candidate
@@ -475,43 +551,30 @@ namespace complete
 		TypeId resolved_dependent_types[32];
 		size_t dependent_type_count = 0;
 
-#if 0
 		for (FunctionTemplateId template_id : overload_set.function_template_ids)
 		{
 			FunctionTemplate const & fn = program.function_templates[template_id.index];
-			span<FunctionTemplate::Parameter const> template_params = fn.parameters;
-			if (template_params.size() == parameters.size())
+			span<FunctionTemplateParameterType const> const fn_parameters = fn.parameter_types;
+			if (fn_parameters.size() == parameters.size())
 			{
-				dependent_type_count = fn.template_parameter_count;
+				dependent_type_count = fn.incomplete_function.template_parameters.size();
 				std::fill(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none);
 
 				int conversions = 0;
 				bool discard = false;
-				for (size_t i = 0; i < template_params.size(); ++i)
+				for (size_t i = 0; i < parameters.size(); ++i)
 				{
-					if (!template_params[i].is_dependent)
+					TypeId const expected_type = expected_type_according_to_pattern(parameters[i], fn_parameters[i], resolved_dependent_types, program);
+					if (expected_type == TypeId::none)
 					{
-						if (!check_type_validness_as_overload_candidate(fn.scope.variables[template_params[i].index].type, parameters[i], program, conversions))
-						{
-							discard = true;
-							break;
-						}
+						discard = true;
+						break;
 					}
-					else
-					{
-						DependentTypeId const dependent_type = fn.scope.dependent_variables[template_params[i].index].type;
-						TypeId const expected_type = expected_type_according_to_pattern(parameters[i], dependent_type, resolved_dependent_types, program);
-						if (expected_type == TypeId::none)
-						{
-							discard = true;
-							break;
-						}
 
-						if (!check_type_validness_as_overload_candidate(expected_type, parameters[i], program, conversions))
-						{
-							discard = true;
-							break;
-						}
+					if (!check_type_validness_as_overload_candidate(expected_type, parameters[i], program, conversions))
+					{
+						discard = true;
+						break;
 					}
 				}
 
@@ -521,7 +584,7 @@ namespace complete
 				}
 			}
 		}
-#endif
+
 		if (candidate_count == 0 && template_candidate_count == 0)
 		{
 			return invalid_function_id;

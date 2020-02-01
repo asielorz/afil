@@ -1,21 +1,10 @@
 #pragma once
 
+#include "program.hh"
 #include "utils/out.hh"
 #include "utils/span.hh"
 #include <vector>
-
-namespace incomplete 
-{
-	struct Statement;
-	struct Function;
-}
-namespace complete 
-{
-	struct Program;
-	struct Function;
-	struct TypeId;
-	struct Scope;
-}
+#include <variant>
 
 namespace instantiation
 {
@@ -34,9 +23,30 @@ namespace instantiation
 
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,
-		std::vector<complete::TypeId> & template_parameters,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program
 	) -> complete::Function;
+
+	namespace lookup_result
+	{
+		struct Nothing {};
+		struct Variable { complete::TypeId variable_type; int variable_offset; };
+		struct GlobalVariable { complete::TypeId variable_type; int variable_offset; };
+		struct OverloadSet : complete::OverloadSet {};
+		struct Type { complete::TypeId type_id; };
+		struct StructTemplate { complete::StructTemplateId template_id; };
+	}
+	auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
+		->std::variant<
+			lookup_result::Nothing,
+			lookup_result::Variable,
+			lookup_result::GlobalVariable,
+			lookup_result::OverloadSet,
+			lookup_result::Type,
+			lookup_result::StructTemplate
+		>;
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack) noexcept->complete::TypeId;
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept -> complete::TypeId;
 
 } // namespace instantiation

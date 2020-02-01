@@ -4,6 +4,7 @@
 #include <vector>
 #include <variant>
 #include <optional>
+#include <string>
 
 namespace incomplete
 {
@@ -11,15 +12,9 @@ namespace incomplete
 	struct TypeId
 	{
 		#pragma warning (disable : 4201)
-		union BaseCase
+		struct BaseCase
 		{
-			struct
-			{
-				unsigned is_language_reserved : 1;
-				unsigned is_dependent : 1;
-				unsigned index : 30;
-			};
-			unsigned flat_value;
+			std::string name;
 		};
 		struct Pointer
 		{
@@ -36,7 +31,7 @@ namespace incomplete
 		};
 		struct TemplateInstantiation
 		{
-			int template_index;
+			std::string template_name;
 			std::vector<TypeId> parameters;
 		};
 		struct Deduce{};
@@ -45,7 +40,6 @@ namespace incomplete
 		bool is_mutable : 1;
 		bool is_reference : 1;
 
-		static auto with_index(unsigned index) noexcept -> TypeId;
 		static TypeId const unknown;
 	};
 
