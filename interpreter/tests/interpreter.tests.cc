@@ -792,7 +792,6 @@ TEST_CASE("A structure template lets the user define generic structures")
 	REQUIRE(tests::parse_and_run(src) == 3 + 4);
 }
 
-#if 0
 TEST_CASE("A structure may contain a variable of a template type")
 {
 	auto const src = R"(
@@ -815,9 +814,8 @@ TEST_CASE("A structure may contain a variable of a template type")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 0);
+	REQUIRE(tests::parse_and_run(src) == 0);
 }
-#endif
 
 TEST_CASE("Statement block in the default value of a member variable")
 {
@@ -841,7 +839,6 @@ TEST_CASE("Statement block in the default value of a member variable")
 	REQUIRE(tests::parse_and_run(src) == 3 * 3 + 4 * 4);
 }
 
-#if 0
 TEST_CASE("Function template refactor: variable nodes")
 {
 	auto const src = R"(
@@ -856,7 +853,7 @@ TEST_CASE("Function template refactor: variable nodes")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 1024);
+	REQUIRE(tests::parse_and_run(src) == 1024);
 }
 
 TEST_CASE("Function template refactor: function call nodes")
@@ -873,7 +870,7 @@ TEST_CASE("Function template refactor: function call nodes")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 9);
+	REQUIRE(tests::parse_and_run(src) == 9);
 }
 
 TEST_CASE("Function template refactor: operator call nodes")
@@ -893,7 +890,7 @@ TEST_CASE("Function template refactor: operator call nodes")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == -5);
+	REQUIRE(tests::parse_and_run(src) == -5);
 }
 
 TEST_CASE("Function template refactor: relational operator call nodes")
@@ -913,7 +910,7 @@ TEST_CASE("Function template refactor: relational operator call nodes")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 5);
+	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
 TEST_CASE("Function template refactor: if expression")
@@ -934,7 +931,7 @@ TEST_CASE("Function template refactor: if expression")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 14);
+	REQUIRE(tests::parse_and_run(src) == 14);
 }
 
 TEST_CASE("Function template refactor: if statement")
@@ -954,7 +951,7 @@ TEST_CASE("Function template refactor: if statement")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 14);
+	REQUIRE(tests::parse_and_run(src) == 14);
 }
 
 TEST_CASE("Function template refactor: variable declaration statement of a non dependent type")
@@ -975,7 +972,7 @@ TEST_CASE("Function template refactor: variable declaration statement of a non d
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 14);
+	REQUIRE(tests::parse_and_run(src) == 14);
 }
 
 TEST_CASE("Function template refactor: variable declaration statement of a non dependent type, round 2")
@@ -996,7 +993,7 @@ TEST_CASE("Function template refactor: variable declaration statement of a non d
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 14);
+	REQUIRE(tests::parse_and_run(src) == 14);
 }
 
 TEST_CASE("Function template refactor: variable declaration of dependent type")
@@ -1019,7 +1016,7 @@ TEST_CASE("Function template refactor: variable declaration of dependent type")
 		return (a + b) / 2;
 	};
 
-	REQUIRE(parse_and_run(src) == midpoint(0, 10));
+	REQUIRE(tests::parse_and_run(src) == midpoint(0, 10));
 }
 
 TEST_CASE("Function template refactor: synthesizing default constructor for variable declaration of dependent type")
@@ -1044,7 +1041,7 @@ TEST_CASE("Function template refactor: synthesizing default constructor for vari
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 5);
+	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
 TEST_CASE("Function template refactor: struct constructor of non-dependent type")
@@ -1069,9 +1066,8 @@ TEST_CASE("Function template refactor: struct constructor of non-dependent type"
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 2);
+	REQUIRE(tests::parse_and_run(src) == 2);
 }
-#endif
 
 TEST_CASE("Structs are assignable by default")
 {
@@ -1092,7 +1088,6 @@ TEST_CASE("Structs are assignable by default")
 	REQUIRE(tests::parse_and_run(src) == 6);
 }
 
-#if 0
 TEST_CASE("Function template refactor: Member access to dependent type")
 {
 	auto const src = R"(
@@ -1120,7 +1115,7 @@ TEST_CASE("Function template refactor: Member access to dependent type")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 5);
+	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
 TEST_CASE("Member default initializer for struct templates")
@@ -1139,7 +1134,7 @@ TEST_CASE("Member default initializer for struct templates")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == -7);
+	REQUIRE(tests::parse_and_run(src) == -7);
 }
 
 TEST_CASE("Default construct struct template without let = syntax")
@@ -1158,7 +1153,7 @@ TEST_CASE("Default construct struct template without let = syntax")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == -7);
+	REQUIRE(tests::parse_and_run(src) == -7);
 }
 
 TEST_CASE("For loops in dependent contexts")
@@ -1186,7 +1181,7 @@ TEST_CASE("For loops in dependent contexts")
 		return sum;
 	};
 
-	REQUIRE(parse_and_run(src) == some_sum(0, 10, 1));
+	REQUIRE(tests::parse_and_run(src) == some_sum(0, 10, 1));
 }
 
 TEST_CASE("Statement blocks in dependent contexts")
@@ -1205,7 +1200,7 @@ TEST_CASE("Statement blocks in dependent contexts")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 3 + 5);
+	REQUIRE(tests::parse_and_run(src) == 3 + 5);
 }
 
 TEST_CASE("Statement block expressions in dependent contexts")
@@ -1226,7 +1221,7 @@ TEST_CASE("Statement block expressions in dependent contexts")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 3 + 5);
+	REQUIRE(tests::parse_and_run(src) == 3 + 5);
 }
 
 TEST_CASE("Recursive dependent types")
@@ -1244,9 +1239,8 @@ TEST_CASE("Recursive dependent types")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 25);
+	REQUIRE(tests::parse_and_run(src) == 25);
 }
-#endif
 
 TEST_CASE("Declaring an array")
 {
@@ -1395,7 +1389,6 @@ TEST_CASE("Can overload based on mutability independent of order")
 	REQUIRE(tests::parse_and_run(src) == 4);
 }
 
-#if 0
 TEST_CASE("Subscript on dependent types")
 {
 	auto const src = R"(
@@ -1429,7 +1422,6 @@ TEST_CASE("Subscript on dependent types")
 
 	REQUIRE(tests::parse_and_run(src) == 6);
 }
-#endif
 
 TEST_CASE("Multiple argument subscript")
 {
@@ -1454,7 +1446,6 @@ TEST_CASE("Multiple argument subscript")
 	REQUIRE(tests::parse_and_run(src) == 3 + 4 + 2);
 }
 
-#if 0
 TEST_CASE("Array of dependent type")
 {
 	auto const src = R"(
@@ -1470,9 +1461,10 @@ TEST_CASE("Array of dependent type")
 		};
 	)"sv;
 
-	REQUIRE(parse_and_run(src) == 0);
+	REQUIRE(tests::parse_and_run(src) == 0);
 }
 
+#if 0
 TEST_CASE("Array pointer type")
 {
 	auto const src = R"(
