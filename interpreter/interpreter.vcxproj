@@ -31,6 +31,7 @@
     <ClCompile Include="src\complete_expression.cc" />
     <ClCompile Include="src\interpreter.cc" />
     <ClCompile Include="src\operator.cc" />
+    <ClCompile Include="src\pretty_print.cc" />
     <ClCompile Include="src\program.cc" />
     <ClCompile Include="src\template_instantiation.cc" />
     <ClCompile Include="src\utils\callc.cc" />
@@ -56,6 +57,7 @@
     <ClInclude Include="src\complete_statement.hh" />
     <ClInclude Include="src\interpreter.hh" />
     <ClInclude Include="src\operator.hh" />
+    <ClInclude Include="src\pretty_print.hh" />
     <ClInclude Include="src\program.hh" />
     <ClInclude Include="src\template_instantiation.hh" />
     <ClInclude Include="src\utils\callc.hh" />

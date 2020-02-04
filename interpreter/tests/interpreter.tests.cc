@@ -2,6 +2,7 @@
 #include "interpreter.hh"
 #include "program.hh"
 #include "parser.hh"
+#include "pretty_print.hh"
 #include "template_instantiation.hh"
 
 using namespace std::literals;
@@ -18,6 +19,12 @@ namespace tests
 	{
 		complete::Program const program = instantiation::instantiate_templates(parser::parse_source(src));
 		return true;
+	}
+
+	auto parse_and_print(std::string_view src) noexcept -> void
+	{
+		complete::Program const program = instantiation::instantiate_templates(parser::parse_source(src));
+		printf("%s", pretty_print(program).c_str());
 	}
 }
 
@@ -78,6 +85,7 @@ TEST_CASE("Main function that calls another function.")
 	int const i = fib(5);
 	int const j = fib(8);
 	REQUIRE(tests::parse_and_run(src) == difference(i, j));
+	tests::parse_and_print(src);
 }
 
 TEST_CASE("C++ comments")
