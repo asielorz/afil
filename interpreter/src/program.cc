@@ -292,6 +292,12 @@ namespace complete
 		return add_type(program, std::move(new_type));
 	}
 
+	auto array_size(Type const & array_type) noexcept -> int
+	{
+		assert(is_array(array_type));
+		return try_get<Type::Array>(array_type.extra_data)->size;
+	}
+
 	auto array_value_type(Type const & array_type) noexcept -> TypeId
 	{
 		assert(is_array(array_type));

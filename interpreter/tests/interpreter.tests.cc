@@ -85,7 +85,6 @@ TEST_CASE("Main function that calls another function.")
 	int const i = fib(5);
 	int const j = fib(8);
 	REQUIRE(tests::parse_and_run(src) == difference(i, j));
-	tests::parse_and_print(src);
 }
 
 TEST_CASE("C++ comments")

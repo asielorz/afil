@@ -169,6 +169,7 @@ namespace complete
 
 	auto is_array(Type const & type) noexcept -> bool;
 	auto array_type_for(TypeId pointee_type, int size, Program & program) noexcept -> TypeId;
+	auto array_size(Type const & array_type) noexcept -> int;
 	auto array_value_type(Type const & array_type) noexcept -> TypeId;
 	auto array_value_type(TypeId array_type_id, Program const & program) noexcept -> TypeId;
 

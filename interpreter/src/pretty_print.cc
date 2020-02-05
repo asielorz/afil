@@ -10,36 +10,91 @@
 using namespace complete;
 using namespace std::literals;
 
+using ScopeStack = std::vector<Scope const *>;
+using ScopeStackView = span<Scope const * const>;
+
 // TODO: Search all scopes
 
-auto type_name(TypeId type, Program const & program) noexcept -> std::string_view
+auto type_name(TypeId type_id, Program const & program) noexcept -> std::string;
+
+auto decayed_type_name(TypeId type_id, Program const & program) noexcept -> std::string
 {
+	Type const & type = type_with_id(program, type_id);
+
+	if (is_pointer(type))
+		return join(type_name(pointee_type(type), program), " *");
+
+	if (is_array(type))
+		return join(type_name(array_value_type(type), program), '[', array_size(type), ']');
+
+	if (is_array_pointer(type))
+		return join(type_name(pointee_type(type), program), "[]");
+
 	for (TypeName const & t : program.global_scope.types)
-		if (t.id == type)
+		if (t.id == type_id)
 			return t.name;
 
-	// TODO: Pointers, references, mutable, arrays...
+	for (Function const & fn : program.functions)
+		for (TypeName const & t : fn.types)
+			if (t.id == type_id)
+				return t.name;
 
-	return "???"sv;
+	return "???"s;
 }
 
-auto function_name(FunctionId fn, Program const & program) noexcept -> std::string_view
+auto type_name(TypeId type_id, Program const & program) noexcept -> std::string
 {
-	for (FunctionName const & t : program.global_scope.functions)
-		if (t.id == fn)
-			return t.name;
+	std::string name = decayed_type_name(decay(type_id), program);
 
-	if (fn == program.main_function)
+	if (type_id.is_mutable)
+		name += " mut";
+
+	if (type_id.is_reference)
+		name += " &";
+
+	return name;
+}
+
+auto function_name(FunctionId fn_id, Program const & program) noexcept -> std::string_view
+{
+	if (fn_id == program.main_function)
 		return "main"sv;
 
+	for (FunctionName const & t : program.global_scope.functions)
+		if (t.id == fn_id)
+			return t.name;
+
+	for (Function const & fn : program.functions)
+		for (FunctionName const & t : fn.functions)
+			if (t.id == fn_id)
+				return t.name;
+
 	return "???"sv;
 }
 
-auto function_template_name(FunctionTemplateId fn, Program const & program) noexcept -> std::string_view
+auto variable_with_offset(ScopeStackView scope_stack, int offset) noexcept -> Variable const &
+{
+	for (auto it = scope_stack.rbegin(); it != scope_stack.rend(); ++it)
+	{
+		Scope const & scope = **it;
+		for (Variable const & var : scope.variables)
+			if (var.offset == offset)
+				return var;
+	}
+
+	declare_unreachable();
+}
+
+auto function_template_name(FunctionTemplateId fn_id, Program const & program) noexcept -> std::string_view
 {
 	for (FunctionTemplateName const & t : program.global_scope.function_templates)
-		if (t.id.index == fn.index)
+		if (t.id.index == fn_id.index)
 			return t.name;
+
+	for (Function const & fn : program.functions)
+		for (FunctionTemplateName const & t : fn.function_templates)
+			if (t.id.index == fn_id.index)
+				return t.name;
 
 	return "???"sv;
 }
@@ -72,21 +127,22 @@ auto relational_operator_name(Operator op) noexcept -> std::string_view
 	}
 }
 
-auto pretty_print(Expression const & expression, Program const & program, int indentation_level) noexcept -> std::string
-{
+auto pretty_print(Statement const & statement, Program const & program, ScopeStack & scope_stack, int indentation_level) noexcept -> std::string;
 
+auto pretty_print(Expression const & expression, Program const & program, ScopeStack & scope_stack, int indentation_level) noexcept -> std::string
+{
 	auto const visitor = overload(
 		[](expression::Literal<int> literal_expr) { return join("literal<int>: ", literal_expr.value, '\n'); },
 		[](expression::Literal<float> literal_expr) { return join("literal<float>: ", literal_expr.value, '\n'); },
 		[](expression::Literal<bool> literal_expr) { return join("literal<bool>: ", literal_expr.value, '\n'); },
 		[&](expression::Variable const & var_expr) 
 		{ 
-			return join("variable<", type_name(var_expr.variable_type, program), ">: ", var_expr.variable_offset, '\n');
+			return join("variable<", type_name(var_expr.variable_type, program), ">: ", variable_with_offset(scope_stack, var_expr.variable_offset).name, '\n');
 		},
 		[&](expression::MemberVariable const & var_expr)
 		{
-			return join("member access\n",
-				pretty_print(*var_expr.owner, program, indentation_level + 1),
+			return join("member access<", type_name(var_expr.variable_type, program), ">\n",
+				pretty_print(*var_expr.owner, program, scope_stack, indentation_level + 1),
 				indent(indentation_level + 1), member_variable_name(expression_type_id(*var_expr.owner, program), var_expr.variable_offset, program), '\n'
 			);
 		},
@@ -112,62 +168,67 @@ auto pretty_print(Expression const & expression, Program const & program, int in
 		{
 			std::string str = join("function call: ", function_name(func_call_expr.function_id, program), '\n');
 			for (Expression const & param : func_call_expr.parameters)
-				str += pretty_print(param, program, indentation_level + 1);
+				str += pretty_print(param, program, scope_stack, indentation_level + 1);
+
 			return str;
 		},
 		[&](expression::RelationalOperatorCall const & op_call_expr)
 		{
 			std::string str = join("relational operator call: ", relational_operator_name(op_call_expr.op), '\n');
 			for (Expression const & param : op_call_expr.parameters)
-				str += pretty_print(param, program, indentation_level + 1);
+				str += pretty_print(param, program, scope_stack, indentation_level + 1);
 			return str;
 		},
 		[&](expression::Constructor const & ctor_expr)
 		{
 			std::string str = join("constructor: ", type_name(ctor_expr.constructed_type, program), '\n');
 			for (Expression const & param : ctor_expr.parameters)
-				str += pretty_print(param, program, indentation_level + 1);
+				str += pretty_print(param, program, scope_stack, indentation_level + 1);
 			return str;
 		},
 		[&](expression::Dereference const & deref_expr) 
 		{
 			return join("dereference\n",
-				pretty_print(*deref_expr.expression, program, indentation_level + 1)
+				pretty_print(*deref_expr.expression, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](expression::ReinterpretCast const & reinterpret_cast_expr) 
 		{
 			return join("reinterpret cast<", type_name(reinterpret_cast_expr.return_type, program),">\n",
-				pretty_print(*reinterpret_cast_expr.operand, program, indentation_level + 1)
+				pretty_print(*reinterpret_cast_expr.operand, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](expression::Subscript const & subscript_expr) 
 		{
 			return join("subscript\n",
-				pretty_print(*subscript_expr.array, program, indentation_level + 1),
-				pretty_print(*subscript_expr.index, program, indentation_level + 1)
+				pretty_print(*subscript_expr.array, program, scope_stack, indentation_level + 1),
+				pretty_print(*subscript_expr.index, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](expression::If const & if_expr) 
 		{
 			return join("if\n",
-				pretty_print(*if_expr.condition, program, indentation_level + 1),
-				pretty_print(*if_expr.then_case, program, indentation_level + 1),
-				pretty_print(*if_expr.else_case, program, indentation_level + 1)
+				pretty_print(*if_expr.condition, program, scope_stack, indentation_level + 1),
+				pretty_print(*if_expr.then_case, program, scope_stack, indentation_level + 1),
+				pretty_print(*if_expr.else_case, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](expression::StatementBlock const & block_expr) 
 		{
+			scope_stack.push_back(&block_expr.scope);
+
 			std::string str = "statement block\n";
 			for (Statement const & statement : block_expr.statements)
-				str += pretty_print(statement, program, indentation_level + 1);
+				str += pretty_print(statement, program, scope_stack, indentation_level + 1);
+
+			scope_stack.pop_back();
 			return str;
 		},
 		[&](expression::Assignment const & assignment_expr) 
 		{ 
 			return join("assignment\n",
-				pretty_print(*assignment_expr.destination, program, indentation_level + 1),
-				pretty_print(*assignment_expr.source, program, indentation_level + 1)
+				pretty_print(*assignment_expr.destination, program, scope_stack, indentation_level + 1),
+				pretty_print(*assignment_expr.source, program, scope_stack, indentation_level + 1)
 			);
 		}
 	);
@@ -175,57 +236,68 @@ auto pretty_print(Expression const & expression, Program const & program, int in
 	return indent(indentation_level) + std::visit(visitor, expression.as_variant());
 }
 
-auto pretty_print(Statement const & statement, Program const & program, int indentation_level) noexcept -> std::string
+auto pretty_print(Statement const & statement, Program const & program, ScopeStack & scope_stack, int indentation_level) noexcept -> std::string
 {
 	auto const visitor = overload(
 		[&](statement::VariableDeclaration const & var_decl_stmt)
 		{
-			return join("variable decalaration: ", var_decl_stmt.variable_offset, "\n",
-				pretty_print(var_decl_stmt.assigned_expression, program, indentation_level + 1)
+			Variable const & var = variable_with_offset(scope_stack, var_decl_stmt.variable_offset);
+
+			return join("variable decalaration<", type_name(var.type, program), ">: ", var.name, "\n",
+				pretty_print(var_decl_stmt.assigned_expression, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](statement::ExpressionStatement const & expr_stmt)
 		{
 			return join("expression\n",
-				pretty_print(expr_stmt.expression, program, indentation_level + 1)
+				pretty_print(expr_stmt.expression, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](statement::Return const & return_stmt)
 		{
 			return join("return\n",
-				pretty_print(return_stmt.returned_expression, program, indentation_level + 1)
+				pretty_print(return_stmt.returned_expression, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](statement::If const & if_stmt)
 		{
 			return join("if\n",
-				pretty_print(if_stmt.condition, program, indentation_level + 1),
-				pretty_print(*if_stmt.then_case, program, indentation_level + 1),
-				if_stmt.else_case ? pretty_print(*if_stmt.else_case, program, indentation_level + 1) : ""
+				pretty_print(if_stmt.condition, program, scope_stack, indentation_level + 1),
+				pretty_print(*if_stmt.then_case, program, scope_stack, indentation_level + 1),
+				if_stmt.else_case ? pretty_print(*if_stmt.else_case, program, scope_stack, indentation_level + 1) : ""
 			);
 		},
 		[&](statement::StatementBlock const & block_stmt)
 		{
+			scope_stack.push_back(&block_stmt.scope);
+
 			std::string str = "statement block\n";
 			for (Statement const & statement : block_stmt.statements)
-				str += pretty_print(statement, program, indentation_level + 1);
+				str += pretty_print(statement, program, scope_stack, indentation_level + 1);
+
+			scope_stack.pop_back();
 			return str;
 		},
 		[&](statement::While const & while_stmt)
 		{
 			return join("while\n",
-				pretty_print(while_stmt.condition, program, indentation_level + 1),
-				pretty_print(*while_stmt.body, program, indentation_level + 1)
+				pretty_print(while_stmt.condition, program, scope_stack, indentation_level + 1),
+				pretty_print(*while_stmt.body, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](statement::For const & for_stmt)
 		{
-			return join("for\n",
-				pretty_print(*for_stmt.init_statement, program, indentation_level + 1),
-				pretty_print(for_stmt.condition, program, indentation_level + 1),
-				pretty_print(for_stmt.end_expression, program, indentation_level + 1),
-				pretty_print(*for_stmt.body, program, indentation_level + 1)
+			scope_stack.push_back(&for_stmt.scope);
+
+			std::string str = join("for\n",
+				pretty_print(*for_stmt.init_statement, program, scope_stack, indentation_level + 1),
+				pretty_print(for_stmt.condition, program, scope_stack, indentation_level + 1),
+				pretty_print(for_stmt.end_expression, program, scope_stack, indentation_level + 1),
+				pretty_print(*for_stmt.body, program, scope_stack, indentation_level + 1)
 			);
+
+			scope_stack.pop_back();
+			return str;
 		},
 		[&](statement::Break const &)
 		{
@@ -245,26 +317,38 @@ auto pretty_print(Program const & program) noexcept -> std::string
 {
 	std::string str;
 
+	ScopeStack scope_stack;
+	scope_stack.push_back(&program.global_scope);
+
 	if (!program.global_initialization_statements.empty())
 	{
 		str += "global initialization statements\n";
 		for (Statement const & statement : program.global_initialization_statements)
-			str += pretty_print(statement, program, 1);
+			str += pretty_print(statement, program, scope_stack, 1);
 		str += '\n';
 	}
+	
 	for (Function const & fn : program.functions)
-	{
-		str += function_name(FunctionId{false, static_cast<unsigned>(&fn - program.functions.data())}, program);
-		str += '(';
-		for (int i = 0; i < fn.parameter_count; ++i)
-			str += join(type_name(fn.variables[i].type, program), ' ', fn.variables[i].name, (i == fn.parameter_count - 1) ? "" : ", ");
-		str += ") -> ";
-		str += type_name(fn.return_type, program);
-		str += '\n';
-		for (Statement const & statement : fn.statements)
-			str += pretty_print(statement, program, 1);
-		str += '\n';
-	}
+		str += pretty_print(fn, program);
 
+	return str;
+}
+
+auto pretty_print(complete::Function const & function, complete::Program const & program) noexcept -> std::string
+{
+	ScopeStack scope_stack;
+	scope_stack.push_back(&program.global_scope);
+	scope_stack.push_back(&function);
+
+	std::string str = std::string(function_name(FunctionId{false, static_cast<unsigned>(&function - program.functions.data())}, program));
+	str += '(';
+	for (int i = 0; i < function.parameter_count; ++i)
+		str += join(type_name(function.variables[i].type, program), ' ', function.variables[i].name, (i == function.parameter_count - 1) ? "" : ", ");
+	str += ") -> ";
+	str += type_name(function.return_type, program);
+	str += '\n';
+	for (Statement const & statement : function.statements)
+		str += pretty_print(statement, program, scope_stack, 1);
+	str += '\n';
 	return str;
 }
