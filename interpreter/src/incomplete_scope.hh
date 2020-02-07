@@ -66,11 +66,14 @@ namespace incomplete
 		TypeId type;
 	};
 
-	struct Function
+	struct FunctionPrototype
 	{
 		std::vector<FunctionParameter> parameters;
-		std::vector<Statement> statements;
 		std::optional<TypeId> return_type;
+	};
+	struct Function : FunctionPrototype
+	{
+		std::vector<Statement> statements;
 	};
 	struct FunctionTemplate : Function 
 	{

@@ -512,6 +512,12 @@ namespace instantiation
 				complete_expression.overload_set.function_ids.push_back(function_id);
 				return complete_expression;
 			},
+			[&](incomplete::expression::ExternFunction const & incomplete_expression) -> complete::Expression
+			{
+				complete::ExternFunction extern_function;
+				extern_function.function_pointer = incomplete_expression.function_pointer;
+				
+			},
 			[&](incomplete::expression::FunctionTemplate const & incomplete_expression) -> complete::Expression
 			{
 				complete::FunctionTemplate new_function_template;

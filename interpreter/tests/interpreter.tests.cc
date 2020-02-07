@@ -1613,6 +1613,62 @@ TEST_CASE("Declaring a function inside a template")
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
+#if 0
+#include <Windows.h>
+
+TEST_CASE("Deleteme")
+{
+	auto module_handle = GetModuleHandle("ucrtbased.dll");
+	REQUIRE(module_handle != nullptr);
+
+	auto puts_address = (int(*)(char const *))GetProcAddress(module_handle, "puts");
+	REQUIRE(puts_address != nullptr);
+	REQUIRE(puts_address == &puts);
+	puts("success!");
+	system("pause");
+
+	auto fopen_address = (FILE*(*)(char const *, const char *))GetProcAddress(module_handle, "fopen");
+	REQUIRE(fopen_address == &fopen);
+}
+#endif
+
+TEST_CASE("import allows to import C functions from DLLs")
+{
+	auto const src = R"(
+		let putchar = fn(char c) -> int 
+			extern_symbol(putchar);
+
+		let print_string = fn(char[] s, int n)
+		{
+			for (int mut i = 0; i < n; ++i)
+				putchar(s[i]);
+		};
+
+		let main = fn() -> int
+		{
+			auto s = "Hello, world!";
+			print_string(data(s), size(s));
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+#if 0
+TEST_CASE("Can use a complex expression to compute the type of an array")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let a = int[1 + 2](0);
+			return size(a);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+#endif
+
 /*****************************************************************
 Backlog
 - importing other files
@@ -1621,4 +1677,6 @@ Backlog
 - concepts (depends on templates)
 - errors
 - some minimalistic standard library
+- synthesizing arithmetic operators
+- destructor and copy operations
 *****************************************************************/

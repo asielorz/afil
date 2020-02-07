@@ -7,6 +7,7 @@
 #include "utils/overload.hh"
 #include "utils/unreachable.hh"
 #include "utils/out.hh"
+#include "utils/load_dll.hh"
 #include <string>
 #include <optional>
 #include <cassert>
@@ -441,7 +442,7 @@ namespace parser
 		return initializers;
 	}
 
-	auto parse_function(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> void
+	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::FunctionPrototype> function) noexcept -> void
 	{
 		// Parameters must be between parenthesis.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after fn.");
@@ -478,7 +479,10 @@ namespace parser
 			index++;
 			function->return_type = parse_type_name(tokens, index, type_names);
 		}
+	}
 
+	auto parse_function_body(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> void
+	{
 		// Body of the function is enclosed by braces.
 		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' at start of function body.");
 		index++;
@@ -502,7 +506,8 @@ namespace parser
 		for (incomplete::TemplateParameter const & param : function.template_parameters)
 			type_names.push_back({param.name, TypeName::Type::template_parameter});
 		
-		parse_function(tokens, index, type_names, out(function));
+		parse_function_prototype(tokens, index, type_names, out(function));
+		parse_function_body(tokens, index, type_names, out(function));
 
 		type_names.resize(type_name_stack_size);
 
@@ -520,7 +525,30 @@ namespace parser
 		}
 
 		incomplete::Function function;
-		parse_function(tokens, index, type_names, out(function));
+		parse_function_prototype(tokens, index, type_names, out(function));
+
+		if (tokens[index].source == "extern_symbol"sv)
+		{
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after extern_symbol.");
+			index++;
+			std::string_view const extern_symbol_name = tokens[index].source;
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after extern_symbol name.");
+			index++;
+
+			auto const module_handle = get_loaded_module("ucrtbase.dll");
+			void const * const extern_symbol_address = find_symbol(module_handle, extern_symbol_name);
+			raise_syntax_error_if_not(extern_symbol_address != nullptr, "Extern symbol not found.");
+
+			incomplete::expression::ExternFunction extern_function;
+			extern_function.prototype = std::move(function);
+			extern_function.function_pointer = extern_symbol_address;
+
+			return extern_function;
+		}
+
+		parse_function_body(tokens, index, type_names, out(function));
 
 		return incomplete::expression::Function{std::move(function)};
 	}

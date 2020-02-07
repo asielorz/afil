@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <array>
+#include <cassert>
 
 template <typename T>
 auto to_string(T const & t) noexcept -> decltype(std::to_string(t))
@@ -37,4 +39,14 @@ template <typename ... Ts>
 auto join(Ts const & ... ts) noexcept -> std::string
 {
 	return (to_string(ts) + ...);
+}
+
+template <size_t N = 256>
+auto make_null_terminated(std::string_view str) noexcept -> std::array<char, N>
+{
+	assert(str.size() < N);
+	std::array<char, N> buffer;
+	memcpy(buffer.data(), str.data(), str.size());
+	buffer[str.size()] = '\0';
+	return buffer;
 }
