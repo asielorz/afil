@@ -1559,16 +1559,66 @@ TEST_CASE("String literals")
 	REQUIRE(tests::parse_and_run(src) == 24);
 }
 
+TEST_CASE("Declaring a struct inside a template")
+{
+	auto const src = R"(
+		let make_pair = fn<T, U>(T t, U u)
+		{
+			struct pair
+			{
+				T first;
+				U second;	
+			}
+			return pair(t, u);
+		};
+
+		let main = fn() -> int
+		{
+			let p = make_pair(3, "foo");
+			return p.first + size(p.second);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 6);
+}
+
+TEST_CASE("Declaring a function inside a template")
+{
+	auto const src = R"(
+		let is_sorted = fn<T>(T[] array, int n)
+		{
+			let compare = fn(T a, T b) { return a < b; };
+			for (int mut i = 1; i < n; i = i + 1)
+				if (compare(array[i], array[i - 1]))
+					return false;
+
+			return true;
+		};
+
+		let main = fn() -> int
+		{
+			let sorted_array = int[6](1, 2, 3, 3, 3, 4);
+			let array_not_sorted = int[6](1, 4, 3, 3, 3, 4);
+
+			int mut ret = 0;
+			if (is_sorted(data(sorted_array), size(sorted_array)))
+				ret = ret + 1;
+			if (not is_sorted(data(array_not_sorted), size(array_not_sorted)))
+				ret = ret + 2;
+
+			return ret;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
 /*****************************************************************
 Backlog
-- templates
-	- struct declaration that contains dependent types
-	- function declaration with dependent types
-- arrays (depends on pointers)
-- strings (depends on arrays)
 - importing other files
 - importing functions in C
 - contracts
 - concepts (depends on templates)
 - errors
+- some minimalistic standard library
 *****************************************************************/
