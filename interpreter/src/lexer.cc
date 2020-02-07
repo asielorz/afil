@@ -178,6 +178,16 @@ namespace lex
 		return 1;
 	}
 
+	auto token_length_string(std::string_view src, int index) noexcept -> int
+	{
+		int length = 1;
+		while (!end_reached(src, index + length) && src[index + length] != '"')
+			++length;
+
+		++length; // The closing '"' is part of the string.
+		return length;
+	}
+
 	auto token_length_identifier(std::string_view src, int index) noexcept -> int
 	{
 		int length = 1;
@@ -191,6 +201,7 @@ namespace lex
 		if (is_number(src[index]))		return token_type_and_length_number(src, index);
 		if (is_arrow(src, index))		return {Token::Type::arrow,				2};
 		if (is_operator(src, index))	return {Token::Type::operator_,			token_length_operator(src, index)};
+		if (src[index] == '"')			return {Token::Type::literal_string,	token_length_string(src, index)};
 		if (src[index] == '(')			return {Token::Type::open_parenthesis,	1};
 		if (src[index] == ')')			return {Token::Type::close_parenthesis,	1};
 		if (src[index] == '{')			return {Token::Type::open_brace,		1};

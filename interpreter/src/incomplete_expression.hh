@@ -98,15 +98,26 @@ namespace incomplete
 			std::vector<DesignatedInitializer> parameters;
 		};
 
+		struct DataCall
+		{
+			value_ptr<Expression> operand;
+		};
+
+		struct SizeCall
+		{
+			value_ptr<Expression> operand;
+		};
+
 		namespace detail
 		{
 			using ExpressionTreeBase = std::variant<
-				Literal<int>, Literal<float>, Literal<bool>,
+				Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>,
 				Dereference, Addressof, Subscript,
 				Identifier, MemberVariable,
 				Function, FunctionTemplate,	FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 				If, StatementBlock,
-				Constructor, DesignatedInitializerConstructor
+				Constructor, DesignatedInitializerConstructor,
+				DataCall, SizeCall
 			>;
 		}
 

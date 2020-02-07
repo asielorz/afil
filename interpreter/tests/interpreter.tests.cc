@@ -25,6 +25,7 @@ namespace tests
 	{
 		complete::Program const program = instantiation::instantiate_templates(parser::parse_source(src));
 		printf("%s", pretty_print(program).c_str());
+		system("pause");
 	}
 }
 
@@ -1471,7 +1472,6 @@ TEST_CASE("Array of dependent type")
 	REQUIRE(tests::parse_and_run(src) == 0);
 }
 
-#if 0
 TEST_CASE("Array pointer type")
 {
 	auto const src = R"(
@@ -1502,7 +1502,7 @@ TEST_CASE("Function template that takes array of pointer type")
 		};
 	)"sv;
 
-	REQUIRE(parser::parse_and_run(src) == 3);
+	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
 TEST_CASE("Subscripting array types")
@@ -1515,10 +1515,49 @@ TEST_CASE("Subscripting array types")
 		};
 	)"sv;
 
-	REQUIRE(parser::parse_and_run(src) == 10);
+	REQUIRE(tests::parse_and_run(src) == 10);
 }
-#endif
 
+TEST_CASE("Subscripting array lvalues")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			return int[4](1, 2, 3, 4)[3];
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
+}
+
+TEST_CASE("size function for arrays")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let a = int[5](1, 2, 3, 4, 5);
+			int mut sum = 0;
+			for (int mut i = 0; i < size(a); i = i + 1)
+				sum = sum + a[i];
+			return sum;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 15);
+}
+
+TEST_CASE("String literals")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let s = "En un lugar de la Mancha";
+			return size(s);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 24);
+}
 
 /*****************************************************************
 Backlog

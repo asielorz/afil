@@ -32,6 +32,7 @@ namespace complete
 		static TypeId const int_;
 		static TypeId const float_;
 		static TypeId const bool_;
+		static TypeId const char_;
 
 		static TypeId const none;
 		static TypeId const function;

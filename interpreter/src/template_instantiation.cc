@@ -359,6 +359,13 @@ namespace instantiation
 			{
 				return complete::expression::Literal<bool>{incomplete_expression.value};
 			},
+			[&](incomplete::expression::Literal<std::string> const & incomplete_expression) -> complete::Expression
+			{
+				complete::expression::StringLiteral complete_expression;
+				complete_expression.value = incomplete_expression.value;
+				complete_expression.type = array_type_for(complete::TypeId::char_, static_cast<int>(complete_expression.value.size()), *program);
+				return complete_expression;
+			},
 			[&](incomplete::expression::Identifier const & incomplete_expression) -> complete::Expression
 			{
 				auto const lookup = lookup_name(scope_stack, incomplete_expression.name);
@@ -462,6 +469,19 @@ namespace instantiation
 					complete::expression::Subscript complete_expression;
 					complete_expression.return_type = value_type;
 					complete_expression.array = allocate(std::move(array));
+					complete_expression.index = allocate(insert_conversion_node(std::move(index), complete::TypeId::int_, *program));
+					return complete_expression;
+				}
+				else if (is_array_pointer(array_type))
+				{
+					complete::TypeId value_type = try_get<complete::Type::ArrayPointer>(array_type.extra_data)->value_type;
+					value_type.is_reference = true;
+
+					complete::Expression index = instantiate_expression(*incomplete_expression.index, template_parameters, scope_stack, program, current_scope_return_type);
+
+					complete::expression::Subscript complete_expression;
+					complete_expression.return_type = value_type;
+					complete_expression.array = allocate(insert_conversion_node(std::move(array), decay(array_type_id), *program));
 					complete_expression.index = allocate(insert_conversion_node(std::move(index), complete::TypeId::int_, *program));
 					return complete_expression;
 				}
@@ -725,6 +745,29 @@ namespace instantiation
 				complete::expression::Constructor complete_expression;
 				complete_expression.constructed_type = constructed_type_id;
 				complete_expression.parameters = std::move(complete_parameters);
+				return complete_expression;
+			},
+			[&](incomplete::expression::DataCall const & incomplete_expression) -> complete::Expression
+			{
+				complete::expression::ReinterpretCast complete_expression;
+				complete_expression.operand = allocate(instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
+				complete::TypeId const operand_type_id = expression_type_id(*complete_expression.operand, *program);
+				complete::Type const & operand_type = type_with_id(*program, operand_type_id);
+				raise_syntax_error_if_not(is_array(operand_type), "Operand of data must be of array type.");
+				raise_syntax_error_if_not(operand_type_id.is_reference, "Operand of data must be of reference to array type.");
+				complete::TypeId value_type = array_value_type(operand_type);
+				value_type.is_mutable = operand_type_id.is_mutable;
+				complete_expression.return_type = array_pointer_type_for(value_type, *program);
+				return complete_expression;
+			},
+			[&](incomplete::expression::SizeCall const & incomplete_expression) -> complete::Expression
+			{
+				complete::expression::Literal<int> complete_expression;
+				complete::Expression operand = instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type);
+				complete::TypeId const operand_type_id = expression_type_id(operand, *program);
+				complete::Type const & operand_type = type_with_id(*program, operand_type_id);
+				raise_syntax_error_if_not(is_array(operand_type), "Operand of data must be of array type.");
+				complete_expression.value = array_size(operand_type);
 				return complete_expression;
 			}
 		);

@@ -112,6 +112,11 @@ namespace parser
 		return value;
 	}
 
+	auto parse_string_literal(std::string_view token_source) noexcept -> std::string
+	{
+		return std::string(token_source.substr(1, token_source.size() - 2));
+	}
+
 	auto insert_expression(incomplete::Expression & tree, incomplete::Expression & new_node) noexcept -> void
 	{
 		using incomplete::expression::BinaryOperatorCall;
@@ -120,13 +125,13 @@ namespace parser
 
 		if (precedence(new_op.op) <= precedence(tree_op.op))
 		{
-			new_op.left = std::make_unique<incomplete::Expression>(std::move(tree));
+			new_op.left = allocate(std::move(tree));
 			tree = std::move(new_node);
 		}
 		else if (!has_type<BinaryOperatorCall>(*tree_op.right))
 		{
 			new_op.left = std::move(tree_op.right);
-			tree_op.right = std::make_unique<incomplete::Expression>(std::move(new_node));
+			tree_op.right = allocate(std::move(new_node));
 		}
 		else
 			insert_expression(*tree_op.right, new_node);
@@ -143,13 +148,13 @@ namespace parser
 		}
 
 		incomplete::Expression root = BinaryOperatorCall{ operators[0],
-				std::make_unique<incomplete::Expression>(std::move(operands[0])),
-				std::make_unique<incomplete::Expression>(std::move(operands[1]))
+				allocate(std::move(operands[0])),
+				allocate(std::move(operands[1]))
 		};
 
 		for (size_t i = 1; i < operators.size(); ++i)
 		{
-			auto new_node = incomplete::Expression(BinaryOperatorCall{operators[i], nullptr, std::make_unique<incomplete::Expression>(std::move(operands[i + 1]))});
+			auto new_node = incomplete::Expression(BinaryOperatorCall{operators[i], nullptr, allocate(std::move(operands[i + 1]))});
 			insert_expression(root, new_node);
 		}
 
@@ -161,7 +166,7 @@ namespace parser
 		incomplete::TypeId pointer_type;
 		pointer_type.is_reference = false;
 		pointer_type.is_mutable = false;
-		pointer_type.value = incomplete::TypeId::Pointer{std::make_unique<incomplete::TypeId>(type)};
+		pointer_type.value = incomplete::TypeId::Pointer{allocate(type)};
 		return pointer_type;
 	}
 
@@ -170,7 +175,7 @@ namespace parser
 		incomplete::TypeId array_type;
 		array_type.is_reference = false;
 		array_type.is_mutable = false;
-		array_type.value = incomplete::TypeId::Array{std::make_unique<incomplete::TypeId>(type), size};
+		array_type.value = incomplete::TypeId::Array{allocate(type), size};
 		return array_type;
 	}
 
@@ -179,7 +184,7 @@ namespace parser
 		incomplete::TypeId pointer_type;
 		pointer_type.is_reference = false;
 		pointer_type.is_mutable = false;
-		pointer_type.value = incomplete::TypeId::ArrayPointer{std::make_unique<incomplete::TypeId>(type)};
+		pointer_type.value = incomplete::TypeId::ArrayPointer{allocate(type)};
 		return pointer_type;
 	}
 
@@ -530,18 +535,18 @@ namespace parser
 		index++;
 
 		incomplete::expression::If if_node;
-		if_node.condition = std::make_unique<incomplete::Expression>(parse_expression(tokens, index, type_names));
+		if_node.condition = allocate(parse_expression(tokens, index, type_names));
 
 		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after if condition.");
 		index++;
 
-		if_node.then_case = std::make_unique<incomplete::Expression>(parse_expression(tokens, index, type_names));
+		if_node.then_case = allocate(parse_expression(tokens, index, type_names));
 
 		// Expect keyword else to separate then and else cases.
 		raise_syntax_error_if_not(tokens[index].source == "else", "Expected keyword \"else\" after if expression body.");
 		index++;
 
-		if_node.else_case = std::make_unique<incomplete::Expression>(parse_expression(tokens, index, type_names));
+		if_node.else_case = allocate(parse_expression(tokens, index, type_names));
 
 		return if_node;
 	}
@@ -599,20 +604,20 @@ namespace parser
 		if (op == Operator::addressof)
 		{
 			incomplete::expression::Addressof addressof_node;
-			addressof_node.operand = std::make_unique<incomplete::Expression>(std::move(operand));
+			addressof_node.operand = allocate(std::move(operand));
 			return addressof_node;
 		}
 		else if (op == Operator::dereference)
 		{
 			incomplete::expression::Dereference deref_node;
-			deref_node.operand = std::make_unique<incomplete::Expression>(std::move(operand));
+			deref_node.operand = allocate(std::move(operand));
 			return deref_node;
 		}
 		else
 		{
 			incomplete::expression::UnaryOperatorCall op_node;
 			op_node.op = op;
-			op_node.operand = std::make_unique<incomplete::Expression>(std::move(operand));
+			op_node.operand = allocate(std::move(operand));
 			return op_node;
 		}
 	}
@@ -631,6 +636,30 @@ namespace parser
 			return incomplete::expression::Literal<float>{parse_number_literal<float>(tokens[index++].source)};
 		else if (tokens[index].type == TokenType::literal_bool)
 			return incomplete::expression::Literal<bool>{tokens[index++].source[0] == 't'}; // if it starts with t it must be true, and otherwise it must be false.
+		else if (tokens[index].type == TokenType::literal_string)
+			return incomplete::expression::Literal<std::string>{parse_string_literal(tokens[index++].source)};
+		else if (tokens[index].source == "data")
+		{
+			index++;
+			incomplete::expression::DataCall data_node;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after data.");
+			index++;
+			data_node.operand = allocate(parse_expression(tokens, index, type_names));
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after operand for data.");
+			index++;
+			return data_node;
+		}
+		else if (tokens[index].source == "size")
+		{
+			index++;
+			incomplete::expression::SizeCall size_node;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after size.");
+			index++;
+			size_node.operand = allocate(parse_expression(tokens, index, type_names));
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after operand for size.");
+			index++;
+			return size_node;
+		}
 		else if (tokens[index].type == TokenType::identifier)
 		{
 			// It can be either a constructor call or the naming of a variable/function
@@ -694,7 +723,7 @@ namespace parser
 
 				incomplete::expression::MemberVariable var_node;
 				var_node.name = member_name;
-				var_node.owner = std::make_unique<incomplete::Expression>(std::move(tree));
+				var_node.owner = allocate(std::move(tree));
 				tree = std::move(var_node);
 			}
 			// Subscript
@@ -705,8 +734,8 @@ namespace parser
 				if (params.size() == 1)
 				{
 					incomplete::expression::Subscript node;
-					node.array = std::make_unique<incomplete::Expression>(std::move(tree));
-					node.index = std::make_unique<incomplete::Expression>(std::move(params[0]));
+					node.array = allocate(std::move(tree));
+					node.index = allocate(std::move(params[0]));
 					tree = std::move(node);
 				}
 				else
@@ -857,14 +886,14 @@ namespace parser
 		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after condition in if statement.");
 		index++;
 
-		statement.then_case = std::make_unique<incomplete::Statement>(parse_statement(tokens, index, type_names));
+		statement.then_case = allocate(parse_statement(tokens, index, type_names));
 
 		// For if statement else is optional.
 		if (tokens[index].source == "else")
 		{
 			// Skip else token.
 			index++;
-			statement.else_case = std::make_unique<incomplete::Statement>(parse_statement(tokens, index, type_names));
+			statement.else_case = allocate(parse_statement(tokens, index, type_names));
 		}
 
 		return statement;
@@ -910,7 +939,7 @@ namespace parser
 		index++;
 
 		// Parse body
-		statement.body = std::make_unique<incomplete::Statement>(parse_statement(tokens, index, type_names));
+		statement.body = allocate(parse_statement(tokens, index, type_names));
 
 		return statement;
 	}
@@ -937,7 +966,7 @@ namespace parser
 				has_type<incomplete::statement::VariableDeclaration>(init_statement) || 
 				has_type<incomplete::statement::ExpressionStatement>(init_statement),
 			"init-statement of a for statement must be a variable declaration or an expression.");
-		for_statement.init_statement = std::make_unique<incomplete::Statement>(std::move(init_statement));
+		for_statement.init_statement = allocate(std::move(init_statement));
 
 		// Parse condition. Must return bool.
 		for_statement.condition = parse_expression(tokens, index, type_names);
@@ -953,7 +982,7 @@ namespace parser
 		index++;
 
 		// Parse body
-		for_statement.body = std::make_unique<incomplete::Statement>(parse_statement(tokens, index, type_names));
+		for_statement.body = allocate(parse_statement(tokens, index, type_names));
 
 		type_names.resize(stack_size);
 
@@ -1133,6 +1162,7 @@ namespace parser
 		type_names.push_back({"int",   TypeName::Type::type});
 		type_names.push_back({"float", TypeName::Type::type});
 		type_names.push_back({"bool",  TypeName::Type::type});
+		type_names.push_back({"char",  TypeName::Type::type});
 
 		size_t index = 0;
 		while (index < tokens.size())

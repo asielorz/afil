@@ -11,4 +11,9 @@ namespace interpreter
 		reinterpret_cast<T &>(stack.memory[address]) = value;
 	}
 
+	template <typename T> auto write(ProgramStack & stack, int address, T const array[], int size) noexcept -> void
+	{
+		memcpy(pointer_at_address(stack, address), array, size * sizeof(T));
+	}
+
 } // namespace interpreter

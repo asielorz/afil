@@ -21,6 +21,7 @@ namespace complete
 			{"int",   {4, 4}},
 			{"float", {4, 4}},
 			{"bool",  {1, 1}},
+			{"char",  {1, 1}},
 		};
 	}
 
@@ -29,6 +30,7 @@ namespace complete
 	template <> struct index_for_type<int> { static constexpr unsigned value = 1; };
 	template <> struct index_for_type<float> { static constexpr unsigned value = 2; };
 	template <> struct index_for_type<bool> { static constexpr unsigned value = 3; };
+	template <> struct index_for_type<unsigned char> { static constexpr unsigned value = 4; };
 	template <typename T> constexpr unsigned index_for_type_v = index_for_type<T>::value;
 
 	using mpl::BoxedType;
@@ -83,6 +85,13 @@ namespace complete
 			{"<=>"sv,	extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
 			{"-"sv,		extern_function_descriptor(+[](float a) noexcept -> float { return -a; })},
 
+			{"+"sv,		extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> unsigned char { return a + b; })},
+			{"-"sv,		extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> unsigned char { return a - b; })},
+			{"*"sv,		extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> unsigned char { return a * b; })},
+			{"/"sv,		extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> unsigned char { return a / b; })},
+			{"=="sv,	extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> bool { return a == b; })},
+			{"<=>"sv,	extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> int { return int(a) - int(b); })},
+
 			{"and"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a && b; })},
 			{"or"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a || b; })},
 			{"xor"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a != b; })},
@@ -117,7 +126,6 @@ namespace complete
 			extern_functions.push_back(fn.second);
 		}
 	}
-
 
 	auto add_type(Program & program, Type new_type) noexcept -> TypeId
 	{

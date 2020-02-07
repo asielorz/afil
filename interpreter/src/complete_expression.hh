@@ -24,6 +24,12 @@ namespace complete
 			T value;
 		};
 
+		struct StringLiteral
+		{
+			std::string value;
+			TypeId type;
+		};
+
 		struct Variable
 		{
 			TypeId variable_type;
@@ -102,7 +108,7 @@ namespace complete
 		namespace detail
 		{
 			using ExpressionTreeBase = std::variant<
-				Literal<int>, Literal<float>, Literal<bool>,
+				Literal<int>, Literal<float>, Literal<bool>, StringLiteral,
 				LocalVariable, GlobalVariable, MemberVariable,
 				OverloadSet, FunctionCall, RelationalOperatorCall, Assignment,
 				Constructor,

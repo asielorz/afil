@@ -135,6 +135,10 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 		[](expression::Literal<int> literal_expr) { return join("literal<int>: ", literal_expr.value, '\n'); },
 		[](expression::Literal<float> literal_expr) { return join("literal<float>: ", literal_expr.value, '\n'); },
 		[](expression::Literal<bool> literal_expr) { return join("literal<bool>: ", literal_expr.value, '\n'); },
+		[&](expression::StringLiteral literal_expr) 
+		{
+			return join("literal<", type_name(literal_expr.type, program),">: \"", literal_expr.value, "\"\n");
+		},
 		[&](expression::Variable const & var_expr) 
 		{ 
 			return join("variable<", type_name(var_expr.variable_type, program), ">: ", variable_with_offset(scope_stack, var_expr.variable_offset).name, '\n');

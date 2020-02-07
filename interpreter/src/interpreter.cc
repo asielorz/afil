@@ -161,6 +161,10 @@ namespace interpreter
 			[&](expression::Literal<int> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<float> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<bool> literal) { write(stack, return_address, literal.value); },
+			[&](expression::StringLiteral literal) 
+			{
+				write(stack, return_address, literal.value.data(), static_cast<int>(literal.value.size())); 
+			},
 			[&](expression::LocalVariable const & var_node)
 			{
 				int const address = stack.base_pointer + var_node.variable_offset;
@@ -200,13 +204,29 @@ namespace interpreter
 			},
 			[&](expression::Subscript const & subscript_node)
 			{
+				TypeId const array_type_id = expression_type_id(*subscript_node.array, program);
+				Type const & array_type = type_with_id(program, array_type_id);
+
 				StackGuard const g(stack);
-				int const array_address = eval_expression(*subscript_node.array, stack, program);
-				int const index_address = eval_expression(*subscript_node.index, stack, program);
-				char const * const array = read<char const *>(stack, array_address);
-				int const index = read<int>(stack, index_address);
-				int const value_type_size = type_size(program, remove_reference(subscript_node.return_type));
-				write(stack, return_address, array + index * value_type_size);
+				
+				if (array_type_id.is_reference || is_array_pointer(array_type))
+				{
+					int const array_address = eval_expression(*subscript_node.array, stack, program);
+					int const index_address = eval_expression(*subscript_node.index, stack, program);
+					char const * const array = read<char const *>(stack, array_address);
+					int const index = read<int>(stack, index_address);
+					int const value_type_size = type_size(program, remove_reference(subscript_node.return_type));
+					write(stack, return_address, array + index * value_type_size);
+				}
+				else // array rvalue
+				{
+					int const array_address = eval_expression(*subscript_node.array, stack, program);
+					int const index_address = eval_expression(*subscript_node.index, stack, program);
+					char const * const array = pointer_at_address(stack, array_address);
+					int const index = read<int>(stack, index_address);
+					int const value_type_size = type_size(program, remove_reference(subscript_node.return_type));
+					memcpy(pointer_at_address(stack, return_address), array + index * value_type_size, value_type_size);
+				}
 			},
 			[&](expression::OverloadSet const &) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
 			{
