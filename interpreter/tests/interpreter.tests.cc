@@ -1638,20 +1638,24 @@ TEST_CASE("import allows to import C functions from DLLs")
 		let putchar = fn(char c) -> int 
 			extern_symbol(putchar);
 
+		let abs = fn(int x) -> int 
+			extern_symbol(abs);
+
 		let print_string = fn(char[] s, int n)
 		{
-			for (int mut i = 0; i < n; ++i)
+			for (int mut i = 0; i < n; i = i + 1)
 				putchar(s[i]);
 		};
 
 		let main = fn() -> int
 		{
-			auto s = "Hello, world!";
+			let s = "Hello, world!";
 			print_string(data(s), size(s));
+			return abs(-5);
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src) == 3);
+	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
 #if 0

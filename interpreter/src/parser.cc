@@ -529,6 +529,8 @@ namespace parser
 
 		if (tokens[index].source == "extern_symbol"sv)
 		{
+			raise_syntax_error_if_not(function.return_type.has_value(), "Cannot omit return type of imported extern function.");
+
 			index++;
 			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after extern_symbol.");
 			index++;

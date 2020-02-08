@@ -274,6 +274,20 @@ namespace instantiation
 		return complete::TypeId::none;
 	}
 
+	auto type_descriptor_for(complete::TypeId type_id, complete::Program const & program) noexcept -> callc::TypeDescriptor
+	{
+		if (type_id.is_reference)
+			return {sizeof(void *), false};
+
+		bool const is_float = decay(type_id) == complete::TypeId::float_;
+
+		complete::Type const & type = type_with_id(program, type_id);
+		if (type.size > 8)
+			mark_as_to_do("Big types");
+
+		return {type.size, is_float};
+	}
+
 	auto instantiate_statement(
 		incomplete::Statement const & incomplete_statement_,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -283,7 +297,7 @@ namespace instantiation
 	)->std::optional<complete::Statement>;
 
 	auto instantiate_function_prototype(
-		incomplete::Function const & incomplete_function,
+		incomplete::FunctionPrototype const & incomplete_function,
 		span<complete::ResolvedTemplateParameter const> template_parameters,
 		ScopeStackView scope_stack,
 		out<complete::Program> program,
@@ -517,6 +531,35 @@ namespace instantiation
 				complete::ExternFunction extern_function;
 				extern_function.function_pointer = incomplete_expression.function_pointer;
 				
+				complete::Function function;
+				instantiate_function_prototype(incomplete_expression.prototype, template_parameters, scope_stack, program, out(function));
+				extern_function.parameter_size = function.stack_frame_size;
+				extern_function.parameter_alignment = function.stack_frame_alignment;
+				extern_function.return_type = function.return_type;
+
+				extern_function.parameter_types.reserve(function.parameter_count);
+				for (int i = 0; i < function.parameter_count; ++i)
+					extern_function.parameter_types.push_back(function.variables[i].type);
+
+				if (function.parameter_count > 4)
+					mark_as_to_do("Extern functions with more than 4 parameters");
+
+				callc::TypeDescriptor parameter_type_descriptors[4];
+				for (int i = 0; i < function.parameter_count; ++i)
+					parameter_type_descriptors[i] = type_descriptor_for(extern_function.parameter_types[i], *program);
+
+				callc::TypeDescriptor const return_type_descriptor = type_descriptor_for(extern_function.return_type, *program);
+
+				extern_function.caller = callc::c_function_caller({parameter_type_descriptors, extern_function.parameter_types.size()}, return_type_descriptor);
+
+				FunctionId function_id;
+				function_id.is_extern = true;
+				function_id.index = static_cast<int>(program->extern_functions.size());
+				program->extern_functions.push_back(std::move(extern_function));
+
+				complete::expression::OverloadSet complete_expression;
+				complete_expression.overload_set.function_ids.push_back(function_id);
+				return complete_expression;
 			},
 			[&](incomplete::expression::FunctionTemplate const & incomplete_expression) -> complete::Expression
 			{
