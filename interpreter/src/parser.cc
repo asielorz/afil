@@ -1163,7 +1163,7 @@ namespace parser
 			index++;
 
 			auto const module_handle = load_library("ucrtbase.dll");
-			void const * const extern_symbol_address = find_symbol(module_handle, extern_symbol_name);
+			void const * const extern_symbol_address = find_symbol(module_handle, parse_string_literal(extern_symbol_name));
 			raise_syntax_error_if_not(extern_symbol_address != nullptr, "Extern symbol not found.");
 
 			incomplete::ExternFunction extern_function;
