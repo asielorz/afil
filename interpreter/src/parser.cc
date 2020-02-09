@@ -526,30 +526,6 @@ namespace parser
 
 		incomplete::Function function;
 		parse_function_prototype(tokens, index, type_names, out(function));
-
-		if (tokens[index].source == "extern_symbol"sv)
-		{
-			raise_syntax_error_if_not(function.return_type.has_value(), "Cannot omit return type of imported extern function.");
-
-			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after extern_symbol.");
-			index++;
-			std::string_view const extern_symbol_name = tokens[index].source;
-			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after extern_symbol name.");
-			index++;
-
-			auto const module_handle = get_loaded_module("ucrtbase.dll");
-			void const * const extern_symbol_address = find_symbol(module_handle, extern_symbol_name);
-			raise_syntax_error_if_not(extern_symbol_address != nullptr, "Extern symbol not found.");
-
-			incomplete::expression::ExternFunction extern_function;
-			extern_function.prototype = std::move(function);
-			extern_function.function_pointer = extern_symbol_address;
-
-			return extern_function;
-		}
-
 		parse_function_body(tokens, index, type_names, out(function));
 
 		return incomplete::expression::Function{std::move(function)};
@@ -1142,6 +1118,71 @@ namespace parser
 		return statement;
 	}
 
+	auto parse_import_block(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::statement::ImportBlock
+	{
+		// Skip import keyword.
+		index++;
+
+		raise_syntax_error_if_not(tokens[index].type == TokenType::literal_string, "Expected string literal with library name after import.");
+		std::string const library_name = parse_string_literal(tokens[index].source);
+		index++;
+
+		DLL const library = load_library(library_name);
+
+		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected { after library name.");
+		index++;
+
+		incomplete::statement::ImportBlock import_block;
+
+		while (tokens[index].type != TokenType::close_brace)
+		{
+			raise_syntax_error_if_not(tokens[index].source == "let", "Expected function declaration in import block.");
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after let.");
+			std::string_view const function_name = tokens[index].source;
+			index++;
+
+			raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' after function name.");
+			index++;
+
+			raise_syntax_error_if_not(tokens[index].source == "fn", "Expected function declaration after '=' in import block.");
+			index++;
+
+			incomplete::FunctionPrototype function_prototype;
+			parse_function_prototype(tokens, index, type_names, out(function_prototype));
+
+			raise_syntax_error_if_not(tokens[index].source == "extern_symbol"sv, "Expected keyword \"extern_symbol\" after function prototype.");
+			raise_syntax_error_if_not(function_prototype.return_type.has_value(), "Cannot omit return type of imported extern function.");
+
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after extern_symbol.");
+			index++;
+			std::string_view const extern_symbol_name = tokens[index].source;
+			index++;
+			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after extern_symbol name.");
+			index++;
+
+			auto const module_handle = load_library("ucrtbase.dll");
+			void const * const extern_symbol_address = find_symbol(module_handle, extern_symbol_name);
+			raise_syntax_error_if_not(extern_symbol_address != nullptr, "Extern symbol not found.");
+
+			incomplete::ExternFunction extern_function;
+			extern_function.name = function_name;
+			extern_function.prototype = std::move(function_prototype);
+			extern_function.function_pointer = extern_symbol_address;
+
+			import_block.imported_functions.push_back(std::move(extern_function));
+			
+			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Missing ';' after function declaration.");
+			index++;
+		}
+
+		// Skip '}'
+		index++;
+
+		return import_block;
+	}
+
 	auto parse_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Statement
 	{
 		incomplete::Statement result;
@@ -1165,6 +1206,8 @@ namespace parser
 			result = parse_break_or_continue_statement<incomplete::statement::Continue>(tokens, index, type_names);
 		else if (tokens[index].source == "struct")
 			return parse_struct_declaration(tokens, index, type_names);
+		else if (tokens[index].source == "import")
+			return parse_import_block(tokens, index, type_names);
 		else
 		{
 			auto const parsed_type = parse_type_name(tokens, index, type_names);

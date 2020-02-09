@@ -526,41 +526,6 @@ namespace instantiation
 				complete_expression.overload_set.function_ids.push_back(function_id);
 				return complete_expression;
 			},
-			[&](incomplete::expression::ExternFunction const & incomplete_expression) -> complete::Expression
-			{
-				complete::ExternFunction extern_function;
-				extern_function.function_pointer = incomplete_expression.function_pointer;
-				
-				complete::Function function;
-				instantiate_function_prototype(incomplete_expression.prototype, template_parameters, scope_stack, program, out(function));
-				extern_function.parameter_size = function.stack_frame_size;
-				extern_function.parameter_alignment = function.stack_frame_alignment;
-				extern_function.return_type = function.return_type;
-
-				extern_function.parameter_types.reserve(function.parameter_count);
-				for (int i = 0; i < function.parameter_count; ++i)
-					extern_function.parameter_types.push_back(function.variables[i].type);
-
-				if (function.parameter_count > 4)
-					mark_as_to_do("Extern functions with more than 4 parameters");
-
-				callc::TypeDescriptor parameter_type_descriptors[4];
-				for (int i = 0; i < function.parameter_count; ++i)
-					parameter_type_descriptors[i] = type_descriptor_for(extern_function.parameter_types[i], *program);
-
-				callc::TypeDescriptor const return_type_descriptor = type_descriptor_for(extern_function.return_type, *program);
-
-				extern_function.caller = callc::c_function_caller({parameter_type_descriptors, extern_function.parameter_types.size()}, return_type_descriptor);
-
-				FunctionId function_id;
-				function_id.is_extern = true;
-				function_id.index = static_cast<int>(program->extern_functions.size());
-				program->extern_functions.push_back(std::move(extern_function));
-
-				complete::expression::OverloadSet complete_expression;
-				complete_expression.overload_set.function_ids.push_back(function_id);
-				return complete_expression;
-			},
 			[&](incomplete::expression::FunctionTemplate const & incomplete_expression) -> complete::Expression
 			{
 				complete::FunctionTemplate new_function_template;
@@ -1055,6 +1020,44 @@ namespace instantiation
 				new_template.scope_template_parameters = template_parameters;
 				auto const id = add_struct_template(*program, std::move(new_template));
 				top(scope_stack).struct_templates.push_back({incomplete_statement.declared_struct_template.name, id});
+
+				return std::nullopt;
+			},
+			[&](incomplete::statement::ImportBlock const & incomplete_statement) -> std::optional<complete::Statement>
+			{
+				for (incomplete::ExternFunction const & incomplete_extern_function : incomplete_statement.imported_functions)
+				{
+					complete::ExternFunction extern_function;
+					extern_function.function_pointer = incomplete_extern_function.function_pointer;
+
+					complete::Function function;
+					instantiate_function_prototype(incomplete_extern_function.prototype, template_parameters, scope_stack, program, out(function));
+					extern_function.parameter_size = function.stack_frame_size;
+					extern_function.parameter_alignment = function.stack_frame_alignment;
+					extern_function.return_type = function.return_type;
+
+					extern_function.parameter_types.reserve(function.parameter_count);
+					for (int i = 0; i < function.parameter_count; ++i)
+						extern_function.parameter_types.push_back(function.variables[i].type);
+
+					if (function.parameter_count > 4)
+						mark_as_to_do("Extern functions with more than 4 parameters");
+
+					callc::TypeDescriptor parameter_type_descriptors[4];
+					for (int i = 0; i < function.parameter_count; ++i)
+						parameter_type_descriptors[i] = type_descriptor_for(extern_function.parameter_types[i], *program);
+
+					callc::TypeDescriptor const return_type_descriptor = type_descriptor_for(extern_function.return_type, *program);
+
+					extern_function.caller = callc::c_function_caller({ parameter_type_descriptors, extern_function.parameter_types.size() }, return_type_descriptor);
+
+					FunctionId function_id;
+					function_id.is_extern = true;
+					function_id.index = static_cast<int>(program->extern_functions.size());
+					program->extern_functions.push_back(std::move(extern_function));
+
+					top(scope_stack).functions.push_back({incomplete_extern_function.name, function_id});
+				}
 
 				return std::nullopt;
 			}

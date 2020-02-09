@@ -2,7 +2,17 @@
 
 #include <string_view>
 
-struct Module;
+struct DLL
+{
+	DLL(void const * h) noexcept : handle(h) {}
+	DLL(DLL const & other) = delete;
+	DLL & operator = (DLL const & other) = delete;
+	DLL(DLL && other) noexcept : handle(std::exchange(other.handle, nullptr)) {}
+	DLL & operator = (DLL && other) noexcept { handle = std::exchange(other.handle, nullptr); return *this; }
+	~DLL() noexcept;
 
-Module const * get_loaded_module(std::string_view path);
-void const * find_symbol(Module const * dll, std::string_view symbol_name);
+	void const * handle;
+};
+
+DLL load_library(std::string_view path);
+void const * find_symbol(DLL const & dll, std::string_view symbol_name);

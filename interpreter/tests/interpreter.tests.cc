@@ -1635,11 +1635,15 @@ TEST_CASE("Deleteme")
 TEST_CASE("import allows to import C functions from DLLs")
 {
 	auto const src = R"(
-		let putchar = fn(char c) -> int 
-			extern_symbol(putchar);
 
-		let abs = fn(int x) -> int 
-			extern_symbol(abs);
+		import "ucrtbase.dll"
+		{
+			let putchar = fn(char c) -> int 
+				extern_symbol(putchar);
+
+			let abs = fn(int x) -> int 
+				extern_symbol(abs);
+		}
 
 		let print_string = fn(char[] s, int n)
 		{

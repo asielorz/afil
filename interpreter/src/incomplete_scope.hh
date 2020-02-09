@@ -80,4 +80,11 @@ namespace incomplete
 		std::vector<TemplateParameter> template_parameters;
 	};
 
+	struct ExternFunction
+	{
+		std::string name;
+		incomplete::FunctionPrototype prototype;
+		void const * function_pointer;
+	};
+
 } // namespace incomplete

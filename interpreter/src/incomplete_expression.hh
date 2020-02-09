@@ -51,12 +51,6 @@ namespace incomplete
 			incomplete::Function function;
 		};
 
-		struct ExternFunction
-		{
-			incomplete::FunctionPrototype prototype;
-			void const * function_pointer;
-		};
-
 		struct FunctionTemplate
 		{
 			incomplete::FunctionTemplate function_template;
@@ -120,7 +114,7 @@ namespace incomplete
 				Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>,
 				Dereference, Addressof, Subscript,
 				Identifier, MemberVariable,
-				Function, ExternFunction, FunctionTemplate,	
+				Function, FunctionTemplate,	
 				FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 				If, StatementBlock,
 				Constructor, DesignatedInitializerConstructor,
