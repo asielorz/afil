@@ -1617,7 +1617,7 @@ TEST_CASE("import allows to import C functions from DLLs")
 {
 	auto const src = R"(
 
-		import "ucrtbase.dll"
+		import "ucrtbase"
 		{
 			let putchar = fn(char c) -> int 
 				extern_symbol("putchar");

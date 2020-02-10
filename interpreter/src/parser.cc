@@ -1162,7 +1162,7 @@ namespace parser
 			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after extern_symbol name.");
 			index++;
 
-			auto const module_handle = load_library("ucrtbase.dll");
+			auto const module_handle = load_library(library_name);
 			void const * const extern_symbol_address = find_symbol(module_handle, parse_string_literal(extern_symbol_name));
 			raise_syntax_error_if_not(extern_symbol_address != nullptr, "Extern symbol not found.");
 

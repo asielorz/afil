@@ -10,8 +10,11 @@ DLL::~DLL() noexcept
 
 DLL load_library(std::string_view path)
 {
-	auto const null_terminated_path = make_null_terminated(path);
-	return DLL(GetModuleHandle(null_terminated_path.data()));
+	char null_terminated_path[256];
+	memcpy(null_terminated_path, path.data(), path.size());
+	memcpy(null_terminated_path + path.size(), ".dll", 5);
+
+	return DLL(GetModuleHandle(null_terminated_path));
 }
 
 void const * find_symbol(DLL const & dll, std::string_view symbol_name)
