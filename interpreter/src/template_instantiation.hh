@@ -59,9 +59,9 @@ namespace instantiation
 
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type,
-		span<complete::ResolvedTemplateParameter const> template_parameters,
-		ScopeStackView scope_stack,
-		complete::Program & program)
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program)
 		-> complete::TypeId;
 
 } // namespace instantiation

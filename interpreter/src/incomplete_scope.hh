@@ -9,6 +9,8 @@
 namespace incomplete
 {
 
+	struct Expression;
+
 	struct TypeId
 	{
 		#pragma warning (disable : 4201)
@@ -23,7 +25,7 @@ namespace incomplete
 		struct Array
 		{
 			value_ptr<TypeId> value_type;
-			int size;
+			value_ptr<Expression> size;
 		};
 		struct ArrayPointer
 		{

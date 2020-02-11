@@ -3,6 +3,7 @@
 #include "syntax_error.hh"
 #include "incomplete_statement.hh"
 #include "complete_expression.hh"
+#include "interpreter.hh"
 #include "utils/out.hh"
 #include "utils/variant.hh"
 #include "utils/overload.hh"
@@ -12,6 +13,17 @@
 #include <cassert>
 
 using namespace std::literals;
+
+auto evaluate_constant_expression(complete::Expression expression, complete::Program const & program) noexcept -> int
+{
+	interpreter::ProgramStack stack;
+	alloc_stack(stack, 256);
+	
+	expression = insert_conversion_node(std::move(expression), complete::TypeId::int_, program);
+	interpreter::eval_expression(expression, stack, program);
+
+	return interpreter::read<int>(stack, 0);
+}
 
 namespace instantiation
 {
@@ -36,9 +48,9 @@ namespace instantiation
 
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type, 
-		span<complete::ResolvedTemplateParameter const> template_parameters,
-		ScopeStackView scope_stack,
-		complete::Program & program) 
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program) 
 		-> complete::TypeId
 	{
 		auto const visitor = overload(
@@ -51,17 +63,19 @@ namespace instantiation
 			[&](incomplete::TypeId::Pointer const & pointer)
 			{
 				complete::TypeId const pointee = resolve_dependent_type(*pointer.pointee, template_parameters, scope_stack, program);
-				return pointer_type_for(pointee, program);
+				return pointer_type_for(pointee, *program);
 			},
 			[&](incomplete::TypeId::Array const & array)
 			{
 				complete::TypeId const value_type = resolve_dependent_type(*array.value_type, template_parameters, scope_stack, program);
-				return array_type_for(value_type, array.size, program);
+
+				complete::Expression size_expr = instantiate_expression(*array.size, template_parameters, scope_stack, program, nullptr);
+				return array_type_for(value_type, evaluate_constant_expression(std::move(size_expr), *program), *program);
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer)
 			{
 				complete::TypeId const pointee = resolve_dependent_type(*array_pointer.pointee, template_parameters, scope_stack, program);
-				return array_pointer_type_for(pointee, program);
+				return array_pointer_type_for(pointee, *program);
 			},
 			[&](incomplete::TypeId::TemplateInstantiation const & template_instantiation) -> complete::TypeId
 			{
@@ -78,7 +92,7 @@ namespace instantiation
 				for (incomplete::TypeId const & parameter : template_instantiation.parameters)
 					parameters.push_back(resolve_dependent_type(parameter, template_parameters, scope_stack, program));
 
-				return instantiate_struct_template(program, template_id, parameters);
+				return instantiate_struct_template(*program, template_id, parameters);
 			},
 			[](incomplete::TypeId::Deduce const &) -> complete::TypeId
 			{
@@ -94,9 +108,9 @@ namespace instantiation
 
 	auto resolve_function_template_parameter_type(
 		incomplete::TypeId const & dependent_type,
-		span<complete::ResolvedTemplateParameter const> resolved_template_parameters,
+		std::vector<complete::ResolvedTemplateParameter> & resolved_template_parameters,
 		span<incomplete::TemplateParameter const> unresolved_template_parameters, 
-		ScopeStackView scope_stack)
+		ScopeStack & scope_stack, out<complete::Program> program)
 		-> complete::FunctionTemplateParameterType
 	{
 		auto const visitor = overload(
@@ -119,20 +133,22 @@ namespace instantiation
 			[&](incomplete::TypeId::Pointer const & pointer) -> complete::FunctionTemplateParameterType
 			{
 				complete::FunctionTemplateParameterType::Pointer pointer_type;
-				pointer_type.pointee = allocate(resolve_function_template_parameter_type(*pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack));
+				pointer_type.pointee = allocate(resolve_function_template_parameter_type(*pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 				return {pointer_type, false, false};
 			},
 			[&](incomplete::TypeId::Array const & array) -> complete::FunctionTemplateParameterType
 			{
 				complete::FunctionTemplateParameterType::Array array_type;
-				array_type.value_type = allocate(resolve_function_template_parameter_type(*array.value_type, resolved_template_parameters, unresolved_template_parameters, scope_stack));
-				array_type.size = array.size;
+				array_type.value_type = allocate(resolve_function_template_parameter_type(*array.value_type, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
+
+				complete::Expression size_expr = instantiate_expression(*array.size, resolved_template_parameters, scope_stack, program, nullptr);
+				array_type.size = evaluate_constant_expression(std::move(size_expr), *program);
 				return {array_type, false, false};
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> complete::FunctionTemplateParameterType
 			{
 				complete::FunctionTemplateParameterType::ArrayPointer array_pointer_type;
-				array_pointer_type.pointee = allocate(resolve_function_template_parameter_type(*array_pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack));
+				array_pointer_type.pointee = allocate(resolve_function_template_parameter_type(*array_pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 				return {array_pointer_type, false, false};
 			},
 			[](incomplete::TypeId::TemplateInstantiation const & /*template_instantiation*/) -> complete::FunctionTemplateParameterType
@@ -298,20 +314,20 @@ namespace instantiation
 
 	auto instantiate_function_prototype(
 		incomplete::FunctionPrototype const & incomplete_function,
-		span<complete::ResolvedTemplateParameter const> template_parameters,
-		ScopeStackView scope_stack,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		out<complete::Function> function
 	) -> void
 	{
 		for (incomplete::FunctionParameter const & parameter : incomplete_function.parameters)
-			add_variable_to_scope(*function, parameter.name, resolve_dependent_type(parameter.type, template_parameters, scope_stack, *program), 0, *program);
+			add_variable_to_scope(*function, parameter.name, resolve_dependent_type(parameter.type, template_parameters, scope_stack, program), 0, *program);
 
 		function->parameter_count = static_cast<int>(incomplete_function.parameters.size());
 		function->parameter_size = function->stack_frame_size;
 
 		if (incomplete_function.return_type.has_value())
-			function->return_type = resolve_dependent_type(*incomplete_function.return_type, template_parameters, scope_stack, *program);
+			function->return_type = resolve_dependent_type(*incomplete_function.return_type, template_parameters, scope_stack, program);
 		else
 			function->return_type = complete::TypeId::deduce;
 	}
@@ -537,7 +553,8 @@ namespace instantiation
 						param.type,
 						template_parameters, 
 						incomplete_expression.function_template.template_parameters,
-						scope_stack
+						scope_stack,
+						program
 					));
 
 				FunctionTemplateId const template_id =  add_function_template(*program, std::move(new_function_template));
@@ -669,7 +686,7 @@ namespace instantiation
 			},
 			[&](incomplete::expression::Constructor const & incomplete_expression) -> complete::Expression
 			{
-				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, *program);
+				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, program);
 
 				if (incomplete_expression.parameters.size() == 0) // Default constructor
 				{
@@ -701,13 +718,14 @@ namespace instantiation
 					complete::Type::Array const & constructed_array = std::get<complete::Type::Array>(constructed_type.extra_data);
 					complete::TypeId const array_type = constructed_array.value_type;
 					int const array_size = constructed_array.size;
+					int const param_count = static_cast<int>(incomplete_expression.parameters.size());
 
 					raise_syntax_error_if_not(
-						incomplete_expression.parameters.size() == 1 || incomplete_expression.parameters.size() == size_t(array_size),
+						incomplete_expression.parameters.size() == 1 || param_count == array_size,
 						"Incorrect number of arguments for array constructor.");
 
-					complete_expression.parameters.reserve(array_size);
-					for (int i = 0; i < array_size; ++i)
+					complete_expression.parameters.reserve(param_count);
+					for (int i = 0; i < param_count; ++i)
 					{
 						complete_expression.parameters.push_back(insert_conversion_node(
 							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type),
@@ -723,7 +741,7 @@ namespace instantiation
 			},
 			[&](incomplete::expression::DesignatedInitializerConstructor const & incomplete_expression) -> complete::Expression
 			{
-				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, *program);
+				complete::TypeId const constructed_type_id = resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, program);
 				complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
 
 				raise_syntax_error_if_not(is_struct(constructed_type), "Designated initializers may only be used on structs.");
@@ -803,7 +821,7 @@ namespace instantiation
 				// Case in which nothing is assigned to the DECLARATION. Must be a variable of a default constructible type.
 				if (!incomplete_statement.assigned_expression.has_value())
 				{
-					complete::TypeId const var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, *program);
+					complete::TypeId const var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program);
 					raise_syntax_error_if_not(is_default_constructible(var_type, *program), "A function must be declared with a let statement.");
 
 					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
@@ -833,7 +851,7 @@ namespace instantiation
 
 				complete::Expression expression = instantiate_expression(*incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type);
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
-				complete::TypeId var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, *program);
+				complete::TypeId var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program);
 				if (decay(var_type) == complete::TypeId::deduce)
 					assign_without_qualifiers(var_type, assigned_expression_type);
 
@@ -985,7 +1003,7 @@ namespace instantiation
 
 				for (incomplete::MemberVariable const & member_variable : incomplete_statement.declared_struct.member_variables)
 				{
-					complete::TypeId const member_type = resolve_dependent_type(member_variable.type, template_parameters, scope_stack, *program);
+					complete::TypeId const member_type = resolve_dependent_type(member_variable.type, template_parameters, scope_stack, program);
 					raise_syntax_error_if_not(is_data_type(member_type), "Member variable cannot be void.");
 					raise_syntax_error_if_not(!member_type.is_reference, "Member variable cannot be reference.");
 					raise_syntax_error_if_not(!member_type.is_mutable, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");

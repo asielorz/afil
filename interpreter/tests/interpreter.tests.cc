@@ -1616,7 +1616,6 @@ TEST_CASE("Declaring a function inside a template")
 TEST_CASE("import allows to import C functions from DLLs")
 {
 	auto const src = R"(
-
 		import "ucrtbase"
 		{
 			let putchar = fn(char c) -> int 
@@ -1641,6 +1640,19 @@ TEST_CASE("import allows to import C functions from DLLs")
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
+TEST_CASE("Constant expressions")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let array = int[1 + 2](0);
+			return size(array);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
 #if 0

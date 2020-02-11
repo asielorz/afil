@@ -1,10 +1,17 @@
 #pragma once
 
+#include "utils/span.hh"
 #include <string_view>
 #include <variant>
 #include <vector>
 
-namespace complete { struct Program; }
+namespace complete 
+{ 
+	struct Expression;
+	struct Statement;
+	struct Program;
+}
+struct FunctionId;
 
 namespace interpreter
 {
@@ -33,6 +40,11 @@ namespace interpreter
 
 	// TODO: argc, argv. Decide a good stack size.
 	auto run(complete::Program const & program, int stack_size = 2048) noexcept -> int;
+
+	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
+	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program) noexcept -> int;
+	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
+	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> control_flow::Variant;
 
 } // namespace interpreter
 

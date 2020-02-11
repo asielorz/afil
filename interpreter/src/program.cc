@@ -436,7 +436,7 @@ namespace complete
 		// Magic
 		for (incomplete::MemberVariable const & var_template : struct_template.incomplete_struct.member_variables)
 		{
-			TypeId const var_type = instantiation::resolve_dependent_type(var_template.type, all_template_parameters, scope_stack, program);
+			TypeId const var_type = instantiation::resolve_dependent_type(var_template.type, all_template_parameters, scope_stack, out(program));
 
 			add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, var_template.name, var_type, 0, program);
 			if (var_template.initializer_expression)

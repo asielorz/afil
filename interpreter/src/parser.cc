@@ -167,16 +167,16 @@ namespace parser
 		incomplete::TypeId pointer_type;
 		pointer_type.is_reference = false;
 		pointer_type.is_mutable = false;
-		pointer_type.value = incomplete::TypeId::Pointer{allocate(type)};
+		pointer_type.value = incomplete::TypeId::Pointer{allocate(std::move(type))};
 		return pointer_type;
 	}
 
-	auto array_type_for(incomplete::TypeId type, int size) noexcept -> incomplete::TypeId
+	auto array_type_for(incomplete::TypeId type, incomplete::Expression size) noexcept -> incomplete::TypeId
 	{
 		incomplete::TypeId array_type;
 		array_type.is_reference = false;
 		array_type.is_mutable = false;
-		array_type.value = incomplete::TypeId::Array{allocate(type), size};
+		array_type.value = incomplete::TypeId::Array{allocate(std::move(type)), allocate(std::move(size))};
 		return array_type;
 	}
 
@@ -185,13 +185,16 @@ namespace parser
 		incomplete::TypeId pointer_type;
 		pointer_type.is_reference = false;
 		pointer_type.is_mutable = false;
-		pointer_type.value = incomplete::TypeId::ArrayPointer{allocate(type)};
+		pointer_type.value = incomplete::TypeId::ArrayPointer{allocate(std::move(type))};
 		return pointer_type;
 	}
 
-	auto parse_type_name(span<lex::Token const> tokens, size_t & index, span<TypeName const> type_names) noexcept -> std::optional<incomplete::TypeId>;
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> std::optional<incomplete::TypeId>;
+	auto parse_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression;
+	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression;
+	auto parse_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Statement;
 
-	auto parse_mutable_pointer_and_array(span<lex::Token const> tokens, size_t & index, incomplete::TypeId type) noexcept -> incomplete::TypeId
+	auto parse_mutable_pointer_and_array(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept -> incomplete::TypeId
 	{
 		// Look for mutable qualifier.
 		if (tokens[index].source == "mut"sv)
@@ -205,7 +208,7 @@ namespace parser
 		{
 			incomplete::TypeId pointer_type = pointer_type_for(type);
 			index++;
-			return parse_mutable_pointer_and_array(tokens, index, std::move(pointer_type));
+			return parse_mutable_pointer_and_array(tokens, index, type_names, std::move(pointer_type));
 		}
 
 		// Look for array type
@@ -217,27 +220,24 @@ namespace parser
 			{
 				incomplete::TypeId pointer_type = array_pointer_type_for(type);
 				index++;
-				return parse_mutable_pointer_and_array(tokens, index, std::move(pointer_type));
+				return parse_mutable_pointer_and_array(tokens, index, type_names, std::move(pointer_type));
 			}
 			else
 			{
-				raise_syntax_error_if_not(tokens[index].type == TokenType::literal_int, "Expected integral constant after [ in array type.");
-				int const size = parse_number_literal<int>(tokens[index].source);
-				raise_syntax_error_if_not(size > 0, "Array size must be greater than 0.");
-				index++;
+				incomplete::Expression size = parse_expression(tokens, index, type_names);
 				raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ] after array size.");
 				index++;
-				incomplete::TypeId array_type = array_type_for(type, size);
-				return parse_mutable_pointer_and_array(tokens, index, std::move(array_type));
+				incomplete::TypeId array_type = array_type_for(std::move(type), std::move(size));
+				return parse_mutable_pointer_and_array(tokens, index, type_names, std::move(array_type));
 			}
 		}
 
 		return type;
 	}
 
-	auto parse_mutable_pointer_array_and_reference(span<lex::Token const> tokens, size_t & index, incomplete::TypeId type) noexcept -> incomplete::TypeId
+	auto parse_mutable_pointer_array_and_reference(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept -> incomplete::TypeId
 	{
-		type = parse_mutable_pointer_and_array(tokens, index, std::move(type));
+		type = parse_mutable_pointer_and_array(tokens, index, type_names, std::move(type));
 
 		// Look for reference qualifier.
 		if (tokens[index].source == "&"sv)
@@ -249,7 +249,7 @@ namespace parser
 		return type;
 	}
 
-	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, span<TypeName const> type_names) noexcept -> std::vector<incomplete::TypeId>
+	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> std::vector<incomplete::TypeId>
 	{
 		raise_syntax_error_if_not(tokens[index].source == "<", "Expected '<' after template name.");
 		index++;
@@ -275,7 +275,7 @@ namespace parser
 		return template_parameters;
 	}
 
-	auto parse_type_name(span<lex::Token const> tokens, size_t & index, span<TypeName const> type_names) noexcept -> std::optional<incomplete::TypeId>
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> std::optional<incomplete::TypeId>
 	{
 		using namespace incomplete;
 		std::string_view const name_to_look_up = tokens[index].source;
@@ -299,7 +299,7 @@ namespace parser
 				type.is_reference = false;
 				type.value = base_case;
 
-				return parse_mutable_pointer_array_and_reference(tokens, index, type);
+				return parse_mutable_pointer_array_and_reference(tokens, index, type_names, type);
 			}
 			case TypeName::Type::struct_template:
 			{
@@ -311,7 +311,7 @@ namespace parser
 				type.is_reference = false;
 				type.value = std::move(template_instantiation);
 
-				return parse_mutable_pointer_array_and_reference(tokens, index, std::move(type));
+				return parse_mutable_pointer_array_and_reference(tokens, index, type_names, std::move(type));
 			}
 		}
 
@@ -352,10 +352,6 @@ namespace parser
 	//******************************************************************************************************************************************************************
 	//******************************************************************************************************************************************************************
 	//******************************************************************************************************************************************************************
-
-	auto parse_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression;
-	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression;
-	auto parse_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Statement;
 
 	auto parse_comma_separated_expression_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names,
 		TokenType opener = TokenType::open_parenthesis, TokenType delimiter = TokenType::close_parenthesis) noexcept -> std::vector<incomplete::Expression>
