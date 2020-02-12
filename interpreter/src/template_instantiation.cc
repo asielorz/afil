@@ -14,17 +14,24 @@
 
 using namespace std::literals;
 
-auto evaluate_constant_expression(complete::Expression expression, complete::Program const & program) noexcept -> int
+auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, void * outValue) noexcept -> void
 {
 	raise_syntax_error_if_not(is_constant_expression(expression), "Cannot evaluate expression at compile time.");
 
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 256);
 	
-	expression = insert_conversion_node(std::move(expression), complete::TypeId::int_, program);
 	interpreter::eval_expression(expression, stack, program);
 
-	return interpreter::read<int>(stack, 0);
+	memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
+}
+
+auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program) noexcept -> int
+{
+	expression = insert_conversion_node(std::move(expression), complete::TypeId::int_, program);
+	int result;
+	evaluate_constant_expression(expression, program, &result);
+	return result;
 }
 
 namespace instantiation
@@ -72,7 +79,7 @@ namespace instantiation
 				complete::TypeId const value_type = resolve_dependent_type(*array.value_type, template_parameters, scope_stack, program);
 
 				complete::Expression size_expr = instantiate_expression(*array.size, template_parameters, scope_stack, program, nullptr);
-				return array_type_for(value_type, evaluate_constant_expression(std::move(size_expr), *program), *program);
+				return array_type_for(value_type, evaluate_array_size_expression(std::move(size_expr), *program), *program);
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer)
 			{
@@ -144,7 +151,7 @@ namespace instantiation
 				array_type.value_type = allocate(resolve_function_template_parameter_type(*array.value_type, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 
 				complete::Expression size_expr = instantiate_expression(*array.size, resolved_template_parameters, scope_stack, program, nullptr);
-				array_type.size = evaluate_constant_expression(std::move(size_expr), *program);
+				array_type.size = evaluate_array_size_expression(std::move(size_expr), *program);
 				return {array_type, false, false};
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> complete::FunctionTemplateParameterType
@@ -694,7 +701,11 @@ namespace instantiation
 				auto const guard = push_block_scope(scope_stack, complete_expression.scope);
 				complete_expression.statements.reserve(incomplete_expression.statements.size());
 				for (incomplete::Statement const & incomplete_substatement : incomplete_expression.statements)
-					complete_expression.statements.push_back(*instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program, out(complete_expression.return_type)));
+				{
+					auto substatement = instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program, out(complete_expression.return_type));
+					if (substatement.has_value())
+						complete_expression.statements.push_back(std::move(*substatement));
+				}
 			
 				return complete_expression;
 			},
@@ -832,7 +843,7 @@ namespace instantiation
 		auto const visitor = overload(
 			[&](incomplete::statement::VariableDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
-				// Case in which nothing is assigned to the DECLARATION. Must be a variable of a default constructible type.
+				// Case in which nothing is assigned to the declaration. Must be a variable of a default constructible type.
 				if (!incomplete_statement.assigned_expression.has_value())
 				{
 					complete::TypeId const var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program);
@@ -896,10 +907,23 @@ namespace instantiation
 					raise_syntax_error_if_not(var_type == complete::TypeId::function, "A function must be declared with a let statement.");
 
 					for (FunctionId const function_id : overload_set->overload_set.function_ids)
-						top(scope_stack).functions.push_back({ incomplete_statement.variable_name, function_id });
+						top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
 
 					for (FunctionTemplateId const template_id : overload_set->overload_set.function_template_ids)
-						top(scope_stack).function_templates.push_back({ incomplete_statement.variable_name, template_id });
+						top(scope_stack).function_templates.push_back({incomplete_statement.variable_name, template_id});
+
+					return std::nullopt;
+				}
+				else if (!var_type.is_mutable && !var_type.is_reference && is_constant_expression(expression))
+				{
+					complete::Constant constant;
+					constant.type = var_type;
+					constant.value.resize(type_size(*program, var_type));
+					constant.name = incomplete_statement.variable_name;
+
+					evaluate_constant_expression(insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program), *program, constant.value.data());
+
+					top(scope_stack).constants.push_back(std::move(constant));
 
 					return std::nullopt;
 				}
