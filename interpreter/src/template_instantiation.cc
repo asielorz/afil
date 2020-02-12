@@ -16,6 +16,8 @@ using namespace std::literals;
 
 auto evaluate_constant_expression(complete::Expression expression, complete::Program const & program) noexcept -> int
 {
+	raise_syntax_error_if_not(is_constant_expression(expression), "Cannot evaluate expression at compile time.");
+
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 256);
 	

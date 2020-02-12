@@ -1,6 +1,7 @@
 #include "complete_expression.hh"
 #include "program.hh"
 #include "utils/overload.hh"
+#include "utils/warning_macro.hh"
 
 namespace complete
 {
@@ -43,6 +44,34 @@ namespace complete
 	auto expression_type_size(Expression const & tree, Program const & program) noexcept -> int
 	{
 		return type_size(program, expression_type_id(tree, program));
+	}
+
+	auto is_constant_expression(Expression const & expr) noexcept -> bool
+	{
+		auto const visitor = overload(
+			[](expression::Literal<int>) { return true; },
+			[](expression::Literal<float>) { return true; },
+			[](expression::Literal<bool>) { return true; },
+			[](expression::StringLiteral const &) { return true; },
+			[](expression::Variable const &) { return false; },
+			[&](expression::MemberVariable const & var_node) { return is_constant_expression(*var_node.owner); },
+			[](expression::OverloadSet const &) { return true; },
+			TODO("Determine whether the function can be called at compile time or not")
+			[&](expression::FunctionCall const & func_call_node) { return std::all_of(func_call_node.parameters.begin(), func_call_node.parameters.end(), is_constant_expression); },
+			[](expression::RelationalOperatorCall const & op_call_node) { return std::all_of(op_call_node.parameters.begin(), op_call_node.parameters.end(), is_constant_expression); },
+			[](expression::Constructor const & ctor_node) { return std::all_of(ctor_node.parameters.begin(), ctor_node.parameters.end(), is_constant_expression); },
+			[](expression::Dereference const & deref_node) { return is_constant_expression(*deref_node.expression); },
+			[](expression::ReinterpretCast const & cast_node) { return is_constant_expression(*cast_node.operand); },
+			[](expression::Subscript const & subscript_node) { return is_constant_expression(*subscript_node.array) && is_constant_expression(*subscript_node.index); },
+			[&](expression::If const & if_node) 
+			{
+				return is_constant_expression(*if_node.condition) && is_constant_expression(*if_node.then_case) && is_constant_expression(*if_node.else_case);
+			},
+			TODO("Statement blocks as constant expressions.")
+			[](expression::StatementBlock const &) { return false; },
+			[](expression::Assignment const &) { return false; }
+		);
+		return std::visit(visitor, expr.as_variant());
 	}
 
 } // namespace complete
