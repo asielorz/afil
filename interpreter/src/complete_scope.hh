@@ -83,11 +83,19 @@ namespace complete
 		StructTemplateId id;
 	};
 
+	struct Constant
+	{
+		std::string name;
+		std::string value;
+		TypeId type;
+	};
+
 	struct Scope
 	{
 		int stack_frame_size = 0;
 		int stack_frame_alignment = 1;
 		std::vector<Variable> variables;
+		std::vector<Constant> constants;
 		std::vector<FunctionName> functions;
 		std::vector<TypeName> types;
 		std::vector<FunctionTemplateName> function_templates;

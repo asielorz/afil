@@ -40,6 +40,7 @@ namespace instantiation
 	{
 		struct Nothing {};
 		struct Variable { complete::TypeId variable_type; int variable_offset; };
+		struct Constant { complete::Constant const * constant; };
 		struct GlobalVariable { complete::TypeId variable_type; int variable_offset; };
 		struct OverloadSet : complete::OverloadSet {};
 		struct Type { complete::TypeId type_id; };
@@ -49,6 +50,7 @@ namespace instantiation
 		->std::variant<
 			lookup_result::Nothing,
 			lookup_result::Variable,
+			lookup_result::Constant,
 			lookup_result::GlobalVariable,
 			lookup_result::OverloadSet,
 			lookup_result::Type,

@@ -171,12 +171,13 @@ namespace instantiation
 
 	auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		->std::variant<
-		lookup_result::Nothing,
-		lookup_result::Variable,
-		lookup_result::GlobalVariable,
-		lookup_result::OverloadSet,
-		lookup_result::Type,
-		lookup_result::StructTemplate
+			lookup_result::Nothing,
+			lookup_result::Variable,
+			lookup_result::Constant,
+			lookup_result::GlobalVariable,
+			lookup_result::OverloadSet,
+			lookup_result::Type,
+			lookup_result::StructTemplate
 		>
 	{
 		using namespace complete;
@@ -208,11 +209,15 @@ namespace instantiation
 
 				auto const type = std::find_if(scope.types.begin(), scope.types.end(), [name](TypeName const & var) { return var.name == name; });
 				if (type != scope.types.end())
-					return lookup_result::Type{ type->id };
+					return lookup_result::Type{type->id};
 
 				auto const struct_template = std::find_if(scope.struct_templates.begin(), scope.struct_templates.end(), [name](StructTemplateName const & var) { return var.name == name; });
 				if (struct_template != scope.struct_templates.end())
-					return lookup_result::StructTemplate{ struct_template->id };
+					return lookup_result::StructTemplate{struct_template->id};
+
+				auto const constant = std::find_if(scope.constants.begin(), scope.constants.end(), [name](Constant const & var) { return var.name == name; });
+				if (constant != scope.constants.end())
+					return lookup_result::Constant{&*constant};
 			}
 
 			// Functions.
@@ -407,6 +412,13 @@ namespace instantiation
 						complete::expression::LocalVariable complete_expression;
 						complete_expression.variable_type = var.variable_type;
 						complete_expression.variable_offset = var.variable_offset;
+						return complete_expression;
+					},
+					[](lookup_result::Constant const & var) -> complete::Expression
+					{
+						complete::expression::Constant complete_expression;
+						complete_expression.type = var.constant->type;
+						complete_expression.value = var.constant->value;
 						return complete_expression;
 					},
 					[](lookup_result::GlobalVariable const & var) -> complete::Expression

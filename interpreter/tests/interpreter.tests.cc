@@ -1655,6 +1655,20 @@ TEST_CASE("Constant expressions")
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
+TEST_CASE("Variables with values known at compile time are constants and can be read in a constant expression")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			int s = 5;
+			let array = int[s](0);
+			return size(array);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 #if 0
 TEST_CASE("Can use a complex expression to compute the type of an array")
 {

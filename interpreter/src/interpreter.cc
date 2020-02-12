@@ -191,6 +191,10 @@ namespace interpreter
 					memcpy(pointer_at_address(stack, return_address), pointer_at_address(stack, owner_address + var_node.variable_offset), variable_size);
 				}
 			},
+			[&](expression::Constant const & constant_node)
+			{
+				write(stack, return_address, constant_node.value.data(), static_cast<int>(constant_node.value.size()));
+			},
 			[&](expression::Dereference const & deref_node)
 			{
 				StackGuard const g(stack);

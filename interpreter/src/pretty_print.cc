@@ -6,6 +6,7 @@
 #include "utils/string.hh"
 #include "utils/unreachable.hh"
 #include <set>
+#include "utils/warning_macro.hh"
 
 using namespace complete;
 using namespace std::literals;
@@ -149,6 +150,11 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 				pretty_print(*var_expr.owner, program, scope_stack, indentation_level + 1),
 				indent(indentation_level + 1), member_variable_name(expression_type_id(*var_expr.owner, program), var_expr.variable_offset, program), '\n'
 			);
+		},
+		[&](expression::Constant const & constant_expr)
+		{
+			TODO("Pretty print value of constant nodes");
+			return join("constant<", type_name(constant_expr.type, program), ">: \"", "???", "\"\n");
 		},
 		[&](expression::OverloadSet const & overload_set_expr) 
 		{

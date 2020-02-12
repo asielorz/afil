@@ -42,6 +42,12 @@ namespace complete
 			value_ptr<Expression> owner;
 		};
 
+		struct Constant
+		{
+			TypeId type;
+			std::string value;
+		};
+
 		struct OverloadSet
 		{
 			complete::OverloadSet overload_set;
@@ -109,7 +115,7 @@ namespace complete
 		{
 			using ExpressionTreeBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>, StringLiteral,
-				LocalVariable, GlobalVariable, MemberVariable,
+				LocalVariable, GlobalVariable, MemberVariable, Constant,
 				OverloadSet, FunctionCall, RelationalOperatorCall, Assignment,
 				Constructor,
 				Dereference, ReinterpretCast, Subscript,

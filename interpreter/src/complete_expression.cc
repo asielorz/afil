@@ -27,6 +27,7 @@ namespace complete
 				var_type.is_mutable = owner_type.is_mutable;
 				return var_type;
 			},
+			[](expression::Constant const & constant) { return constant.type; },
 			[](expression::OverloadSet const &) { return TypeId::function; },
 			[&](expression::FunctionCall const & func_call_node) { return return_type(program, func_call_node.function_id); },
 			[](expression::RelationalOperatorCall const &) { return TypeId::bool_; },
@@ -55,6 +56,7 @@ namespace complete
 			[](expression::StringLiteral const &) { return true; },
 			[](expression::Variable const &) { return false; },
 			[&](expression::MemberVariable const & var_node) { return is_constant_expression(*var_node.owner); },
+			[](expression::Constant const &) { return true; },
 			[](expression::OverloadSet const &) { return true; },
 			TODO("Determine whether the function can be called at compile time or not")
 			[&](expression::FunctionCall const & func_call_node) { return std::all_of(func_call_node.parameters.begin(), func_call_node.parameters.end(), is_constant_expression); },
