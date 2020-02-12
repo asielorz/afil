@@ -193,7 +193,8 @@ namespace interpreter
 			},
 			[&](expression::Constant const & constant_node)
 			{
-				write(stack, return_address, constant_node.value.data(), static_cast<int>(constant_node.value.size()));
+				//write(stack, return_address, constant_node.value.data(), static_cast<int>(constant_node.value.size()));
+				write(stack, return_address, constant_node.value.data());
 			},
 			[&](expression::Dereference const & deref_node)
 			{

@@ -702,9 +702,9 @@ namespace instantiation
 				complete_expression.statements.reserve(incomplete_expression.statements.size());
 				for (incomplete::Statement const & incomplete_substatement : incomplete_expression.statements)
 				{
-					auto substatement = instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program, out(complete_expression.return_type));
-					if (substatement.has_value())
-						complete_expression.statements.push_back(std::move(*substatement));
+					auto complete_substatement = instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program, out(complete_expression.return_type));
+					if (complete_substatement.has_value())
+						complete_expression.statements.push_back(std::move(*complete_substatement));
 				}
 			
 				return complete_expression;
@@ -914,7 +914,9 @@ namespace instantiation
 
 					return std::nullopt;
 				}
-				else if (!var_type.is_mutable && !var_type.is_reference && is_constant_expression(expression))
+				else if (!var_type.is_mutable && !var_type.is_reference 
+					&& !is_pointer(type_with_id(*program, var_type)) && !is_array_pointer(type_with_id(*program, var_type))
+					&& is_constant_expression(expression))
 				{
 					complete::Constant constant;
 					constant.type = var_type;

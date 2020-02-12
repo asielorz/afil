@@ -1486,7 +1486,7 @@ TEST_CASE("Array pointer type")
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
-TEST_CASE("Function template that takes array of pointer type")
+TEST_CASE("Function template that takes array pointer")
 {
 	auto const src = R"(
 		let subscript = fn<T>(T[] array, int i)

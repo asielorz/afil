@@ -27,7 +27,7 @@ namespace complete
 				var_type.is_mutable = owner_type.is_mutable;
 				return var_type;
 			},
-			[](expression::Constant const & constant) { return constant.type; },
+			[](expression::Constant const & constant) { return make_reference(constant.type); },
 			[](expression::OverloadSet const &) { return TypeId::function; },
 			[&](expression::FunctionCall const & func_call_node) { return return_type(program, func_call_node.function_id); },
 			[](expression::RelationalOperatorCall const &) { return TypeId::bool_; },
