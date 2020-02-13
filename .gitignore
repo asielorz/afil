@@ -1,6 +1,8 @@
 .vs/
 interpreter/bin/
 interpreter/obj/
+test_dll/bin/
+test_dll/obj/
 interpreter/test_files/
 *.vcxproj.filters
 *.vcxproj.user
