@@ -914,9 +914,7 @@ namespace instantiation
 
 					return std::nullopt;
 				}
-				else if (!var_type.is_mutable && !var_type.is_reference 
-					&& !is_pointer(type_with_id(*program, var_type)) && !is_array_pointer(type_with_id(*program, var_type))
-					&& is_constant_expression(expression))
+				else if (!var_type.is_mutable && is_constant_expression(expression))
 				{
 					complete::Constant constant;
 					constant.type = var_type;

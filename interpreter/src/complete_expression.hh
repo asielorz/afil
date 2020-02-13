@@ -4,6 +4,7 @@
 #include "function_id.hh"
 #include "complete_scope.hh"
 #include "utils/value_ptr.hh"
+#include "utils/span.hh"
 #include <variant>
 
 namespace complete
@@ -45,7 +46,7 @@ namespace complete
 		struct Constant
 		{
 			TypeId type;
-			std::string value;
+			span<char const> value;
 		};
 
 		struct OverloadSet

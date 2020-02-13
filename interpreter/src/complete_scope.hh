@@ -86,7 +86,7 @@ namespace complete
 	struct Constant
 	{
 		std::string name;
-		std::string value;
+		std::vector<char> value;
 		TypeId type;
 	};
 
