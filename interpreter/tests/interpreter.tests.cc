@@ -1667,22 +1667,22 @@ TEST_CASE("Variables with values known at compile time are constants and can be 
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 5);
-}
+} 
 
-#if 0
-TEST_CASE("Can use a complex expression to compute the type of an array")
+TEST_CASE("Contant variable of pointer type")
 {
 	auto const src = R"(
 		let main = fn() -> int
 		{
-			let a = int[1 + 2](0);
-			return size(a);
+			int s = 5;
+			int * ps = &s;
+			let array = int[*ps](0);
+			return size(array);
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src) == 3);
+	REQUIRE(tests::parse_and_run(src) == 5);
 }
-#endif
 
 /*****************************************************************
 Backlog
