@@ -1860,6 +1860,31 @@ TEST_CASE("Importing the same file repeatedly is idempotent")
 	REQUIRE(tests::parse_and_run(src) == 8);
 }
 
+//TEST_CASE("Functions that take a template instantiation")
+//{
+//	auto const src = R"(
+//		struct<T> span
+//		{
+//			T[] data_;
+//			int size_;
+//		}
+//		
+//		let ([]) = fn<T>(span<T> s, int i) -> T &
+//		{
+//			return s.data_[i];
+//		};
+//		
+//		let main = fn() -> int
+//		{
+//			let array = int[3](1, 2, 3);
+//			let s = span<int>(data(array), size(array));
+//			return s[1];
+//		};
+//	)"sv;
+//
+//	REQUIRE(tests::parse_and_run(src) == 2);
+//}
+
 /*****************************************************************
 Backlog
 - contracts
