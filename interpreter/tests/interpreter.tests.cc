@@ -1729,10 +1729,82 @@ TEST_CASE("Function call in constant expression")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("Bitwise and")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			return 25 & 7;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == (25 & 7));
+}
+
+TEST_CASE("Bitwise or")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			return 25 | 7;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == (25 | 7));
+}
+
+TEST_CASE("Bitwise xor")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			return 25 ^ 7;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == (25 ^ 7));
+}
+
+TEST_CASE("Bitwise not")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			return ~25;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == ~25);
+}
+
+TEST_CASE("Bitwise right shift")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			return 25 >> 7;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == (25 >> 7));
+}
+
+TEST_CASE("Bitwise left shift")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			return 25 << 7;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == (25 << 7));
+}
+
 /*****************************************************************
 Backlog
-- deciding whether a function can be called at compile time or not
 - importing other files
+- bitwise operations
 - contracts
 - concepts (depends on templates)
 - errors

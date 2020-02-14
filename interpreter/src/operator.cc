@@ -5,11 +5,16 @@ auto precedence(Operator op) noexcept -> int
 {
 	switch (op)
 	{
-		case Operator::multiply:			return 7;
-		case Operator::divide:				return 7;
-		case Operator::modulo:				return 7;
-		case Operator::add:					return 6;
-		case Operator::subtract:			return 6;
+		case Operator::multiply:			return 11;
+		case Operator::divide:				return 11;
+		case Operator::modulo:				return 11;
+		case Operator::add:					return 10;
+		case Operator::subtract:			return 10;
+		case Operator::bit_shift_left:		return 9;
+		case Operator::bit_shift_right:		return 9;
+		case Operator::bitwise_and:			return 8;
+		case Operator::bitwise_xor:			return 7;
+		case Operator::bitwise_or:			return 6;
 		case Operator::three_way_compare:	return 5;
 		case Operator::less:				return 4;
 		case Operator::less_equal:			return 4;
@@ -46,8 +51,13 @@ auto operator_function_name(Operator op) noexcept -> std::string_view
 		case Operator::or_:					return "or";
 		case Operator::xor_:				return "xor";
 		case Operator::not_:				return "not";
+		case Operator::bitwise_and:			return "&";
+		case Operator::bitwise_or:			return "|";
+		case Operator::bitwise_xor:			return "^";
+		case Operator::bitwise_not:			return "~";
+		case Operator::bit_shift_left:		return "<<";
+		case Operator::bit_shift_right:		return ">>";
 		case Operator::assign:				return "=";
-		case Operator::addressof:			return "&";
 	}
 	declare_unreachable();
 }

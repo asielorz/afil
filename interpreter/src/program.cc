@@ -77,6 +77,12 @@ namespace complete
 			{"=="sv,	extern_function_descriptor(+[](int a, int b) noexcept -> bool { return a == b; })},
 			{"<=>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
 			{"-"sv,		extern_function_descriptor(+[](int a) noexcept -> int { return -a; })},
+			{"&"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a & b; })},
+			{"|"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a | b; })},
+			{"^"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a ^ b; })},
+			{"~"sv,		extern_function_descriptor(+[](int a) noexcept -> int { return ~a; })},
+			{">>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a >> b; })},
+			{"<<"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a << b; })},
 
 			{"+"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a + b; })},
 			{"-"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},

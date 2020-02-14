@@ -80,6 +80,8 @@ namespace parser
 		if (token_source == "or"sv) return Operator::or_;
 		if (token_source == "xor"sv) return Operator::xor_;
 		if (token_source == "not"sv) return Operator::not_;
+		if (token_source == "<<"sv) return Operator::bit_shift_left;
+		if (token_source == ">>"sv) return Operator::bit_shift_right;
 
 		switch (token_source[0])
 		{
@@ -90,8 +92,11 @@ namespace parser
 			case '%': return Operator::modulo;
 			case '<': return Operator::less;
 			case '>': return Operator::greater;
+			case '&': return Operator::bitwise_and;
+			case '|': return Operator::bitwise_or;
+			case '^': return Operator::bitwise_xor;
+			case '~': return Operator::bitwise_not;
 			case '=': return Operator::assign;
-			case '&': return Operator::addressof;
 		}
 		declare_unreachable();
 	}
@@ -102,6 +107,7 @@ namespace parser
 			token.source == "-"sv ||
 			token.source == "&"sv ||
 			token.source == "*"sv ||
+			token.source == "~"sv ||
 			token.source == "not"sv;
 	}
 

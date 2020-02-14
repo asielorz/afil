@@ -25,8 +25,8 @@ namespace lex
 	auto is_first_char_of_operator(char c) noexcept -> bool
 	{
 		return
-			(c == '+') || (c == '-') || (c == '*') || (c == '/') || (c == '%') ||
-			(c == '<') || (c == '>') || (c == '=') || (c == '!') || (c == '&');
+			(c == '+') || (c == '-') || (c == '*') || (c == '/') || (c == '%') || (c == '<') || 
+			(c == '>') || (c == '=') || (c == '!') || (c == '&') || (c == '|') || (c == '~') || (c == '^');
 	}
 
 	auto is_operator(std::string_view src, int index) noexcept -> bool
@@ -170,7 +170,7 @@ namespace lex
 			if (starts_with(src, index, s))
 				return 3;
 
-		constexpr std::string_view two_char_ops[] = { "==", "!=", "<=", ">=", "or" };
+		constexpr std::string_view two_char_ops[] = { "==", "!=", "<=", ">=", "or", ">>", "<<" };
 		for (auto const s : two_char_ops)
 			if (starts_with(src, index, s))
 				return 2;
