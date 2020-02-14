@@ -1842,6 +1842,24 @@ TEST_CASE("Importing source files from code")
 	REQUIRE(tests::parse_and_run(src) == 8);
 }
 
+TEST_CASE("Importing the same file repeatedly is idempotent")
+{
+	auto const src = R"(
+		import "test_files/ivec2.afil";
+		import "test_files/ivec2.afil";
+		import "test_files/ivec2.afil";
+		import "test_files/ivec2.afil";
+		
+		let main = fn() -> int
+		{
+			let v = ivec2(4, 5) + ivec2(-1, 3);
+			return v.y;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 8);
+}
+
 /*****************************************************************
 Backlog
 - importing other files

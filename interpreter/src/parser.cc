@@ -10,10 +10,11 @@
 #include "utils/string.hh"
 #include "utils/unreachable.hh"
 #include "utils/variant.hh"
-#include <string>
-#include <optional>
 #include <cassert>
 #include <charconv>
+#include <optional>
+#include <filesystem>
+#include <string>
 
 using TokenType = lex::Token::Type;
 using namespace std::literals;
@@ -1183,6 +1184,7 @@ namespace parser
 	auto parse_global_scope(
 		std::string_view src,
 		std::vector<TypeName> & type_names,
+		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
 	) noexcept -> void;
 
@@ -1190,6 +1192,7 @@ namespace parser
 		span<lex::Token const> tokens, 
 		size_t & index, 
 		std::vector<TypeName> & type_names,
+		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
 	) noexcept -> void
 	{
@@ -1209,8 +1212,15 @@ namespace parser
 			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected semicolon after file name in import declaration.");
 			index++;
 
-			std::string const source = load_whole_file(file_name);
-			parse_global_scope(source, type_names, global_initialization_statements);
+			std::filesystem::path canonical_file_name = std::filesystem::canonical(file_name);
+
+			// If the file has not been imported.
+			if (std::find(imported_files.begin(), imported_files.end(), canonical_file_name) == imported_files.end())
+			{
+				std::string const source = load_whole_file(canonical_file_name);
+				imported_files.push_back(std::move(canonical_file_name));
+				parse_global_scope(source, type_names, imported_files, global_initialization_statements);
+			}
 		}
 	}
 
@@ -1255,7 +1265,8 @@ namespace parser
 
 	auto parse_global_scope(
 		std::string_view src,
-		std::vector<TypeName> & type_names, 
+		std::vector<TypeName> & type_names,
+		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
 	) noexcept -> void
 	{
@@ -1266,7 +1277,7 @@ namespace parser
 		{
 			if (tokens[index].source == "import")
 			{
-				parse_import_declaration(tokens, index, type_names, global_initialization_statements);
+				parse_import_declaration(tokens, index, type_names, imported_files, global_initialization_statements);
 			}
 			else
 			{
@@ -1290,7 +1301,9 @@ namespace parser
 		for (complete::StructTemplateName const & name : program.global_scope.struct_templates)
 			type_names.push_back({name.name, TypeName::Type::struct_template});
 
-		parse_global_scope(src, type_names, out(global_initialization_statements));
+		std::vector<std::filesystem::path> imported_files;
+
+		parse_global_scope(src, type_names, imported_files, out(global_initialization_statements));
 
 		return global_initialization_statements;
 	}

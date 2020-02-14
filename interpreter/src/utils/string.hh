@@ -3,6 +3,7 @@
 #include <string>
 #include <array>
 #include <cassert>
+#include <filesystem>
 
 template <typename T>
 auto to_string(T const & t) noexcept -> decltype(std::to_string(t))
@@ -52,4 +53,5 @@ auto make_null_terminated(std::string_view str) noexcept -> std::array<char, N>
 }
 
 auto is_null_terminated(std::string_view str) noexcept -> bool;
-auto load_whole_file(std::string_view path) noexcept -> std::string;
+auto load_whole_file(std::string_view path) noexcept->std::string;
+auto load_whole_file(std::filesystem::path path) noexcept->std::string;

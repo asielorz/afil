@@ -13,3 +13,10 @@ auto load_whole_file(std::string_view path) noexcept -> std::string
 	assert(file);
 	return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
 }
+
+auto load_whole_file(std::filesystem::path path) noexcept -> std::string
+{
+	std::ifstream file(path);
+	assert(file);
+	return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+}
