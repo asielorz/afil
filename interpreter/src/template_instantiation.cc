@@ -14,29 +14,10 @@
 
 using namespace std::literals;
 
-auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, void * outValue) noexcept -> void
-{
-	raise_syntax_error_if_not(is_constant_expression(expression), "Cannot evaluate expression at compile time.");
-
-	interpreter::ProgramStack stack;
-	alloc_stack(stack, 256);
-	
-	interpreter::eval_expression(expression, stack, program);
-
-	memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
-}
-
-auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program) noexcept -> int
-{
-	expression = insert_conversion_node(std::move(expression), complete::TypeId::int_, program);
-	int result;
-	evaluate_constant_expression(expression, program, &result);
-	return result;
-}
-
 namespace instantiation
 {
 	auto top(ScopeStack & scope_stack) noexcept -> complete::Scope & { return *scope_stack.back().scope; }
+	auto top(ScopeStackView scope_stack) noexcept -> complete::Scope const & { return *scope_stack.back().scope; }
 
 	template <typename Stack>
 	struct StackGuard
@@ -48,11 +29,37 @@ namespace instantiation
 
 		Stack * stack;
 	};
+
+	auto next_block_scope_offset(ScopeStackView scope_stack) -> int
+	{
+		return scope_stack.back().scope_offset + top(scope_stack).stack_frame_size;
+	}
+
 	auto push_block_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>
 	{
-		int const offset = scope_stack.back().scope_offset + top(scope_stack).stack_frame_size;
-		scope_stack.push_back({ &scope, ScopeType::block, offset });
+		int const offset = next_block_scope_offset(scope_stack);
+		scope_stack.push_back({&scope, ScopeType::block, offset});
 		return StackGuard<ScopeStack>(scope_stack);
+	}
+
+	auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> void
+	{
+		raise_syntax_error_if_not(is_constant_expression(expression, constant_base_index), "Cannot evaluate expression at compile time.");
+
+		interpreter::ProgramStack stack;
+		alloc_stack(stack, 256);
+
+		interpreter::eval_expression(expression, stack, program);
+
+		memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
+	}
+
+	auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> int
+	{
+		expression = insert_conversion_node(std::move(expression), complete::TypeId::int_, program);
+		int result;
+		evaluate_constant_expression(expression, program, constant_base_index, &result);
+		return result;
 	}
 
 	auto resolve_dependent_type(
@@ -79,7 +86,7 @@ namespace instantiation
 				complete::TypeId const value_type = resolve_dependent_type(*array.value_type, template_parameters, scope_stack, program);
 
 				complete::Expression size_expr = instantiate_expression(*array.size, template_parameters, scope_stack, program, nullptr);
-				return array_type_for(value_type, evaluate_array_size_expression(std::move(size_expr), *program), *program);
+				return array_type_for(value_type, evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack)), *program);
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer)
 			{
@@ -151,7 +158,7 @@ namespace instantiation
 				array_type.value_type = allocate(resolve_function_template_parameter_type(*array.value_type, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 
 				complete::Expression size_expr = instantiate_expression(*array.size, resolved_template_parameters, scope_stack, program, nullptr);
-				array_type.size = evaluate_array_size_expression(std::move(size_expr), *program);
+				array_type.size = evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack));
 				return {array_type, false, false};
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> complete::FunctionTemplateParameterType
@@ -914,14 +921,16 @@ namespace instantiation
 
 					return std::nullopt;
 				}
-				else if (!var_type.is_mutable && is_constant_expression(expression))
+				else if (!var_type.is_mutable && is_constant_expression(expression, next_block_scope_offset(scope_stack)))
 				{
 					complete::Constant constant;
 					constant.type = var_type;
 					constant.value.resize(type_size(*program, var_type));
 					constant.name = incomplete_statement.variable_name;
 
-					evaluate_constant_expression(insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program), *program, constant.value.data());
+					evaluate_constant_expression(
+						insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program),
+						*program, next_block_scope_offset(scope_stack), constant.value.data());
 
 					top(scope_stack).constants.push_back(std::move(constant));
 

@@ -138,6 +138,6 @@ namespace complete
 	auto expression_type(Expression const & tree, Program const & program) noexcept -> Type const &;
 	auto expression_type_id(Expression const & tree, Program const & program) noexcept -> TypeId;
 	auto expression_type_size(Expression const & tree, Program const & program) noexcept -> int;
-	auto is_constant_expression(Expression const & expr) noexcept -> bool;
+	auto is_constant_expression(Expression const & expr, int constant_base_index) noexcept -> bool;
 
 } // namespace complete

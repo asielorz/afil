@@ -1684,6 +1684,24 @@ TEST_CASE("Contant variable of pointer type")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("Statement blocks in constant expressions")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			int s = {
+				int mut i = 3;
+				i = i * 2;
+				return i;
+			};
+			let array = int[s](0);
+			return size(array);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 6);
+}
+
 /*****************************************************************
 Backlog
 - importing other files
