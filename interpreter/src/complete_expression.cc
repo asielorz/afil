@@ -134,7 +134,12 @@ namespace complete
 				return std::all_of(block_node.statements.begin(), block_node.statements.end(), 
 					[=](Statement const & statement) {return can_be_run_in_a_constant_expression(statement, constant_base_index); });
 			},
-			[](expression::Assignment const &) { return false; }
+			[=](expression::Assignment const & assign_node) 
+			{
+				return 
+					is_constant_expression(*assign_node.source, constant_base_index) &&
+					is_constant_expression(*assign_node.destination, constant_base_index);
+			}
 		);
 		return std::visit(visitor, expr.as_variant());
 	}
