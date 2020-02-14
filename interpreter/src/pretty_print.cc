@@ -14,8 +14,6 @@ using namespace std::literals;
 using ScopeStack = std::vector<Scope const *>;
 using ScopeStackView = span<Scope const * const>;
 
-// TODO: Search all scopes
-
 auto type_name(TypeId type_id, Program const & program) noexcept -> std::string;
 
 auto decayed_type_name(TypeId type_id, Program const & program) noexcept -> std::string

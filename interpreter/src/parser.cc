@@ -828,10 +828,9 @@ namespace parser
 		}
 
 		std::string_view name;
-		bool is_operator = false;
 
 		// Parsing an operator function
-		if (tokens[index].type == TokenType::open_parenthesis)
+		if (tokens[index].source == "operator"sv)
 		{
 			index++;
 			if (tokens[index].type == TokenType::open_bracket)
@@ -842,14 +841,10 @@ namespace parser
 			}
 			else
 			{
-				raise_syntax_error_if_not(tokens[index].type == TokenType::operator_, "Expected operator after '(' in function declaration.");
+				raise_syntax_error_if_not(tokens[index].type == TokenType::operator_, "Expected operator name after keyword \"operator\".");
 				name = tokens[index].source;
 			}
 			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after operator in function declaration.");
-			index++;
-
-			is_operator = true;
 		}
 		else
 		{

@@ -700,7 +700,7 @@ TEST_CASE("Operator overloading")
 			int x = 0;
 			int y = 0;
 		}
-		let (+) = fn(ivec2 a, ivec2 b)
+		let operator+ = fn(ivec2 a, ivec2 b)
 		{
 			return ivec2(a.x + b.x, a.y + b.y);
 		};
@@ -1292,7 +1292,7 @@ TEST_CASE("User can overload subscript operator for their type")
 			int w = 0;
 		}
 
-		let ([]) = fn(ivec4 v, int i)
+		let operator[] = fn(ivec4 v, int i)
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1321,7 +1321,7 @@ TEST_CASE("Can overload based on mutability")
 			int w = 0;
 		}
 
-		let ([]) = fn(ivec4 & v, int i) -> int &
+		let operator[] = fn(ivec4 & v, int i) -> int &
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1329,7 +1329,7 @@ TEST_CASE("Can overload based on mutability")
 			return v.w;
 		};
 
-		let ([]) = fn(ivec4 mut & v, int i) -> int mut &
+		let operator[] = fn(ivec4 mut & v, int i) -> int mut &
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1364,7 +1364,7 @@ TEST_CASE("Can overload based on mutability independent of order")
 			int w = 0;
 		}
 
-		let ([]) = fn(ivec4 mut & v, int i) -> int mut &
+		let operator[] = fn(ivec4 mut & v, int i) -> int mut &
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1372,7 +1372,7 @@ TEST_CASE("Can overload based on mutability independent of order")
 			return v.w;
 		};
 
-		let ([]) = fn(ivec4 & v, int i) -> int &
+		let operator[] = fn(ivec4 & v, int i) -> int &
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1407,7 +1407,7 @@ TEST_CASE("Subscript on dependent types")
 			int w = 0;
 		}
 
-		let ([]) = fn(ivec4 v, int i)
+		let operator[] = fn(ivec4 v, int i)
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1438,7 +1438,7 @@ TEST_CASE("Multiple argument subscript")
 			int value;
 		}
 
-		let ([]) = fn(foo f, int i, int j)
+		let operator[] = fn(foo f, int i, int j)
 		{
 			return f.value + i + j;
 		};
@@ -1808,7 +1808,7 @@ TEST_CASE("A program can be parsed incrementally")
 			int x = 0;
 			int y = 0;
 		}
-		let (+) = fn(ivec2 a, ivec2 b)
+		let operator+ = fn(ivec2 a, ivec2 b)
 		{
 			return ivec2(a.x + b.x, a.y + b.y);
 		};
@@ -1869,7 +1869,7 @@ TEST_CASE("Importing the same file repeatedly is idempotent")
 //			int size_;
 //		}
 //		
-//		let ([]) = fn<T>(span<T> s, int i) -> T &
+//		let operator[] = fn<T>(span<T> s, int i) -> T &
 //		{
 //			return s.data_[i];
 //		};
@@ -1887,6 +1887,7 @@ TEST_CASE("Importing the same file repeatedly is idempotent")
 
 /*****************************************************************
 Backlog
+- name collisions with keywords and other names
 - contracts
 - concepts (depends on templates)
 - errors
