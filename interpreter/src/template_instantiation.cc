@@ -5,6 +5,7 @@
 #include "complete_expression.hh"
 #include "interpreter.hh"
 #include "constexpr.hh"
+#include "utils/algorithm.hh"
 #include "utils/out.hh"
 #include "utils/variant.hh"
 #include "utils/overload.hh"
@@ -137,7 +138,7 @@ namespace instantiation
 				if (type != complete::TypeId::none)
 					return {complete::FunctionTemplateParameterType::BaseCase{type}, false, false};
 
-				auto const it = std::find_if(unresolved_template_parameters.begin(), unresolved_template_parameters.end(), [&](incomplete::TemplateParameter const & param)
+				auto const it = std::find_if(unresolved_template_parameters, [&](incomplete::TemplateParameter const & param)
 				{
 					return param.name == base_case.name;
 				});
@@ -211,26 +212,26 @@ namespace instantiation
 			{
 				if (scope_stack[i].type == ScopeType::global)
 				{
-					auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), [name](Variable const & var) { return var.name == name; });
+					auto const var = std::find_if(scope.variables, [name](Variable const & var) { return var.name == name; });
 					if (var != scope.variables.end())
 						return lookup_result::GlobalVariable{var->type, var->offset};
 				}
 				else if (!stop_looking_for_variables)
 				{
-					auto const var = std::find_if(scope.variables.begin(), scope.variables.end(), [name](Variable const & var) { return var.name == name; });
+					auto const var = std::find_if(scope.variables, [name](Variable const & var) { return var.name == name; });
 					if (var != scope.variables.end())
 						return lookup_result::Variable{var->type, var->offset};
 				}
 
-				auto const type = std::find_if(scope.types.begin(), scope.types.end(), [name](TypeName const & var) { return var.name == name; });
+				auto const type = std::find_if(scope.types, [name](TypeName const & var) { return var.name == name; });
 				if (type != scope.types.end())
 					return lookup_result::Type{type->id};
 
-				auto const struct_template = std::find_if(scope.struct_templates.begin(), scope.struct_templates.end(), [name](StructTemplateName const & var) { return var.name == name; });
+				auto const struct_template = std::find_if(scope.struct_templates, [name](StructTemplateName const & var) { return var.name == name; });
 				if (struct_template != scope.struct_templates.end())
 					return lookup_result::StructTemplate{struct_template->id};
 
-				auto const constant = std::find_if(scope.constants.begin(), scope.constants.end(), [name](Constant const & var) { return var.name == name; });
+				auto const constant = std::find_if(scope.constants, [name](Constant const & var) { return var.name == name; });
 				if (constant != scope.constants.end())
 					return lookup_result::Constant{&*constant};
 			}
@@ -302,7 +303,7 @@ namespace instantiation
 		if (type != complete::TypeId::none)
 			return type;
 
-		auto const it = std::find_if(template_parameters.begin(), template_parameters.end(), [name](complete::ResolvedTemplateParameter const & param)
+		auto const it = std::find_if(template_parameters, [name](complete::ResolvedTemplateParameter const & param)
 		{
 			return param.name == name;
 		});

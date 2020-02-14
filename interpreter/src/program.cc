@@ -1,6 +1,7 @@
 #include "program.hh"
 #include "syntax_error.hh"
 #include "template_instantiation.hh"
+#include "utils/algorithm.hh"
 #include "utils/callc.hh"
 #include "utils/function_ptr.hh"
 #include "utils/overload.hh"
@@ -157,8 +158,7 @@ namespace complete
 
 	auto is_default_constructible(Struct const & type) noexcept -> bool
 	{
-		return std::all_of(type.member_variables.begin(), type.member_variables.end(),
-			[](MemberVariable const & var) { return var.initializer_expression.has_value(); });
+		return std::all_of(type.member_variables, [](MemberVariable const & var) { return var.initializer_expression.has_value(); });
 	}
 
 	auto is_default_constructible(TypeId type_id, Program const & program) noexcept -> bool
@@ -235,8 +235,7 @@ namespace complete
 
 	auto find_member_variable(Struct const & type, std::string_view member_name) noexcept -> int
 	{
-		auto const it = std::find_if(type.member_variables.begin(), type.member_variables.end(),
-			[member_name](MemberVariable const & var) { return var.name == member_name; });
+		auto const it = std::find_if(type.member_variables, [member_name](MemberVariable const & var) { return var.name == member_name; });
 
 		if (it == type.member_variables.end())
 			return -1;
@@ -263,7 +262,7 @@ namespace complete
 		Type new_type;
 		new_type.size = sizeof(void *);
 		new_type.alignment = alignof(void *);
-		new_type.extra_data = Type::Pointer{ pointee_type };
+		new_type.extra_data = Type::Pointer{pointee_type};
 		return add_type(program, std::move(new_type));
 	}
 

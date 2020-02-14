@@ -2,6 +2,7 @@
 #include "complete_expression.hh"
 #include "complete_statement.hh"
 #include "program.hh"
+#include "utils/algorithm.hh"
 #include "utils/overload.hh"
 
 namespace complete
@@ -22,7 +23,7 @@ namespace complete
 			},
 			[&](statement::StatementBlock const & block_node)
 			{
-				return std::all_of(block_node.statements.begin(), block_node.statements.end(),
+				return std::all_of(block_node.statements,
 					[&](Statement const & statement) {return can_be_run_in_a_constant_expression(statement, program, constant_base_index); });
 			},
 			[&](statement::While const & while_node)
@@ -61,17 +62,17 @@ namespace complete
 			{
 				return
 					is_callable_at_compile_time(program, func_call_node.function_id) &&
-					std::all_of(func_call_node.parameters.begin(), func_call_node.parameters.end(),
+					std::all_of(func_call_node.parameters,
 						[&](Expression const & param) { return is_constant_expression(param, program, constant_base_index); });
 			},
 			[&](expression::RelationalOperatorCall const & op_call_node)
 			{
-				return std::all_of(op_call_node.parameters.begin(), op_call_node.parameters.end(),
+				return std::all_of(op_call_node.parameters,
 					[&](Expression const & param) { return is_constant_expression(param, program, constant_base_index); });
 			},
 			[&](expression::Constructor const & ctor_node)
 			{
-				return std::all_of(ctor_node.parameters.begin(), ctor_node.parameters.end(),
+				return std::all_of(ctor_node.parameters,
 					[&](Expression const & param) { return is_constant_expression(param, program, constant_base_index); });
 			},
 				[&](expression::Dereference const & deref_node) { return is_constant_expression(*deref_node.expression, program, constant_base_index); },
@@ -91,7 +92,7 @@ namespace complete
 			},
 			[&](expression::StatementBlock const & block_node)
 			{
-				return std::all_of(block_node.statements.begin(), block_node.statements.end(),
+				return std::all_of(block_node.statements,
 					[&](Statement const & statement) {return can_be_run_in_a_constant_expression(statement, program, constant_base_index); });
 			},
 			[&](expression::Assignment const & assign_node)
@@ -106,7 +107,7 @@ namespace complete
 
 	auto can_be_run_in_a_constant_expression(Function const & function, Program const & program) noexcept -> bool
 	{
-		return std::all_of(function.statements.begin(), function.statements.end(),
+		return std::all_of(function.statements,
 			[&](Statement const & stmt) { return can_be_run_in_a_constant_expression(stmt, program, 0); });
 	}
 

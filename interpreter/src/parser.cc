@@ -3,6 +3,7 @@
 #include "program.hh"
 #include "syntax_error.hh"
 #include "lexer.hh"
+#include "utils/algorithm.hh"
 #include "utils/load_dll.hh"
 #include "utils/out.hh"
 #include "utils/overload.hh"
@@ -1215,7 +1216,7 @@ namespace parser
 			std::filesystem::path canonical_file_name = std::filesystem::canonical(file_name);
 
 			// If the file has not been imported.
-			if (std::find(imported_files.begin(), imported_files.end(), canonical_file_name) == imported_files.end())
+			if (std::find(imported_files, canonical_file_name) == imported_files.end())
 			{
 				std::string const source = load_whole_file(canonical_file_name);
 				imported_files.push_back(std::move(canonical_file_name));
