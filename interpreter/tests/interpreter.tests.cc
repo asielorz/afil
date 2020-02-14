@@ -1862,7 +1862,6 @@ TEST_CASE("Importing the same file repeatedly is idempotent")
 
 /*****************************************************************
 Backlog
-- importing other files
 - contracts
 - concepts (depends on templates)
 - errors
