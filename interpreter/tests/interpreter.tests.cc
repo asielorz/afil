@@ -1800,7 +1800,7 @@ TEST_CASE("Bitwise left shift")
 	REQUIRE(tests::parse_and_run(src) == (25 << 7));
 }
 
-TEST_CASE("Importing files")
+TEST_CASE("A program can be parsed incrementally")
 {
 	auto const file1 = R"(
 		struct ivec2
@@ -1825,6 +1825,21 @@ TEST_CASE("Importing files")
 	complete::Program program = afil::parse_source(file1);
 	afil::parse_source(file2, out(program));
 	REQUIRE(interpreter::run(program) == 8);
+}
+
+TEST_CASE("Importing source files from code")
+{
+	auto const src = R"(
+		import "test_files/ivec2.afil";
+		
+		let main = fn() -> int
+		{
+			let v = ivec2(4, 5) + ivec2(-1, 3);
+			return v.y;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 8);
 }
 
 /*****************************************************************

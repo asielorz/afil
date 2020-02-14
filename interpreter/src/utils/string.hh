@@ -50,3 +50,6 @@ auto make_null_terminated(std::string_view str) noexcept -> std::array<char, N>
 	buffer[str.size()] = '\0';
 	return buffer;
 }
+
+auto is_null_terminated(std::string_view str) noexcept -> bool;
+auto load_whole_file(std::string_view path) noexcept -> std::string;

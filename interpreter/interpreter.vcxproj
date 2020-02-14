@@ -45,6 +45,7 @@
     <ClCompile Include="src\incomplete_statement.cc" />
     <ClCompile Include="src\syntax_error.cc" />
     <ClCompile Include="src\utils\load_dll.cc" />
+    <ClCompile Include="src\utils\string.cc" />
     <ClCompile Include="src\utils\unreachable.cc" />
     <ClCompile Include="src\utils\utils.cc" />
     <ClCompile Include="tests\callc.tests.cc" />
