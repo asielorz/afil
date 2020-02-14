@@ -1704,12 +1704,12 @@ TEST_CASE("Statement blocks in constant expressions")
 
 /*****************************************************************
 Backlog
+- deciding whether a function can be called at compile time or not
 - importing other files
-- importing functions in C
 - contracts
 - concepts (depends on templates)
 - errors
-- some minimalistic standard library
 - synthesizing arithmetic operators
 - destructor and copy operations
+- some minimalistic standard library
 *****************************************************************/
