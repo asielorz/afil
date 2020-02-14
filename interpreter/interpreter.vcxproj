@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClCompile Include="src\complete_scope.cc" />
     <ClCompile Include="src\complete_expression.cc" />
+    <ClCompile Include="src\constexpr.cc" />
     <ClCompile Include="src\interpreter.cc" />
     <ClCompile Include="src\operator.cc" />
     <ClCompile Include="src\pretty_print.cc" />
@@ -56,6 +57,7 @@
     <ClInclude Include="src\complete_expression.hh" />
     <ClInclude Include="src\complete_scope.hh" />
     <ClInclude Include="src\complete_statement.hh" />
+    <ClInclude Include="src\constexpr.hh" />
     <ClInclude Include="src\interpreter.hh" />
     <ClInclude Include="src\operator.hh" />
     <ClInclude Include="src\pretty_print.hh" />

@@ -44,6 +44,7 @@ namespace complete
 		int parameter_size = 0;	     // Size in bytes needed for parameters.
 		TypeId return_type;
 		std::vector<Statement> statements;
+		bool is_callable_at_compile_time;
 	};
 
 	struct ExternFunction
@@ -54,6 +55,7 @@ namespace complete
 		std::vector<TypeId> parameter_types;
 		callc::CFunctionCaller caller;
 		void const * function_pointer;
+		bool is_callable_at_compile_time;
 	};
 
 	struct MemcmpRanges
@@ -180,6 +182,7 @@ namespace complete
 	auto add_function_template(Program & program, FunctionTemplate new_function_template) noexcept -> FunctionTemplateId;
 	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>;
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
+	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool;
 
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId;
 	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> TypeId;

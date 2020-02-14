@@ -4,6 +4,7 @@
 #include "incomplete_statement.hh"
 #include "complete_expression.hh"
 #include "interpreter.hh"
+#include "constexpr.hh"
 #include "utils/out.hh"
 #include "utils/variant.hh"
 #include "utils/overload.hh"
@@ -13,6 +14,26 @@
 #include <cassert>
 
 using namespace std::literals;
+
+auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> void
+{
+	raise_syntax_error_if_not(is_constant_expression(expression, program, constant_base_index), "Cannot evaluate expression at compile time.");
+
+	interpreter::ProgramStack stack;
+	alloc_stack(stack, 256);
+
+	interpreter::eval_expression(expression, stack, program);
+
+	memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
+}
+
+auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> int
+{
+	expression = insert_conversion_node(std::move(expression), complete::TypeId::int_, program);
+	int result;
+	evaluate_constant_expression(expression, program, constant_base_index, &result);
+	return result;
+}
 
 namespace instantiation
 {
@@ -40,26 +61,6 @@ namespace instantiation
 		int const offset = next_block_scope_offset(scope_stack);
 		scope_stack.push_back({&scope, ScopeType::block, offset});
 		return StackGuard<ScopeStack>(scope_stack);
-	}
-
-	auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> void
-	{
-		raise_syntax_error_if_not(is_constant_expression(expression, constant_base_index), "Cannot evaluate expression at compile time.");
-
-		interpreter::ProgramStack stack;
-		alloc_stack(stack, 256);
-
-		interpreter::eval_expression(expression, stack, program);
-
-		memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
-	}
-
-	auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> int
-	{
-		expression = insert_conversion_node(std::move(expression), complete::TypeId::int_, program);
-		int result;
-		evaluate_constant_expression(expression, program, constant_base_index, &result);
-		return result;
 	}
 
 	auto resolve_dependent_type(
@@ -372,6 +373,8 @@ namespace instantiation
 		}
 
 		scope_stack.pop_back();
+
+		function->is_callable_at_compile_time = can_be_run_in_a_constant_expression(*function, *program);
 	}
 
 	auto instantiate_function_template(
@@ -921,7 +924,7 @@ namespace instantiation
 
 					return std::nullopt;
 				}
-				else if (!var_type.is_mutable && is_constant_expression(expression, next_block_scope_offset(scope_stack)))
+				else if (!var_type.is_mutable && is_constant_expression(expression, *program, next_block_scope_offset(scope_stack)))
 				{
 					complete::Constant constant;
 					constant.type = var_type;
@@ -1114,7 +1117,8 @@ namespace instantiation
 
 					callc::TypeDescriptor const return_type_descriptor = type_descriptor_for(extern_function.return_type, *program);
 
-					extern_function.caller = callc::c_function_caller({ parameter_type_descriptors, extern_function.parameter_types.size() }, return_type_descriptor);
+					extern_function.caller = callc::c_function_caller({parameter_type_descriptors, extern_function.parameter_types.size()}, return_type_descriptor);
+					extern_function.is_callable_at_compile_time = false;
 
 					FunctionId function_id;
 					function_id.is_extern = true;
@@ -1136,7 +1140,7 @@ namespace instantiation
 		complete::Program complete_program;
 		std::vector<complete::ResolvedTemplateParameter> template_parameters;
 		ScopeStack scope_stack;
-		scope_stack.push_back({ &complete_program.global_scope, ScopeType::global, 0 });
+		scope_stack.push_back({&complete_program.global_scope, ScopeType::global, 0});
 
 		for (incomplete::Statement const & incomplete_statement : incomplete_program)
 		{

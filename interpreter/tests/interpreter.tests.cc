@@ -1702,6 +1702,33 @@ TEST_CASE("Statement blocks in constant expressions")
 	REQUIRE(tests::parse_and_run(src) == 6);
 }
 
+TEST_CASE("Function call in constant expression")
+{
+	auto const src = R"(
+		let int_sqrt = fn(int mut number) -> int
+		{
+			int mut result = 0;
+ 			int mut result_squared = 1;
+			while (number >= result_squared)
+			{
+				number = number - result_squared;
+				result = result + 1;
+				result_squared = 1 + 2 * result;
+ 			}
+			return result;
+		};
+
+		let main = fn() -> int
+		{
+			int s = int_sqrt(25);
+			let array = int[s](0);
+			return size(array);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - deciding whether a function can be called at compile time or not

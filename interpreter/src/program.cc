@@ -61,7 +61,8 @@ namespace complete
 			id_for(box<R>),
 			{id_for(box<Args>)...},
 			callc::c_function_caller(fn),
-			fn
+			fn,
+			true
 		};
 	}
 
@@ -376,6 +377,14 @@ namespace complete
 			return program.extern_functions[id.index].return_type;
 		else
 			return program.functions[id.index].return_type;
+	}
+
+	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool
+	{
+		if (id.is_extern)
+			return program.extern_functions[id.index].is_callable_at_compile_time;
+		else
+			return program.functions[id.index].is_callable_at_compile_time;
 	}
 
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId
