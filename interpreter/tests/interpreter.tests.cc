@@ -1,9 +1,8 @@
 #include <catch2/catch.hpp>
 #include "interpreter.hh"
+#include "afil.hh"
 #include "program.hh"
-#include "parser.hh"
 #include "pretty_print.hh"
-#include "template_instantiation.hh"
 
 using namespace std::literals;
 
@@ -11,19 +10,19 @@ namespace tests
 {
 	auto parse_and_run(std::string_view src) noexcept -> int
 	{
-		complete::Program const program = instantiation::instantiate_templates(parser::parse_source(src));
+		complete::Program const program = afil::parse_source(src);
 		return interpreter::run(program);
 	}
 
 	auto parse_source(std::string_view src) noexcept -> bool
 	{
-		complete::Program const program = instantiation::instantiate_templates(parser::parse_source(src));
+		complete::Program const program = afil::parse_source(src);
 		return true;
 	}
 
 	auto parse_and_print(std::string_view src) noexcept -> void
 	{
-		complete::Program const program = instantiation::instantiate_templates(parser::parse_source(src));
+		complete::Program const program = afil::parse_source(src);
 		printf("%s", pretty_print(program).c_str());
 		system("pause");
 	}
@@ -1801,10 +1800,36 @@ TEST_CASE("Bitwise left shift")
 	REQUIRE(tests::parse_and_run(src) == (25 << 7));
 }
 
+TEST_CASE("Importing files")
+{
+	auto const file1 = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+		let (+) = fn(ivec2 a, ivec2 b)
+		{
+			return ivec2(a.x + b.x, a.y + b.y);
+		};
+	)"sv;
+
+	auto const file2 = R"(
+		let main = fn() -> int
+		{
+			let v = ivec2(4, 5) + ivec2(-1, 3);
+			return v.y;
+		};
+	)"sv;
+
+	complete::Program program = afil::parse_source(file1);
+	afil::parse_source(file2, out(program));
+	REQUIRE(interpreter::run(program) == 8);
+}
+
 /*****************************************************************
 Backlog
 - importing other files
-- bitwise operations
 - contracts
 - concepts (depends on templates)
 - errors

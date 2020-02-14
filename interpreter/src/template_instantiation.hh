@@ -19,7 +19,7 @@ namespace instantiation
 	using ScopeStack = std::vector<CurrentScope>;
 	using ScopeStackView = span<const CurrentScope>;
 
-	auto instantiate_templates(span<incomplete::Statement const> program) noexcept -> complete::Program;
+	auto instantiate_templates(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> void;
 
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,

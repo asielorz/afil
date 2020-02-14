@@ -1135,12 +1135,11 @@ namespace instantiation
 		return std::visit(visitor, incomplete_statement_.as_variant());
 	}
 
-	auto instantiate_templates(span<incomplete::Statement const> incomplete_program) noexcept -> complete::Program
+	auto instantiate_templates(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> void
 	{
-		complete::Program complete_program;
 		std::vector<complete::ResolvedTemplateParameter> template_parameters;
 		ScopeStack scope_stack;
-		scope_stack.push_back({&complete_program.global_scope, ScopeType::global, 0});
+		scope_stack.push_back({&complete_program->global_scope, ScopeType::global, 0});
 
 		for (incomplete::Statement const & incomplete_statement : incomplete_program)
 		{
@@ -1151,11 +1150,9 @@ namespace instantiation
 					has_type<complete::statement::VariableDeclaration>(*complete_statement),
 					"Only variable declarations, function declarations and struct declarations allowed at global scope."
 				);
-				complete_program.global_initialization_statements.push_back(std::move(*complete_statement));
+				complete_program->global_initialization_statements.push_back(std::move(*complete_statement));
 			}
 		}
-
-		return complete_program;
 	}
 
 } // namespace instantiation

@@ -1,5 +1,6 @@
 #include "parser.hh"
 #include "incomplete_statement.hh"
+#include "program.hh"
 #include "syntax_error.hh"
 #include "lexer.hh"
 #include "utils/span.hh"
@@ -1226,18 +1227,19 @@ namespace parser
 		return result;
 	}
 
-	auto parse_source(std::string_view src) noexcept -> std::vector<incomplete::Statement>
+	auto parse_source(std::string_view src, complete::Program const & program) noexcept -> std::vector<incomplete::Statement>
 	{
 		auto const tokens = lex::tokenize(src);
 		std::vector<incomplete::Statement> global_initialization_statements;
 
 		std::vector<TypeName> type_names;
-		type_names.reserve(16);
-		type_names.push_back({"void",  TypeName::Type::type});
-		type_names.push_back({"int",   TypeName::Type::type});
-		type_names.push_back({"float", TypeName::Type::type});
-		type_names.push_back({"bool",  TypeName::Type::type});
-		type_names.push_back({"char",  TypeName::Type::type});
+		type_names.reserve(16 + program.global_scope.types.size() + program.global_scope.struct_templates.size());
+
+		for (complete::TypeName const & name : program.global_scope.types)
+			type_names.push_back({name.name, TypeName::Type::type});
+
+		for (complete::StructTemplateName const & name : program.global_scope.struct_templates)
+			type_names.push_back({name.name, TypeName::Type::struct_template});
 
 		size_t index = 0;
 		while (index < tokens.size())

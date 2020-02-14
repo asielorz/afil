@@ -27,6 +27,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\afil.cc" />
     <ClCompile Include="src\complete_scope.cc" />
     <ClCompile Include="src\complete_expression.cc" />
     <ClCompile Include="src\constexpr.cc" />
@@ -54,6 +55,7 @@
     <ClCompile Include="tests\variant.tests.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\afil.hh" />
     <ClInclude Include="src\complete_expression.hh" />
     <ClInclude Include="src\complete_scope.hh" />
     <ClInclude Include="src\complete_statement.hh" />
