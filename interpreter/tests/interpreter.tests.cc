@@ -1887,7 +1887,6 @@ TEST_CASE("Importing the same file repeatedly is idempotent")
 
 /*****************************************************************
 Backlog
-- name collisions with keywords and other names
 - contracts
 - errors
 - concepts (depends on errors)
