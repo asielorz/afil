@@ -37,6 +37,7 @@ namespace parser
 		"int",
 		"float",
 		"bool",
+		"char",
 
 		// Declarations
 		"fn",

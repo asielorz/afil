@@ -1889,8 +1889,9 @@ TEST_CASE("Importing the same file repeatedly is idempotent")
 Backlog
 - name collisions with keywords and other names
 - contracts
-- concepts (depends on templates)
 - errors
+- concepts (depends on errors)
+- a consistent system for typing overload sets
 - synthesizing arithmetic operators
 - destructor and copy operations
 - some minimalistic standard library

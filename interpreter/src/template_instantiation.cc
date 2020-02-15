@@ -64,6 +64,29 @@ namespace instantiation
 		return StackGuard<ScopeStack>(scope_stack);
 	}
 
+	auto does_name_collide(ScopeStackView scope_stack, std::string_view name) noexcept -> bool
+	{
+		auto const visitor = overload(
+			[](lookup_result::Nothing const &) { return false; },
+			[](auto const &) { return true; }
+		);
+
+		auto const lookup = lookup_name(scope_stack, name);
+		return std::visit(visitor, lookup);
+	}
+
+	auto does_function_name_collide(ScopeStackView scope_stack, std::string_view name) noexcept -> bool
+	{
+		auto const visitor = overload(
+			[](lookup_result::Nothing const &) { return false; },
+			[](lookup_result::OverloadSet const &) { return false; },
+			[](auto const &) { return true; }
+		);
+
+		auto const lookup = lookup_name(scope_stack, name);
+		return std::visit(visitor, lookup);
+	}
+
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type, 
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -860,6 +883,7 @@ namespace instantiation
 					complete::TypeId const var_type = resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program);
 					raise_syntax_error_if_not(is_default_constructible(var_type, *program), "A function must be declared with a let statement.");
 
+					raise_syntax_error_if_not(!does_name_collide(scope_stack, incomplete_statement.variable_name), "Variable name collides with another name.");
 					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
 
 					complete::statement::VariableDeclaration complete_statement;
@@ -875,6 +899,8 @@ namespace instantiation
 
 					complete::Function function;
 					instantiate_function_prototype(incomplete_function, template_parameters, scope_stack, program, out(function));
+
+					raise_syntax_error_if_not(!does_function_name_collide(scope_stack, incomplete_statement.variable_name), "Function name collides with another name.");
 
 					FunctionId const function_id = add_function(*program, function);
 					top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
@@ -917,6 +943,8 @@ namespace instantiation
 				{
 					raise_syntax_error_if_not(var_type == complete::TypeId::function, "A function must be declared with a let statement.");
 
+					raise_syntax_error_if_not(!does_function_name_collide(scope_stack, incomplete_statement.variable_name), "Function name collides with another name.");
+
 					for (FunctionId const function_id : overload_set->overload_set.function_ids)
 						top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
 
@@ -936,6 +964,8 @@ namespace instantiation
 						insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program),
 						*program, next_block_scope_offset(scope_stack), constant.value.data());
 
+					raise_syntax_error_if_not(!does_name_collide(scope_stack, incomplete_statement.variable_name), "Constant name collides with another name.");
+
 					top(scope_stack).constants.push_back(std::move(constant));
 
 					return std::nullopt;
@@ -943,6 +973,8 @@ namespace instantiation
 				else
 				{
 					raise_syntax_error_if_not(is_convertible(assigned_expression_type, var_type, *program), "Cannot convert to variable type in variable declaration.");
+
+					raise_syntax_error_if_not(!does_name_collide(scope_stack, incomplete_statement.variable_name), "Variable name collides with another name.");
 
 					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
 
@@ -1075,15 +1107,19 @@ namespace instantiation
 					}
 				}
 
+				raise_syntax_error_if_not(!does_name_collide(scope_stack, incomplete_statement.declared_struct.name), "Struct name collides with another name.");
+
 				new_type.extra_data = complete::Type::Struct{ static_cast<int>(program->structs.size()) };
 				complete::TypeId const new_type_id = add_type(*program, std::move(new_type));
 				program->structs.push_back(std::move(new_struct));
-				top(scope_stack).types.push_back({ incomplete_statement.declared_struct.name, new_type_id });
+				top(scope_stack).types.push_back({incomplete_statement.declared_struct.name, new_type_id});
 
 				return std::nullopt;
 			},
 			[&](incomplete::statement::StructTemplateDeclaration const & incomplete_statement) -> std::optional<complete::Statement>
 			{
+				raise_syntax_error_if_not(!does_name_collide(scope_stack, incomplete_statement.declared_struct_template.name), "Struct template name collides with another name.");
+
 				complete::StructTemplate new_template;
 				new_template.incomplete_struct = incomplete_statement.declared_struct_template;
 				new_template.scope_template_parameters = template_parameters;
@@ -1125,6 +1161,8 @@ namespace instantiation
 					function_id.is_extern = true;
 					function_id.index = static_cast<int>(program->extern_functions.size());
 					program->extern_functions.push_back(std::move(extern_function));
+
+					raise_syntax_error_if_not(!does_function_name_collide(scope_stack, incomplete_extern_function.name), "Extern function name collides with another name.");
 
 					top(scope_stack).functions.push_back({incomplete_extern_function.name, function_id});
 				}
