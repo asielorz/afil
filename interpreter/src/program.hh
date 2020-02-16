@@ -137,6 +137,10 @@ namespace complete
 	struct Program
 	{
 		Program();
+		Program(Program const &) = delete;
+		Program(Program &&) = default;
+		Program & operator = (Program const &) = delete;
+		Program & operator = (Program &&) = default;
 
 		std::vector<Type> types;
 		std::vector<Struct> structs;

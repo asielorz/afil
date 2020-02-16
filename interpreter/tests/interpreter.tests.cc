@@ -10,19 +10,18 @@ namespace tests
 {
 	auto parse_and_run(std::string_view src) noexcept -> int
 	{
-		complete::Program const program = afil::parse_source(src);
+		complete::Program const program = *afil::parse_source(src);
 		return interpreter::run(program);
 	}
 
 	auto parse_source(std::string_view src) noexcept -> bool
 	{
-		complete::Program const program = afil::parse_source(src);
-		return true;
+		return afil::parse_source(src).has_value();
 	}
 
 	auto parse_and_print(std::string_view src) noexcept -> void
 	{
-		complete::Program const program = afil::parse_source(src);
+		complete::Program const program = *afil::parse_source(src);
 		printf("%s", pretty_print(program).c_str());
 		system("pause");
 	}
@@ -1822,8 +1821,8 @@ TEST_CASE("A program can be parsed incrementally")
 		};
 	)"sv;
 
-	complete::Program program = afil::parse_source(file1);
-	afil::parse_source(file2, out(program));
+	complete::Program program = *afil::parse_source(file1);
+	(void)afil::parse_source(file2, out(program));
 	REQUIRE(interpreter::run(program) == 8);
 }
 
@@ -1858,6 +1857,20 @@ TEST_CASE("Importing the same file repeatedly is idempotent")
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 8);
+}
+
+TEST_CASE("Forgetting a variable name will result in a compiler error")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let = 5;
+			return 5;
+		};
+	)"sv;
+
+	expected<complete::Program, SyntaxError> program = afil::parse_source(src);
+	REQUIRE(!program.has_value());
 }
 
 //TEST_CASE("Functions that take a template instantiation")

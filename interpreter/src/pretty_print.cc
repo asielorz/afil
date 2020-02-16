@@ -108,6 +108,20 @@ auto member_variable_name(TypeId owner_type, int variable_offset, Program const 
 	return "???"sv;
 }
 
+auto print_constant(TypeId type, void const * data) noexcept -> std::string
+{
+	if (type == complete::TypeId::int_)
+		return join(*static_cast<int const *>(data));
+	if (type == complete::TypeId::float_)
+		return join(*static_cast<float const *>(data));
+	if (type == complete::TypeId::bool_)
+		return join(*static_cast<bool const *>(data));
+	if (type == complete::TypeId::char_)
+		return join(*static_cast<char const *>(data));
+	else
+		return "???";
+}
+
 auto indent(int indentation_level) noexcept -> std::string
 {
 	return std::string(indentation_level, '\t');
@@ -151,8 +165,7 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 		},
 		[&](expression::Constant const & constant_expr)
 		{
-			TODO("Pretty print value of constant nodes");
-			return join("constant<", type_name(constant_expr.type, program), ">: \"", "???", "\"\n");
+			return join("constant<", type_name(constant_expr.type, program), ">: ", print_constant(constant_expr.type, constant_expr.value.data()), "\n");
 		},
 		[&](expression::OverloadSet const & overload_set_expr) 
 		{

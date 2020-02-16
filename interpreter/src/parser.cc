@@ -236,7 +236,7 @@ namespace parser
 			else
 			{
 				incomplete::Expression size = parse_expression(tokens, index, type_names);
-				raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected ] after array size.");
+				if (tokens[index].type != TokenType::close_bracket) return make_syntax_error("Expected ] after array size.");
 				index++;
 				incomplete::TypeId array_type = array_type_for(std::move(type), std::move(size));
 				return parse_mutable_pointer_and_array(tokens, index, type_names, std::move(array_type));
@@ -262,7 +262,7 @@ namespace parser
 
 	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> std::vector<incomplete::TypeId>
 	{
-		raise_syntax_error_if_not(tokens[index].source == "<", "Expected '<' after template name.");
+		if (tokens[index].source != "<") return make_syntax_error("Expected '<' after template name.");
 		index++;
 
 		std::vector<incomplete::TypeId> template_parameters;
@@ -270,17 +270,17 @@ namespace parser
 		while (true)
 		{
 			auto type = parse_type_name(tokens, index, type_names);
-			raise_syntax_error_if_not(type.has_value(), "Expected type in template instantiation parameter list.");
+			if (!type.has_value()) return make_syntax_error("Expected type in template instantiation parameter list.");
 			template_parameters.push_back(std::move(*type));
 
 			if (tokens[index].source == ">")
 				break;
 
-			raise_syntax_error_if_not(tokens[index].type == TokenType::comma, "Expected comma ',' after template parameter.");
+			if(!(tokens[index].type == TokenType::comma)) return make_syntax_error("Expected comma ',' after template parameter.");
 			index++;
 		}
 
-		raise_syntax_error_if_not(tokens[index].source == ">", "Expected comma '>' at the end of template parameter list.");
+		if (tokens[index].source != ">") return make_syntax_error("Expected comma '>' at the end of template parameter list.");
 		index++;
 
 		return template_parameters;
@@ -338,10 +338,10 @@ namespace parser
 
 		for (;;)
 		{
-			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier.");
+			if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected identifier.");
 
 			incomplete::TemplateParameter param;
-			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as template parameter name.");
+			if (is_keyword(tokens[index].source)) return make_syntax_error("Cannot use a keyword as template parameter name.");
 			param.name = tokens[index].source;
 			parsed_parameters.push_back(std::move(param));
 			index++;
@@ -351,7 +351,7 @@ namespace parser
 				index++;
 				break;
 			}
-			raise_syntax_error_if_not(tokens[index].type == TokenType::comma, "Expected '>' or ',' after template parameter.");
+			if (tokens[index].type != TokenType::comma) return make_syntax_error("Expected '>' or ',' after template parameter.");
 			index++;
 		}
 
@@ -369,7 +369,7 @@ namespace parser
 	{
 		std::vector<incomplete::Expression> parsed_expressions;
 
-		raise_syntax_error_if_not(tokens[index].type == opener, "Expected '('.");
+		if (tokens[index].type != opener) return make_syntax_error("Expected '('.");
 		index++;
 
 		// Check for empty list.
@@ -395,7 +395,7 @@ namespace parser
 				index++;
 			// Anything else we find is wrong.
 			else
-				raise_syntax_error("Expected ')' or ',' after expression.");
+				return make_syntax_error("Expected ')' or ',' after expression.");
 		}
 
 		return parsed_expressions;
@@ -405,7 +405,7 @@ namespace parser
 		-> std::vector<incomplete::DesignatedInitializer>
 	{
 		// Parameter list starts with (
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after type name in struct constructor.");
+		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after type name in struct constructor.");
 		index++;
 
 		std::vector<incomplete::DesignatedInitializer> initializers;
@@ -413,18 +413,18 @@ namespace parser
 		for (;;)
 		{
 			// A member initializer by name starts with a period.
-			raise_syntax_error_if_not(tokens[index].type == TokenType::period, "Expected '.' in designated initializer.");
+			if (tokens[index].type != TokenType::period) return make_syntax_error("Expected '.' in designated initializer.");
 			index++;
 
 			incomplete::DesignatedInitializer parameter;
 
 			// Find the member to initialize.
-			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected member name after '.' in designated initializer.");
+			if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected member name after '.' in designated initializer.");
 			parameter.member_name = tokens[index].source;
 			index++;
 
 			// Next token must be =
-			raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' after member name in designated initializer.");
+			if (tokens[index].source != "=") return make_syntax_error("Expected '=' after member name in designated initializer.");
 			index++;
 
 			// Parse a parameter.
@@ -443,7 +443,7 @@ namespace parser
 				index++;
 			// Anything else we find is wrong.
 			else
-				raise_syntax_error("Expected ')' or ',' after designated initializer.");
+				return make_syntax_error("Expected ')' or ',' after designated initializer.");
 		}
 
 		return initializers;
@@ -452,7 +452,7 @@ namespace parser
 	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::FunctionPrototype> function) noexcept -> void
 	{
 		// Parameters must be between parenthesis.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after fn.");
+		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after fn.");
 		index++;
 
 		// Parse arguments.
@@ -460,11 +460,11 @@ namespace parser
 		{
 			incomplete::FunctionParameter var;
 			auto type = parse_type_name(tokens, index, type_names);
-			raise_syntax_error_if_not(type.has_value(), "Parameter type not found.");
+			if (!type.has_value()) return make_syntax_error("Parameter type not found.");
 			var.type = std::move(*type);
 
-			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after function parameter type.");
-			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as function parameter name.");
+			if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected identifier after function parameter type.");
+			if (is_keyword(tokens[index].source)) return make_syntax_error("Cannot use a keyword as function parameter name.");
 			var.name = tokens[index].source;
 			function->parameters.push_back(std::move(var));
 			index++;
@@ -472,12 +472,12 @@ namespace parser
 			if (tokens[index].type == TokenType::close_parenthesis)
 				break;
 
-			raise_syntax_error_if_not(tokens[index].type == TokenType::comma, "Expected ',' or ')' after function parameter.");
+			if (tokens[index].type != TokenType::comma) return make_syntax_error("Expected ',' or ')' after function parameter.");
 			index++;
 		}
 
 		// After parameters close parenthesis.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after function parameter list.");
+		if (tokens[index].type != TokenType::close_parenthesis)  return make_syntax_error("Expected ')' after function parameter list.");
 		index++;
 
 		// Return type is introduced with an arrow (optional).
@@ -491,7 +491,7 @@ namespace parser
 	auto parse_function_body(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> void
 	{
 		// Body of the function is enclosed by braces.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' at start of function body.");
+		if (tokens[index].type != TokenType::open_brace) return make_syntax_error("Expected '{' at start of function body.");
 		index++;
 
 		// Parse all statements in the function.
@@ -544,19 +544,19 @@ namespace parser
 		index++;
 
 		// Condition goes between parenthesis.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after if.");
+		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after if.");
 		index++;
 
 		incomplete::expression::If if_node;
 		if_node.condition = allocate(parse_expression(tokens, index, type_names));
 
-		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after if condition.");
+		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after if condition.");
 		index++;
 
 		if_node.then_case = allocate(parse_expression(tokens, index, type_names));
 
 		// Expect keyword else to separate then and else cases.
-		raise_syntax_error_if_not(tokens[index].source == "else", "Expected keyword \"else\" after if expression body.");
+		if (tokens[index].source != "else") return make_syntax_error("Expected keyword \"else\" after if expression body.");
 		index++;
 
 		if_node.else_case = allocate(parse_expression(tokens, index, type_names));
@@ -598,10 +598,10 @@ namespace parser
 		type_names.resize(stack_size);
 
 		// Ensure that all branches return.
-		raise_syntax_error_if_not(all_branches_return(node.statements.back()), "Not all branches of statement block expression return.");
+		if (!all_branches_return(node.statements.back())) return make_syntax_error("Not all branches of statement block expression return.");
 
 		// Skip closing brace.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::close_brace, "Expected '}' at the end of statement block expression.");
+		if (tokens[index].type != TokenType::close_brace) return make_syntax_error("Expected '}' at the end of statement block expression.");
 		index++;
 
 		return node;
@@ -655,10 +655,10 @@ namespace parser
 		{
 			index++;
 			incomplete::expression::DataCall data_node;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after data.");
+			if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after data.");
 			index++;
 			data_node.operand = allocate(parse_expression(tokens, index, type_names));
-			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after operand for data.");
+			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after operand for data.");
 			index++;
 			return data_node;
 		}
@@ -666,10 +666,10 @@ namespace parser
 		{
 			index++;
 			incomplete::expression::SizeCall size_node;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after size.");
+			if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after size.");
 			index++;
 			size_node.operand = allocate(parse_expression(tokens, index, type_names));
-			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after operand for size.");
+			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after operand for size.");
 			index++;
 			return size_node;
 		}
@@ -708,7 +708,7 @@ namespace parser
 			auto expr = parse_expression(tokens, index, type_names);
 
 			// Next token must be close parenthesis.
-			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after parenthesized expression.");
+			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after parenthesized expression.");
 			index++;
 
 			return expr;
@@ -716,7 +716,7 @@ namespace parser
 		else if (is_unary_operator(tokens[index]))
 			return parse_unary_operator(tokens, index, type_names);
 		else
-			raise_syntax_error("Unrecognized token. Expected expression.");
+			return make_syntax_error("Unrecognized token. Expected expression.");
 	}
 
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression
@@ -730,7 +730,7 @@ namespace parser
 			{
 				index++;
 
-				raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected member name after '.'.");
+				if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected member name after '.'.");
 				std::string_view const member_name = tokens[index].source;
 				index++;
 
@@ -837,24 +837,24 @@ namespace parser
 			if (tokens[index].type == TokenType::open_bracket)
 			{
 				index++;
-				raise_syntax_error_if_not(tokens[index].type == TokenType::close_bracket, "Expected operator after '(' in function declaration.");
+				if (tokens[index].type != TokenType::close_bracket) return make_syntax_error("Expected operator after '(' in function declaration.");
 				name = "[]"sv;
 			}
 			else
 			{
-				raise_syntax_error_if_not(tokens[index].type == TokenType::operator_, "Expected operator name after keyword \"operator\".");
+				if (tokens[index].type != TokenType::operator_) return make_syntax_error("Expected operator name after keyword \"operator\".");
 				name = tokens[index].source;
 			}
 			index++;
 		}
 		else
 		{
-			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after let.");
+			if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected identifier after let.");
 			name = tokens[index].source;
 			index++;
 		}
 
-		raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' after identifier in let declaration.");
+		if (tokens[index].source != "=") return make_syntax_error("Expected '=' after identifier in let declaration.");
 		index++;
 
 		// If the expression returns a function, bind it to its name and return a noop.
@@ -885,13 +885,13 @@ namespace parser
 		// Skip the if
 		index++;
 
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after if.");
+		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after if.");
 		index++;
 
 		incomplete::statement::If statement;
 		statement.condition = parse_expression(tokens, index, type_names);
 
-		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after condition in if statement.");
+		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after condition in if statement.");
 		index++;
 
 		statement.then_case = allocate(parse_statement(tokens, index, type_names));
@@ -935,7 +935,7 @@ namespace parser
 		index++;
 
 		// Condition goes inside parenthesis.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after while.");
+		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after while.");
 		index++;
 
 		incomplete::statement::While statement;
@@ -943,7 +943,7 @@ namespace parser
 		// Parse condition. Must return bool.
 		statement.condition = parse_expression(tokens, index, type_names);
 
-		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after condition in while statement.");
+		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after condition in while statement.");
 		index++;
 
 		// Parse body
@@ -962,7 +962,7 @@ namespace parser
 		index++;
 
 		// Condition goes inside parenthesis.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after for.");
+		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after for.");
 		index++;
 
 		incomplete::statement::For for_statement;
@@ -970,23 +970,22 @@ namespace parser
 
 		// Parse init statement. Must be an expression or a declaration.
 		incomplete::Statement init_statement = parse_statement(tokens, index, type_names);
-		raise_syntax_error_if_not(
-				has_type<incomplete::statement::VariableDeclaration>(init_statement) || 
-				has_type<incomplete::statement::ExpressionStatement>(init_statement),
-			"init-statement of a for statement must be a variable declaration or an expression.");
+		if (!(has_type<incomplete::statement::VariableDeclaration>(init_statement) || 
+			  has_type<incomplete::statement::ExpressionStatement>(init_statement)))
+			return make_syntax_error("init-statement of a for statement must be a variable declaration or an expression.");
 		for_statement.init_statement = allocate(std::move(init_statement));
 
 		// Parse condition. Must return bool.
 		for_statement.condition = parse_expression(tokens, index, type_names);
 
 		// Parse ; after condition.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after for statement condition.");
+		if (tokens[index].type != TokenType::semicolon) return make_syntax_error("Expected ';' after for statement condition.");
 		index++;
 
 		// Parse end expression.
 		for_statement.end_expression = parse_expression(tokens, index, type_names);
 
-		raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after for statement end expression.");
+		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after for statement end expression.");
 		index++;
 
 		// Parse body
@@ -1012,13 +1011,13 @@ namespace parser
 		incomplete::Struct declared_struct;
 
 		// Parse name
-		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after struct.");
-		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as struct name.");
+		if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected identifier after struct.");
+		if (is_keyword(tokens[index].source)) return make_syntax_error("Cannot use a keyword as struct name.");
 		auto const type_name = tokens[index].source;
 		index++;
 
 		// Skip { token.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected '{' after struct name.");
+		if (tokens[index].type != TokenType::open_brace) return make_syntax_error("Expected '{' after struct name.");
 		index++;
 
 		declared_struct.name = type_name;
@@ -1028,14 +1027,14 @@ namespace parser
 		{
 			incomplete::MemberVariable var;
 			auto var_type = parse_type_name(tokens, index, type_names);
-			raise_syntax_error_if_not(var_type.has_value(), "Expected type in struct member declaration.");
+			if (!var_type.has_value()) return make_syntax_error("Expected type in struct member declaration.");
 			var.type = std::move(*var_type);
-			raise_syntax_error_if_not(!var.type.is_reference, "Member variable cannot be reference.");
-			raise_syntax_error_if_not(!var.type.is_mutable, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
+			if (var.type.is_reference) return make_syntax_error("Member variable cannot be reference.");
+			if (var.type.is_mutable) return make_syntax_error("Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
 
-			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name in member variable declaration.");
-			raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as member variable name.");
-			raise_syntax_error_if_not(!is_name_locally_taken(tokens[index].source, declared_struct.member_variables), "More than one member variable with the same name.");
+			if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected identifier after type name in member variable declaration.");
+			if (is_keyword(tokens[index].source)) return make_syntax_error("Cannot use a keyword as member variable name.");
+			if (is_name_locally_taken(tokens[index].source, declared_struct.member_variables)) return make_syntax_error("More than one member variable with the same name.");
 			var.name = tokens[index].source;
 			index++;
 
@@ -1046,7 +1045,7 @@ namespace parser
 				var.initializer_expression = parse_expression(tokens, index, type_names);
 			}
 
-			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "");
+			if (tokens[index].type != TokenType::semicolon) return make_syntax_error("Expected semicolon after struct member.");
 			declared_struct.member_variables.push_back(std::move(var));
 			index++;
 		}
@@ -1093,8 +1092,8 @@ namespace parser
 		incomplete::statement::VariableDeclaration statement;
 		
 		// The second token of the statement is the variable name.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after type name.");
-		raise_syntax_error_if_not(!is_keyword(tokens[index].source), "Cannot use a keyword as variable name.");
+		if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected identifier after type name.");
+		if (is_keyword(tokens[index].source)) return make_syntax_error("Cannot use a keyword as variable name.");
 		std::string_view const var_name = tokens[index].source;
 		index++;
 
@@ -1105,7 +1104,7 @@ namespace parser
 			return statement;
 
 		// The third token is a '='.
-		raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' or ';' after variable name in declaration.");
+		if (tokens[index].source != "=") return make_syntax_error("Expected '=' or ';' after variable name in declaration.");
 		index++;
 
 		// The rest is the expression assigned to the variable.
@@ -1122,7 +1121,7 @@ namespace parser
 
 	auto parse_import_block(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, std::string_view library_name) noexcept -> incomplete::statement::ImportBlock
 	{
-		raise_syntax_error_if_not(tokens[index].type == TokenType::open_brace, "Expected { after library name.");
+		if (tokens[index].type != TokenType::open_brace) return make_syntax_error("Expected { after library name.");
 		index++;
 
 		DLL const library = load_library(library_name);
@@ -1131,35 +1130,35 @@ namespace parser
 
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			raise_syntax_error_if_not(tokens[index].source == "let", "Expected function declaration in import block.");
+			if (tokens[index].source != "let") return make_syntax_error("Expected function declaration in import block.");
 			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::identifier, "Expected identifier after let.");
+			if (tokens[index].type != TokenType::identifier) return make_syntax_error("Expected identifier after let.");
 			std::string_view const function_name = tokens[index].source;
 			index++;
 
-			raise_syntax_error_if_not(tokens[index].source == "=", "Expected '=' after function name.");
+			if (tokens[index].source != "=") return make_syntax_error("Expected '=' after function name.");
 			index++;
 
-			raise_syntax_error_if_not(tokens[index].source == "fn", "Expected function declaration after '=' in import block.");
+			if (tokens[index].source != "fn") return make_syntax_error("Expected function declaration after '=' in import block.");
 			index++;
 
 			incomplete::FunctionPrototype function_prototype;
 			parse_function_prototype(tokens, index, type_names, out(function_prototype));
 
-			raise_syntax_error_if_not(tokens[index].source == "extern_symbol"sv, "Expected keyword \"extern_symbol\" after function prototype.");
-			raise_syntax_error_if_not(function_prototype.return_type.has_value(), "Cannot omit return type of imported extern function.");
+			if (tokens[index].source != "extern_symbol"sv) return make_syntax_error("Expected keyword \"extern_symbol\" after function prototype.");
+			if (!function_prototype.return_type.has_value()) return make_syntax_error("Cannot omit return type of imported extern function.");
 
 			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::open_parenthesis, "Expected '(' after extern_symbol.");
+			if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after extern_symbol.");
 			index++;
 			std::string_view const extern_symbol_name = tokens[index].source;
 			index++;
-			raise_syntax_error_if_not(tokens[index].type == TokenType::close_parenthesis, "Expected ')' after extern_symbol name.");
+			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after extern_symbol name.");
 			index++;
 
 			auto const module_handle = load_library(library_name);
 			void const * const extern_symbol_address = find_symbol(module_handle, parse_string_literal(extern_symbol_name));
-			raise_syntax_error_if_not(extern_symbol_address != nullptr, "Extern symbol not found.");
+			if (extern_symbol_address == nullptr) return make_syntax_error("Extern symbol not found.");
 
 			incomplete::ExternFunction extern_function;
 			extern_function.name = function_name;
@@ -1168,7 +1167,7 @@ namespace parser
 
 			import_block.imported_functions.push_back(std::move(extern_function));
 			
-			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Missing ';' after function declaration.");
+			if (tokens[index].type != TokenType::semicolon) return make_syntax_error("Missing ';' after function declaration.");
 			index++;
 		}
 
@@ -1183,7 +1182,7 @@ namespace parser
 		std::vector<TypeName> & type_names,
 		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
-	) noexcept -> void;
+	) noexcept -> expected<void, SyntaxError>;
 
 	auto parse_import_declaration(
 		span<lex::Token const> tokens, 
@@ -1191,12 +1190,12 @@ namespace parser
 		std::vector<TypeName> & type_names,
 		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
-	) noexcept -> void
+	) noexcept -> expected<void, SyntaxError>
 	{
 		// Skip import keyword.
 		index++;
 
-		raise_syntax_error_if_not(tokens[index].type == TokenType::literal_string, "Expected string literal with library name after import.");
+		if (tokens[index].type != TokenType::literal_string) return make_syntax_error("Expected string literal with library name after import.");
 		std::string const file_name = parse_string_literal(tokens[index].source);
 		index++;
 
@@ -1206,7 +1205,7 @@ namespace parser
 		}
 		else
 		{
-			raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected semicolon after file name in import declaration.");
+			if (tokens[index].type != TokenType::semicolon) return make_syntax_error("Expected semicolon after file name in import declaration.");
 			index++;
 
 			std::filesystem::path canonical_file_name = std::filesystem::canonical(file_name);
@@ -1216,7 +1215,7 @@ namespace parser
 			{
 				std::string const source = load_whole_file(canonical_file_name);
 				imported_files.push_back(std::move(canonical_file_name));
-				parse_global_scope(source, type_names, imported_files, global_initialization_statements);
+				try_call_void(parse_global_scope(source, type_names, imported_files, global_initialization_statements));
 			}
 		}
 	}
@@ -1254,7 +1253,7 @@ namespace parser
 		}
 
 		// A statement must end with a semicolon.
-		raise_syntax_error_if_not(tokens[index].type == TokenType::semicolon, "Expected ';' after statement.");
+		if (tokens[index].type != TokenType::semicolon) return make_syntax_error("Expected ';' after statement.");
 		index++;
 
 		return result;
@@ -1265,7 +1264,7 @@ namespace parser
 		std::vector<TypeName> & type_names,
 		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
-	) noexcept -> void
+	) noexcept -> expected<void, SyntaxError>
 	{
 		auto const tokens = lex::tokenize(src);
 
@@ -1274,18 +1273,18 @@ namespace parser
 		{
 			if (tokens[index].source == "import")
 			{
-				parse_import_declaration(tokens, index, type_names, imported_files, global_initialization_statements);
+				try_call_void(parse_import_declaration(tokens, index, type_names, imported_files, global_initialization_statements));
 			}
 			else
 			{
 				incomplete::Statement statement = parse_statement(tokens, index, type_names);
-				raise_syntax_error_if_not(!has_type<incomplete::statement::ExpressionStatement>(statement), "An expression statement is not allowed at the global scope.");
+				if (has_type<incomplete::statement::ExpressionStatement>(statement)) return make_syntax_error("An expression statement is not allowed at the global scope.");
 				global_initialization_statements->push_back(std::move(statement));
 			}
 		}
 	}
 
-	auto parse_source(std::string_view src, complete::Program const & program) noexcept -> std::vector<incomplete::Statement>
+	auto parse_source(std::string_view src, complete::Program const & program) noexcept -> expected<std::vector<incomplete::Statement>, SyntaxError>
 	{
 		std::vector<incomplete::Statement> global_initialization_statements;
 
@@ -1300,9 +1299,9 @@ namespace parser
 
 		std::vector<std::filesystem::path> imported_files;
 
-		parse_global_scope(src, type_names, imported_files, out(global_initialization_statements));
+		try_call_void(parse_global_scope(src, type_names, imported_files, out(global_initialization_statements)));
 
-		return global_initialization_statements;
+		return std::move(global_initialization_statements);
 	}
 
 }

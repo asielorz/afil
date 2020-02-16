@@ -6,16 +6,19 @@
 namespace afil
 {
 
-	auto parse_source(std::string_view source) noexcept -> complete::Program
+	auto parse_source(std::string_view source) noexcept -> expected<complete::Program, SyntaxError>
 	{
 		complete::Program program;
-		parse_source(source, out(program));
-		return program;
+		try_call_void(parse_source(source, out(program)));
+		return std::move(program);
 	}
 
-	auto parse_source(std::string_view source, out<complete::Program> program) noexcept -> void
+	auto parse_source(std::string_view source, out<complete::Program> program) noexcept -> expected<void, SyntaxError>
 	{
-		instantiation::instantiate_templates(parser::parse_source(source, *program), program);
+		std::vector<incomplete::Statement> incomplete_program;
+		try_call(assign_to(incomplete_program), parser::parse_source(source, *program));
+		/*try_call_void*/(instantiation::instantiate_templates(incomplete_program, program));
+		return expected<void, SyntaxError>();
 	}
 
 } // namespace afil

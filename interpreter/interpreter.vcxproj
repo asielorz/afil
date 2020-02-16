@@ -70,6 +70,7 @@
     <ClInclude Include="src\utils\callc.hh" />
     <ClInclude Include="src\incomplete_expression.hh" />
     <ClInclude Include="src\function_id.hh" />
+    <ClInclude Include="src\utils\expected.hh" />
     <ClInclude Include="src\utils\function_ptr.hh" />
     <ClInclude Include="src\utils\load_dll.hh" />
     <ClInclude Include="src\utils\map.hh" />
