@@ -18,6 +18,18 @@ struct expected
 	constexpr expected(T t) noexcept : value_or_error(std::move(t)) {}
 	constexpr expected(Error<ErrorT> err) noexcept : value_or_error(std::move(err)) {}
 
+	template <typename U, typename = std::enable_if_t<std::is_convertible_v<U, T> && !std::is_same_v<U, T>>>
+	constexpr expected(U u) noexcept : value_or_error(std::move(u)) {}
+
+	template <typename U, typename = std::enable_if_t<std::is_convertible_v<U, T> && !std::is_same_v<U, T>>>
+	constexpr expected(expected<U, ErrorT> other) noexcept
+	{
+		if (other.has_value())
+			value_or_error = std::move(other.value());
+		else
+			value_or_error = Error(std::move(other.error()));
+	}
+
 	constexpr bool has_value() const noexcept { return value_or_error.index() == 0; }
 	constexpr operator bool() const noexcept { return has_value(); }
 
@@ -74,12 +86,16 @@ private:
 };
 
 #define try_call(result_function, expression)											\
-	if (auto zzzResult = expression; zzzResult.has_value())								\
-		std::invoke(result_function, std::move(zzzResult.value()));						\
-	else																				\
-		return Error(std::move(zzzResult.error()));										\
+	{																					\
+		if (auto zzzResult = expression; zzzResult.has_value())							\
+			std::invoke(result_function, std::move(zzzResult.value()));					\
+		else																			\
+			return Error(std::move(zzzResult.error()));									\
+	}																					\
 
 
 #define try_call_void(expression)														\
-	if (auto zzzResult = expression; !zzzResult.has_value())							\
-		return Error(std::move(zzzResult.error()));										\
+	{																					\
+		if (auto zzzResult = expression; !zzzResult.has_value())						\
+			return Error(std::move(zzzResult.error()));									\
+	}																					\

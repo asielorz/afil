@@ -17,7 +17,7 @@ auto raise_syntax_error_if_not(bool condition, char const msg[]) noexcept -> voi
 		raise_syntax_error(msg);
 }
 
-auto make_syntax_error(std::string_view msg) noexcept -> SyntaxError
+auto make_syntax_error(std::string_view msg) noexcept -> Error<SyntaxError>
 {
 	SyntaxError error;
 	error.error_message = msg;
