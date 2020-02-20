@@ -1873,6 +1873,20 @@ TEST_CASE("Forgetting a variable name will result in a compiler error")
 	REQUIRE(!program.has_value());
 }
 
+TEST_CASE("There is no operator + for booleans")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			bool b = true + false;
+			return 5;
+		};
+	)"sv;
+
+	expected<complete::Program, SyntaxError> program = afil::parse_source(src);
+	REQUIRE(!program.has_value());
+}
+
 //TEST_CASE("Functions that take a template instantiation")
 //{
 //	auto const src = R"(

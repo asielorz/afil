@@ -392,7 +392,7 @@ namespace complete
 			return program.functions[id.index].is_callable_at_compile_time;
 	}
 
-	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, SyntaxError>
 	{
 		FunctionTemplate & function_template = program.function_templates[template_id.index];
 		assert(parameters.size() == function_template.incomplete_function.template_parameters.size());
@@ -413,7 +413,8 @@ namespace complete
 		instantiation::ScopeStack scope_stack;
 		scope_stack.push_back({&program.global_scope, instantiation::ScopeType::global, 0});
 
-		Function instantiated_function = instantiation::instantiate_function_template(function_template.incomplete_function, all_template_parameters, scope_stack, out(program));
+		try_call_decl(Function instantiated_function,
+			instantiation::instantiate_function_template(function_template.incomplete_function, all_template_parameters, scope_stack, out(program)));
 		FunctionId const instantiated_function_id = add_function(program, std::move(instantiated_function));
 
 		auto parameters_to_insert = std::vector<TypeId>(parameters.begin(), parameters.end());
@@ -422,7 +423,7 @@ namespace complete
 		return instantiated_function_id;
 	}
 
-	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> TypeId
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, SyntaxError>
 	{
 		StructTemplate & struct_template = program.struct_templates[template_id.index];
 
@@ -450,13 +451,13 @@ namespace complete
 		// Magic
 		for (incomplete::MemberVariable const & var_template : struct_template.incomplete_struct.member_variables)
 		{
-			TypeId const var_type = instantiation::resolve_dependent_type(var_template.type, all_template_parameters, scope_stack, out(program));
+			try_call_decl(TypeId const var_type, instantiation::resolve_dependent_type(var_template.type, all_template_parameters, scope_stack, out(program)));
 
 			add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, var_template.name, var_type, 0, program);
 			if (var_template.initializer_expression)
 			{
-				new_struct.member_variables.back().initializer_expression = instantiation::instantiate_expression(
-					*var_template.initializer_expression, all_template_parameters, scope_stack, out(program), nullptr);
+				try_call(assign_to(new_struct.member_variables.back().initializer_expression), instantiation::instantiate_expression(
+					*var_template.initializer_expression, all_template_parameters, scope_stack, out(program), nullptr));
 			}
 		}
 
@@ -696,7 +697,7 @@ namespace complete
 			{
 				// Ensure that all template parameters have been resolved.
 				assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
-				return instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
+				return *instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
 			}
 		}
 	}

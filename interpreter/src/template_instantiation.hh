@@ -3,6 +3,7 @@
 #include "program.hh"
 #include "utils/out.hh"
 #include "utils/span.hh"
+#include "syntax_error.hh"
 #include <vector>
 #include <variant>
 
@@ -19,14 +20,14 @@ namespace instantiation
 	using ScopeStack = std::vector<CurrentScope>;
 	using ScopeStackView = span<const CurrentScope>;
 
-	auto instantiate_templates(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> void;
+	auto instantiate_templates(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, SyntaxError>;
 
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program
-	) -> complete::Function;
+	) -> expected<complete::Function, SyntaxError>;
 
 	auto instantiate_expression(
 		incomplete::Expression const & incomplete_expression_,
@@ -34,7 +35,7 @@ namespace instantiation
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		optional_out<complete::TypeId> current_scope_return_type
-	) -> complete::Expression;
+	) -> expected<complete::Expression, SyntaxError>;
 
 	namespace lookup_result
 	{
@@ -64,6 +65,6 @@ namespace instantiation
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program)
-		-> complete::TypeId;
+		-> expected<complete::TypeId, SyntaxError>;
 
 } // namespace instantiation

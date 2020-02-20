@@ -5,6 +5,7 @@
 #include "complete_scope.hh"
 #include "complete_expression.hh"
 #include "function_id.hh"
+#include "syntax_error.hh"
 #include "utils/callc.hh"
 #include <optional>
 #include <map>
@@ -188,8 +189,8 @@ namespace complete
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool;
 
-	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> FunctionId;
-	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> TypeId;
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, SyntaxError>;
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, SyntaxError>;
 
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression;
 	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression;
