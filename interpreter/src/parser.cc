@@ -205,7 +205,8 @@ namespace parser
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, SyntaxError>;
 	auto parse_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Statement, SyntaxError>;
 
-	auto parse_mutable_pointer_and_array(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept -> incomplete::TypeId
+	auto parse_mutable_pointer_and_array(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept 
+		-> expected<incomplete::TypeId, SyntaxError>
 	{
 		// Look for mutable qualifier.
 		if (tokens[index].source == "mut"sv)
@@ -235,7 +236,7 @@ namespace parser
 			}
 			else
 			{
-				incomplete::Expression size = parse_expression(tokens, index, type_names);
+				try_call_decl(incomplete::Expression size, parse_expression(tokens, index, type_names));
 				if (tokens[index].type != TokenType::close_bracket) return make_syntax_error("Expected ] after array size.");
 				index++;
 				incomplete::TypeId array_type = array_type_for(std::move(type), std::move(size));
@@ -246,9 +247,10 @@ namespace parser
 		return type;
 	}
 
-	auto parse_mutable_pointer_array_and_reference(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept -> incomplete::TypeId
+	auto parse_mutable_pointer_array_and_reference(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept 
+		-> expected<incomplete::TypeId, SyntaxError>
 	{
-		type = parse_mutable_pointer_and_array(tokens, index, type_names, std::move(type));
+		try_call(assign_to(type), parse_mutable_pointer_and_array(tokens, index, type_names, std::move(type)));
 
 		// Look for reference qualifier.
 		if (tokens[index].source == "&"sv)
@@ -260,7 +262,8 @@ namespace parser
 		return type;
 	}
 
-	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> std::vector<incomplete::TypeId>
+	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
+		-> expected<std::vector<incomplete::TypeId>, SyntaxError>
 	{
 		if (tokens[index].source != "<") return make_syntax_error("Expected '<' after template name.");
 		index++;
@@ -269,7 +272,7 @@ namespace parser
 
 		while (true)
 		{
-			auto type = parse_type_name(tokens, index, type_names);
+			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (!type.has_value()) return make_syntax_error("Expected type in template instantiation parameter list.");
 			template_parameters.push_back(std::move(*type));
 
@@ -286,7 +289,7 @@ namespace parser
 		return template_parameters;
 	}
 
-	auto parse_type_name(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> std::optional<incomplete::TypeId>
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<std::optional<incomplete::TypeId>, SyntaxError>
 	{
 		using namespace incomplete;
 		std::string_view const name_to_look_up = tokens[index].source;
@@ -316,7 +319,7 @@ namespace parser
 			{
 				TypeId::TemplateInstantiation template_instantiation;
 				template_instantiation.template_name = name_to_look_up;
-				template_instantiation.parameters = parse_template_instantiation_parameter_list(tokens, index, type_names);
+				try_call(assign_to(template_instantiation.parameters), parse_template_instantiation_parameter_list(tokens, index, type_names));
 				TypeId type;
 				type.is_mutable = false;
 				type.is_reference = false;
@@ -365,7 +368,7 @@ namespace parser
 	//******************************************************************************************************************************************************************
 
 	auto parse_comma_separated_expression_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names,
-		TokenType opener = TokenType::open_parenthesis, TokenType delimiter = TokenType::close_parenthesis) noexcept -> std::vector<incomplete::Expression>
+		TokenType opener = TokenType::open_parenthesis, TokenType delimiter = TokenType::close_parenthesis) noexcept -> expected<std::vector<incomplete::Expression>, SyntaxError>
 	{
 		std::vector<incomplete::Expression> parsed_expressions;
 
@@ -382,7 +385,7 @@ namespace parser
 		for (;;)
 		{
 			// Parse a parameter.
-			parsed_expressions.push_back(parse_expression(tokens, index, type_names));
+			try_call(parsed_expressions.push_back, parse_expression(tokens, index, type_names));
 
 			// If after a parameter we find a delimiter token, end parameter list.
 			if (tokens[index].type == delimiter)
@@ -402,7 +405,7 @@ namespace parser
 	}
 
 	auto parse_designated_initializer_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) 
-		-> std::vector<incomplete::DesignatedInitializer>
+		-> expected<std::vector<incomplete::DesignatedInitializer>, SyntaxError>
 	{
 		// Parameter list starts with (
 		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after type name in struct constructor.");
@@ -428,7 +431,7 @@ namespace parser
 			index++;
 
 			// Parse a parameter.
-			parameter.assigned_expression = parse_expression(tokens, index, type_names);
+			try_call(assign_to(parameter.assigned_expression), parse_expression(tokens, index, type_names));
 
 			initializers.push_back(std::move(parameter));
 
@@ -449,7 +452,8 @@ namespace parser
 		return initializers;
 	}
 
-	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::FunctionPrototype> function) noexcept -> expected<void, SyntaxError>
+	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::FunctionPrototype> function) noexcept 
+		-> expected<void, SyntaxError>
 	{
 		// Parameters must be between parenthesis.
 		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after fn.");
@@ -459,7 +463,7 @@ namespace parser
 		while (tokens[index].type == TokenType::identifier)
 		{
 			incomplete::FunctionParameter var;
-			auto type = parse_type_name(tokens, index, type_names);
+			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (!type.has_value()) return make_syntax_error("Parameter type not found.");
 			var.type = std::move(*type);
 
@@ -484,11 +488,13 @@ namespace parser
 		if (tokens[index].type == TokenType::arrow)
 		{
 			index++;
-			function->return_type = parse_type_name(tokens, index, type_names);
+			try_call(assign_to(function->return_type), parse_type_name(tokens, index, type_names));
 		}
+
+		return success;
 	}
 
-	auto parse_function_body(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> void
+	auto parse_function_body(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> expected<void, SyntaxError>
 	{
 		// Body of the function is enclosed by braces.
 		if (tokens[index].type != TokenType::open_brace) return make_syntax_error("Expected '{' at start of function body.");
@@ -497,31 +503,33 @@ namespace parser
 		// Parse all statements in the function.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			function->statements.push_back(parse_statement(tokens, index, type_names));
+			try_call(function->statements.push_back, parse_statement(tokens, index, type_names));
 		}
 
 		// Skip closing brace.
 		index++;
+
+		return success;
 	}
 
-	auto parse_function_template_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression
+	auto parse_function_template_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, SyntaxError>
 	{
 		incomplete::FunctionTemplate function;
-		function.template_parameters = parse_template_parameter_list(tokens, index);
+		try_call(assign_to(function.template_parameters), parse_template_parameter_list(tokens, index));
 
 		size_t const type_name_stack_size = type_names.size();
 		for (incomplete::TemplateParameter const & param : function.template_parameters)
 			type_names.push_back({param.name, TypeName::Type::template_parameter});
 		
-		parse_function_prototype(tokens, index, type_names, out(function));
-		parse_function_body(tokens, index, type_names, out(function));
+		try_call_void(parse_function_prototype(tokens, index, type_names, out(function)));
+		try_call_void(parse_function_body(tokens, index, type_names, out(function)));
 
 		type_names.resize(type_name_stack_size);
 
 		return incomplete::expression::FunctionTemplate{std::move(function)};
 	}
 
-	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression
+	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, SyntaxError>
 	{
 		// Skip fn token.
 		index++;
@@ -532,13 +540,13 @@ namespace parser
 		}
 
 		incomplete::Function function;
-		parse_function_prototype(tokens, index, type_names, out(function));
-		parse_function_body(tokens, index, type_names, out(function));
+		try_call_void(parse_function_prototype(tokens, index, type_names, out(function)));
+		try_call_void(parse_function_body(tokens, index, type_names, out(function)));
 
 		return incomplete::expression::Function{std::move(function)};
 	}
 
-	auto parse_if_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::expression::If
+	auto parse_if_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::expression::If, SyntaxError>
 	{
 		// Skip if token
 		index++;
@@ -548,18 +556,18 @@ namespace parser
 		index++;
 
 		incomplete::expression::If if_node;
-		if_node.condition = allocate(parse_expression(tokens, index, type_names));
+		try_call(assign_to(if_node.condition), parse_expression(tokens, index, type_names));
 
 		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after if condition.");
 		index++;
 
-		if_node.then_case = allocate(parse_expression(tokens, index, type_names));
+		try_call(assign_to(if_node.then_case), parse_expression(tokens, index, type_names));
 
 		// Expect keyword else to separate then and else cases.
 		if (tokens[index].source != "else") return make_syntax_error("Expected keyword \"else\" after if expression body.");
 		index++;
 
-		if_node.else_case = allocate(parse_expression(tokens, index, type_names));
+		try_call(assign_to(if_node.else_case), parse_expression(tokens, index, type_names));
 
 		return if_node;
 	}
@@ -582,7 +590,8 @@ namespace parser
 		return std::visit(visitor, statement.as_variant());
 	}
 
-	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::expression::StatementBlock
+	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
+		-> expected<incomplete::expression::StatementBlock, SyntaxError>
 	{
 		// Skip opening brace.
 		index++;
@@ -593,7 +602,7 @@ namespace parser
 		size_t const stack_size = type_names.size();
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			node.statements.push_back(parse_statement(tokens, index, type_names));
+			try_call(node.statements.push_back, parse_statement(tokens, index, type_names));
 		}
 		type_names.resize(stack_size);
 
@@ -607,12 +616,13 @@ namespace parser
 		return node;
 	}
 
-	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression
+	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, SyntaxError>
 	{
 		Operator const op = parse_operator(tokens[index].source);
 		index++;
 
-		incomplete::Expression operand = parse_expression_and_trailing_subexpressions(tokens, index, type_names);
+		incomplete::Expression operand;
+		try_call(assign_to(operand), parse_expression_and_trailing_subexpressions(tokens, index, type_names));
 
 		if (op == Operator::addressof)
 		{
@@ -635,7 +645,7 @@ namespace parser
 		}
 	}
 
-	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression
+	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, SyntaxError>
 	{
 		if (tokens[index].source == "fn")
 			return parse_function_expression(tokens, index, type_names);
@@ -657,7 +667,7 @@ namespace parser
 			incomplete::expression::DataCall data_node;
 			if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after data.");
 			index++;
-			data_node.operand = allocate(parse_expression(tokens, index, type_names));
+			try_call(assign_to(data_node.operand), parse_expression(tokens, index, type_names));
 			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after operand for data.");
 			index++;
 			return data_node;
@@ -668,7 +678,7 @@ namespace parser
 			incomplete::expression::SizeCall size_node;
 			if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error("Expected '(' after size.");
 			index++;
-			size_node.operand = allocate(parse_expression(tokens, index, type_names));
+			try_call(assign_to(size_node.operand), parse_expression(tokens, index, type_names));
 			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after operand for size.");
 			index++;
 			return size_node;
@@ -676,21 +686,21 @@ namespace parser
 		else if (tokens[index].type == TokenType::identifier)
 		{
 			// It can be either a constructor call or the naming of a variable/function
-			auto type = parse_type_name(tokens, index, type_names);
+			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (type.has_value())
 			{
 				if (tokens[index + 1].type == TokenType::period)
 				{
 					incomplete::expression::DesignatedInitializerConstructor ctor_node;
 					ctor_node.constructed_type = std::move(*type);
-					ctor_node.parameters = parse_designated_initializer_list(tokens, index, type_names);
+					try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
 					return ctor_node;
 				}
 				else
 				{
 					incomplete::expression::Constructor ctor_node;
 					ctor_node.constructed_type = std::move(*type);
-					ctor_node.parameters = parse_comma_separated_expression_list(tokens, index, type_names);
+					try_call(assign_to(ctor_node.parameters), parse_comma_separated_expression_list(tokens, index, type_names));
 					return ctor_node;
 				}
 			}
@@ -719,9 +729,9 @@ namespace parser
 			return make_syntax_error("Unrecognized token. Expected expression.");
 	}
 
-	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::Expression
+	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, SyntaxError>
 	{
-		incomplete::Expression tree = parse_single_expression(tokens, index, type_names);
+		try_call_decl(incomplete::Expression tree, parse_single_expression(tokens, index, type_names));
 
 		while (index < tokens.size())
 		{
@@ -742,7 +752,7 @@ namespace parser
 			// Subscript
 			else if (tokens[index].type == TokenType::open_bracket)
 			{
-				std::vector<incomplete::Expression> params = parse_comma_separated_expression_list(tokens, index, type_names, TokenType::open_bracket, TokenType::close_bracket);
+				try_call_decl(std::vector<incomplete::Expression> params, parse_comma_separated_expression_list(tokens, index, type_names, TokenType::open_bracket, TokenType::close_bracket));
 
 				if (params.size() == 1)
 				{
@@ -765,7 +775,7 @@ namespace parser
 			// Function call
 			else if (tokens[index].type == TokenType::open_parenthesis)
 			{
-				std::vector<incomplete::Expression> params = parse_comma_separated_expression_list(tokens, index, type_names);
+				try_call_decl(std::vector<incomplete::Expression> params, parse_comma_separated_expression_list(tokens, index, type_names));
 				incomplete::expression::FunctionCall node;
 				node.parameters.reserve(params.size() + 1);
 				node.parameters.push_back(std::move(tree));
@@ -786,7 +796,7 @@ namespace parser
 
 		while (index < tokens.size())
 		{
-			operands.push_back(parse_expression_and_trailing_subexpressions(tokens, index, type_names));
+			try_call(operands.push_back, parse_expression_and_trailing_subexpressions(tokens, index, type_names));
 
 			// If the next token is an operator, parse the operator and repeat. Otherwise end the loop and return the expression.
 			if (index < tokens.size() && tokens[index].type == TokenType::operator_)
@@ -806,7 +816,7 @@ namespace parser
 	//******************************************************************************************************************************************************************
 	//******************************************************************************************************************************************************************
 
-	auto parse_let_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> incomplete::statement::VariableDeclaration
+	auto parse_let_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::VariableDeclaration, SyntaxError>
 	{
 		// Skip let token.
 		index++;
@@ -858,7 +868,7 @@ namespace parser
 		index++;
 
 		// If the expression returns a function, bind it to its name and return a noop.
-		incomplete::Expression expression = parse_expression(tokens, index, type_names);
+		try_call_decl(incomplete::Expression expression, parse_expression(tokens, index, type_names));
 
 		incomplete::statement::VariableDeclaration statement;
 		statement.variable_name = name;
@@ -969,8 +979,7 @@ namespace parser
 		size_t const stack_size = type_names.size();
 
 		// Parse init statement. Must be an expression or a declaration.
-		incomplete::Statement init_statement;
-		try_call(assign_to(init_statement), parse_statement(tokens, index, type_names));
+		try_call_decl(incomplete::Statement init_statement, parse_statement(tokens, index, type_names));
 		if (!(has_type<incomplete::statement::VariableDeclaration>(init_statement) || 
 			  has_type<incomplete::statement::ExpressionStatement>(init_statement)))
 			return make_syntax_error("init-statement of a for statement must be a variable declaration or an expression.");
@@ -1027,7 +1036,7 @@ namespace parser
 		while (tokens[index].type != TokenType::close_brace)
 		{
 			incomplete::MemberVariable var;
-			auto var_type = parse_type_name(tokens, index, type_names);
+			try_call_decl(auto var_type, parse_type_name(tokens, index, type_names));
 			if (!var_type.has_value()) return make_syntax_error("Expected type in struct member declaration.");
 			var.type = std::move(*var_type);
 			if (var.type.is_reference) return make_syntax_error("Member variable cannot be reference.");
@@ -1084,8 +1093,7 @@ namespace parser
 		if (tokens[index].source == "<"sv)
 			return parse_struct_template_declaration(tokens, index, type_names);
 
-		incomplete::Struct declared_struct;
-		try_call(assign_to(declared_struct), parse_struct(tokens, index, type_names));
+		try_call_decl(incomplete::Struct declared_struct, parse_struct(tokens, index, type_names));
 		type_names.push_back({ declared_struct.name, TypeName::Type::type});
 		return incomplete::statement::StructDeclaration{std::move(declared_struct)};
 	}
@@ -1223,6 +1231,8 @@ namespace parser
 				try_call_void(parse_global_scope(source, type_names, imported_files, global_initialization_statements));
 			}
 		}
+
+		return success;
 	}
 
 	auto parse_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Statement, SyntaxError>
@@ -1230,7 +1240,7 @@ namespace parser
 		incomplete::Statement result;
 
 		if (tokens[index].source == "let")
-			result = parse_let_statement(tokens, index, type_names);
+			try_call(assign_to(result), parse_let_statement(tokens, index, type_names))
 		else if (tokens[index].source == "return")
 			try_call(assign_to(result), parse_return_statement(tokens, index, type_names))
 		// With if, {}, while and for statements, return to avoid checking for final ';' because it is not needed.
@@ -1250,9 +1260,9 @@ namespace parser
 			return parse_struct_declaration(tokens, index, type_names);
 		else
 		{
-			auto const parsed_type = parse_type_name(tokens, index, type_names);
+			try_call_decl(auto parsed_type, parse_type_name(tokens, index, type_names));
 			if (parsed_type.has_value())
-				try_call(assign_to(result), parse_variable_declaration_statement(tokens, index, type_names, *parsed_type))
+				try_call(assign_to(result), parse_variable_declaration_statement(tokens, index, type_names, std::move(*parsed_type)))
 			else
 				try_call(assign_to(result), parse_expression_statement(tokens, index, type_names));
 		}
@@ -1282,12 +1292,13 @@ namespace parser
 			}
 			else
 			{
-				incomplete::Statement statement;
-				try_call(assign_to(statement), parse_statement(tokens, index, type_names));
+				try_call_decl(incomplete::Statement statement, parse_statement(tokens, index, type_names));
 				if (has_type<incomplete::statement::ExpressionStatement>(statement)) return make_syntax_error("An expression statement is not allowed at the global scope.");
 				global_initialization_statements->push_back(std::move(statement));
 			}
 		}
+
+		return success;
 	}
 
 	auto parse_source(std::string_view src, complete::Program const & program) noexcept -> expected<std::vector<incomplete::Statement>, SyntaxError>

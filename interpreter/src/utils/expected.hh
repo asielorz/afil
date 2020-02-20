@@ -55,10 +55,14 @@ private:
 	std::variant<T, Error<ErrorT>> value_or_error;
 };
 
+struct success_t {};
+constexpr success_t success;
+
 template <typename ErrorT>
 struct expected<void, ErrorT>
 {
 	constexpr expected() noexcept = default;
+	constexpr expected(success_t) noexcept {};
 	constexpr expected(Error<ErrorT> err) noexcept : maybe_error(std::move(err.value)) {}
 
 	constexpr bool has_value() const noexcept { return !maybe_error.has_value(); }
@@ -88,10 +92,20 @@ private:
 #define try_call(result_function, expression)											\
 	{																					\
 		if (auto zzzResult = expression; zzzResult.has_value())							\
-			std::invoke(result_function, std::move(zzzResult.value()));					\
+			static_cast<void>(result_function(std::move(zzzResult.value())));			\
 		else																			\
 			return Error(std::move(zzzResult.error()));									\
 	}																					\
+
+
+#define CONCAT2(x, y) x ## y
+#define CONCAT(x, y) CONCAT2(x, y)
+
+#define try_call_decl(result_declaration, expression)									\
+	auto CONCAT(zzzResult, __LINE__) = expression;										\
+	if (!CONCAT(zzzResult, __LINE__).has_value())										\
+		return Error(std::move(CONCAT(zzzResult, __LINE__).error()));					\
+	result_declaration = std::move(CONCAT(zzzResult, __LINE__).value());				\
 
 
 #define try_call_void(expression)														\
