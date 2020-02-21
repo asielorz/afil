@@ -101,6 +101,7 @@ namespace complete
 	auto assign_without_qualifiers(TypeId & dst, TypeId src) noexcept -> void
 	{
 		dst.is_language_reseved = src.is_language_reseved;
+		dst.is_function = src.is_function;
 		dst.index = src.index;
 	}
 

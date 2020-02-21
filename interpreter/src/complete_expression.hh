@@ -117,7 +117,7 @@ namespace complete
 			using ExpressionTreeBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>, StringLiteral,
 				LocalVariable, GlobalVariable, MemberVariable, Constant,
-				OverloadSet, FunctionCall, RelationalOperatorCall, Assignment,
+				FunctionCall, RelationalOperatorCall, Assignment,
 				Constructor,
 				Dereference, ReinterpretCast, Subscript,
 				If, StatementBlock
