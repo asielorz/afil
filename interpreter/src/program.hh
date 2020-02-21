@@ -192,8 +192,8 @@ namespace complete
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, SyntaxError>;
 	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, SyntaxError>;
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression;
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression;
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, SyntaxError>;
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, SyntaxError>;
 
 	struct OverloadSetView
 	{
@@ -207,13 +207,14 @@ namespace complete
 		span<FunctionTemplateId const> function_template_ids;
 	};
 	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
-	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept -> FunctionId;
+	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
+		-> expected<FunctionId, SyntaxError>;
 
-	auto insert_conversions(
+	[[nodiscard]] auto insert_conversions(
 		span<Expression> parameters,
 		span<TypeId const> parsed_parameter_types,
 		span<TypeId const> target_parameter_types,
-		Program const & program) noexcept -> void;
+		Program const & program) noexcept -> expected<void, SyntaxError>;
 
 } // namespace complete
 

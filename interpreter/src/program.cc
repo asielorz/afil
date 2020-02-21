@@ -469,24 +469,26 @@ namespace complete
 		return new_type_id;
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> Expression
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, SyntaxError>
 	{
 		if (from.index == to.index)
 		{
 			// From reference to reference and value to value there is no conversion. A pointer is a pointer, regardless of constness.
 			if (from.is_reference == to.is_reference)
-				return tree;
+				return std::move(tree);
 
 			if (from.is_reference && !to.is_reference)
 			{
 				expression::Dereference deref_node;
 				deref_node.expression = std::make_unique<Expression>(std::move(tree));
 				deref_node.return_type = to;
-				return deref_node;
+				return std::move(deref_node);
 			}
 			else
 			{
-				raise_syntax_error_if_not(!to.is_mutable, "Can't bind a temporary to a mutable reference.");
+				if (to.is_mutable) 
+					return make_syntax_error("Can't bind a temporary to a mutable reference.");
+
 				mark_as_to_do("Address of temporaries");
 			}
 		}
@@ -494,10 +496,10 @@ namespace complete
 		{
 			return std::move(tree);
 		}
-		raise_syntax_error("Conversion between types does not exist.");
+		return make_syntax_error("Conversion between types does not exist.");
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> Expression
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, SyntaxError>
 	{
 		return insert_conversion_node(std::move(tree), expression_type_id(tree, program), to, program);
 	}
@@ -702,7 +704,8 @@ namespace complete
 		}
 	}
 
-	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept -> FunctionId
+	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
+		-> expected<FunctionId, SyntaxError>
 	{
 		FunctionId const function_id = resolve_function_overloading(overload_set, parameter_types, program);
 		if (function_id == invalid_function_id)
@@ -710,7 +713,7 @@ namespace complete
 
 		// If any conversion is needed in order to call the function, perform the conversion.
 		auto const target_parameter_types = parameter_types_of(program, function_id);
-		insert_conversions(parameters, parameter_types, target_parameter_types, program);
+		try_call_void(insert_conversions(parameters, parameter_types, target_parameter_types, program));
 
 		return function_id;
 	}
@@ -719,13 +722,15 @@ namespace complete
 		span<Expression> parameters,
 		span<TypeId const> parsed_parameter_types,
 		span<TypeId const> target_parameter_types,
-		Program const & program) noexcept -> void
+		Program const & program) noexcept -> expected<void, SyntaxError>
 	{
 		for (size_t i = 0; i < target_parameter_types.size(); ++i)
 		{
 			if (parsed_parameter_types[i] != target_parameter_types[i])
-				parameters[i] = insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program);
+				try_call(assign_to(parameters[i]), insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program));
 		}
+
+		return success;
 	}
 
 } // namespace complete

@@ -452,7 +452,7 @@ namespace parser
 		return initializers;
 	}
 
-	auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::FunctionPrototype> function) noexcept 
+	[[nodiscard]] auto parse_function_prototype(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::FunctionPrototype> function) noexcept 
 		-> expected<void, SyntaxError>
 	{
 		// Parameters must be between parenthesis.
@@ -494,7 +494,7 @@ namespace parser
 		return success;
 	}
 
-	auto parse_function_body(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> expected<void, SyntaxError>
+	[[nodiscard]] auto parse_function_body(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> expected<void, SyntaxError>
 	{
 		// Body of the function is enclosed by braces.
 		if (tokens[index].type != TokenType::open_brace) return make_syntax_error("Expected '{' at start of function body.");
@@ -1190,14 +1190,14 @@ namespace parser
 		return import_block;
 	}
 
-	auto parse_global_scope(
+	[[nodiscard]] auto parse_global_scope(
 		std::string_view src,
 		std::vector<TypeName> & type_names,
 		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
 	) noexcept -> expected<void, SyntaxError>;
 
-	auto parse_import_declaration(
+	[[nodiscard]] auto parse_import_declaration(
 		span<lex::Token const> tokens, 
 		size_t & index, 
 		std::vector<TypeName> & type_names,
@@ -1274,14 +1274,14 @@ namespace parser
 		return result;
 	}
 
-	auto parse_global_scope(
+	[[nodiscard]] auto parse_global_scope(
 		std::string_view src,
 		std::vector<TypeName> & type_names,
 		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
 	) noexcept -> expected<void, SyntaxError>
 	{
-		auto const tokens = lex::tokenize(src);
+		try_call_decl(auto const tokens, lex::tokenize(src));
 
 		size_t index = 0;
 		while (index < tokens.size())

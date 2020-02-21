@@ -87,7 +87,7 @@ namespace lex
 		return chars_skipped;
 	}
 
-	auto skip_comments(std::string_view src, int index) noexcept -> int
+	auto skip_comments(std::string_view src, int index) noexcept -> expected<int, SyntaxError>
 	{
 		if (starts_with(src, index, "//"sv))
 		{
@@ -100,20 +100,20 @@ namespace lex
 		else if (starts_with(src, index, "/*"sv))
 		{
 			size_t const comment_end = src.find("*/"sv, index);
-			raise_syntax_error_if_not(comment_end != std::string_view::npos, "A C comment must be closed."); 
+			if (comment_end == std::string_view::npos) return make_syntax_error("A C comment must be closed."); 
 			return static_cast<int>(comment_end + 2) - index;
 		}
 		else
 			return 0;
 	}
 
-	auto skip_whitespace_and_comments(std::string_view src, int index) noexcept -> int
+	auto skip_whitespace_and_comments(std::string_view src, int index) noexcept -> expected<int, SyntaxError>
 	{
 		int original_index = index;
 		for (;;)
 		{
 			int const whitespace_chars = skip_whitespace(src, index);
-			int const comment_chars = skip_comments(src, index + whitespace_chars);
+			try_call_decl(int const comment_chars, skip_comments(src, index + whitespace_chars));
 			if (whitespace_chars + comment_chars == 0)
 				break;
 			else
@@ -130,7 +130,7 @@ namespace lex
 		return length;
 	}
 
-	auto token_type_and_length_number(std::string_view src, int index) noexcept -> std::pair<Token::Type, int>
+	auto token_type_and_length_number(std::string_view src, int index) noexcept -> expected<std::pair<Token::Type, int>, SyntaxError>
 	{
 		bool dot_read = false;
 		bool exp_read = false;
@@ -154,10 +154,10 @@ namespace lex
 			else if (is_valid_after_literal(src[end]))
 				break;
 			else
-				raise_syntax_error("Unrecognized char in number literal.");
+				return make_syntax_error("Unrecognized char in number literal.");
 		}
 
-		return { 
+		return std::pair<Token::Type, int>{
 			(dot_read || exp_read) ? Token::Type::literal_float : Token::Type::literal_int,
 			end - index
 		};
@@ -196,33 +196,34 @@ namespace lex
 		return length;
 	}
 
-	auto next_token_type_and_length(std::string_view src, int index) noexcept -> std::pair<Token::Type, int>
+	auto next_token_type_and_length(std::string_view src, int index) noexcept -> expected<std::pair<Token::Type, int>, SyntaxError>
 	{
 		if (is_number(src[index]))		return token_type_and_length_number(src, index);
-		if (is_arrow(src, index))		return {Token::Type::arrow,				2};
-		if (is_operator(src, index))	return {Token::Type::operator_,			token_length_operator(src, index)};
-		if (src[index] == '"')			return {Token::Type::literal_string,	token_length_string(src, index)};
-		if (src[index] == '(')			return {Token::Type::open_parenthesis,	1};
-		if (src[index] == ')')			return {Token::Type::close_parenthesis,	1};
-		if (src[index] == '{')			return {Token::Type::open_brace,		1};
-		if (src[index] == '}')			return {Token::Type::close_brace,		1};
-		if (src[index] == '[')			return {Token::Type::open_bracket,		1};
-		if (src[index] == ']')			return {Token::Type::close_bracket,		1};
-		if (src[index] == ';')			return {Token::Type::semicolon,			1};
-		if (src[index] == ',')			return {Token::Type::comma,				1};
-		if (src[index] == '.')			return {Token::Type::period,			1};
-		if (is_boolean(src, index))		return {Token::Type::literal_bool,		src[index] == 't' ? 4 : 5};
-		else							return {Token::Type::identifier,		token_length_identifier(src, index)};
+		if (is_arrow(src, index))		return std::pair<Token::Type, int>{Token::Type::arrow,				2};
+		if (is_operator(src, index))	return std::pair<Token::Type, int>{Token::Type::operator_,			token_length_operator(src, index)};
+		if (src[index] == '"')			return std::pair<Token::Type, int>{Token::Type::literal_string,		token_length_string(src, index)};
+		if (src[index] == '(')			return std::pair<Token::Type, int>{Token::Type::open_parenthesis,	1};
+		if (src[index] == ')')			return std::pair<Token::Type, int>{Token::Type::close_parenthesis,	1};
+		if (src[index] == '{')			return std::pair<Token::Type, int>{Token::Type::open_brace,			1};
+		if (src[index] == '}')			return std::pair<Token::Type, int>{Token::Type::close_brace,		1};
+		if (src[index] == '[')			return std::pair<Token::Type, int>{Token::Type::open_bracket,		1};
+		if (src[index] == ']')			return std::pair<Token::Type, int>{Token::Type::close_bracket,		1};
+		if (src[index] == ';')			return std::pair<Token::Type, int>{Token::Type::semicolon,			1};
+		if (src[index] == ',')			return std::pair<Token::Type, int>{Token::Type::comma,				1};
+		if (src[index] == '.')			return std::pair<Token::Type, int>{Token::Type::period,				1};
+		if (is_boolean(src, index))		return std::pair<Token::Type, int>{Token::Type::literal_bool,		src[index] == 't' ? 4 : 5};
+		else							return std::pair<Token::Type, int>{Token::Type::identifier,			token_length_identifier(src, index)};
 	}
 
-	std::vector<Token> tokenize(std::string_view src)
+	auto tokenize(std::string_view src) noexcept -> expected<std::vector<Token>, SyntaxError>
 	{
 		std::vector<Token> result;
-		int index = skip_whitespace_and_comments(src, 0);
+		try_call_decl(int index, skip_whitespace_and_comments(src, 0));
 
 		while (!end_reached(src, index))
 		{
-			auto const [token_type, token_length] = next_token_type_and_length(src, index);
+			try_call_decl(auto token_type_and_length, next_token_type_and_length(src, index));
+			auto const [token_type, token_length] = token_type_and_length;
 			Token token;
 			token.type = token_type;
 			token.source = src.substr(index, token_length);
@@ -232,14 +233,15 @@ namespace lex
 			if (token.type == any_of(Token::Type::literal_int, Token::Type::literal_float) || 
 				token.source == any_of("and"sv, "or"sv, "xor"sv))
 			{
-				raise_syntax_error_if_not(end_reached(src, index) || is_valid_after_literal(src[index]), "Expected whitespace, operator or delimiter after literal.");
+				if (!end_reached(src, index) && !is_valid_after_literal(src[index])) return make_syntax_error("Expected whitespace, operator or delimiter after literal.");
 			}
 
-			index += skip_whitespace_and_comments(src, index);
+			try_call_decl(int const comment_length, skip_whitespace_and_comments(src, index));
+			index += comment_length;
 			result.push_back(token);
 		}
 
-		return result;
+		return std::move(result);
 	}
 
 } // namespace tr

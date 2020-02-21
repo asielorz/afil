@@ -1,5 +1,6 @@
 #pragma once
 
+#include "syntax_error.hh"
 #include <string_view>
 #include <vector>
 
@@ -28,6 +29,6 @@ namespace lex
 		std::string_view source;
 		Type type;
 	};
-	std::vector<Token> tokenize(std::string_view src);
+	auto tokenize(std::string_view src) noexcept -> expected<std::vector<Token>, SyntaxError>;
 
 } // namespace tr

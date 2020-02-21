@@ -32,7 +32,7 @@ auto evaluate_constant_expression(complete::Expression const & expression, compl
 
 auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> expected<int, SyntaxError>
 {
-	expression = insert_conversion_node(std::move(expression), complete::TypeId::int_, program);
+	try_call(assign_to(expression), insert_conversion_node(std::move(expression), complete::TypeId::int_, program));
 	int result;
 	try_call_void(evaluate_constant_expression(expression, program, constant_base_index, &result));
 	return result;
@@ -368,7 +368,7 @@ namespace instantiation
 		optional_out<complete::TypeId> current_scope_return_type
 	) -> expected<std::optional<complete::Statement>, SyntaxError>;
 
-	auto instantiate_function_prototype(
+	[[nodiscard]] auto instantiate_function_prototype(
 		incomplete::FunctionPrototype const & incomplete_function,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
@@ -394,7 +394,7 @@ namespace instantiation
 		return success;
 	}
 
-	auto instantiate_function_body(
+	[[nodiscard]] auto instantiate_function_body(
 		incomplete::Function const & incomplete_function,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
@@ -541,13 +541,14 @@ namespace instantiation
 
 					complete::expression::ReinterpretCast complete_expression;
 					complete_expression.return_type = pointee_type;
-					complete_expression.operand = allocate(insert_conversion_node(std::move(operand), operand_type_id, decay(operand_type_id), *program));
+					try_call(assign_to(complete_expression.operand), insert_conversion_node(std::move(operand), operand_type_id, decay(operand_type_id), *program));
 					return std::move(complete_expression);
 				}
 				else
 				{
-					FunctionId const function = resolve_function_overloading_and_insert_conversions(
-						operator_overload_set(Operator::dereference, scope_stack), { &operand, 1 }, { &operand_type_id, 1 }, *program);
+					try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(
+						operator_overload_set(Operator::dereference, scope_stack), { &operand, 1 }, { &operand_type_id, 1 }, *program));
+
 					if (function == invalid_function_id) return make_syntax_error("Overload not found for dereference operator.");
 
 					complete::expression::FunctionCall complete_expression;
@@ -572,7 +573,7 @@ namespace instantiation
 					complete::expression::Subscript complete_expression;
 					complete_expression.return_type = value_type;
 					complete_expression.array = allocate(std::move(array));
-					complete_expression.index = allocate(insert_conversion_node(std::move(index), complete::TypeId::int_, *program));
+					try_call(assign_to(complete_expression.index), insert_conversion_node(std::move(index), complete::TypeId::int_, *program));
 					return std::move(complete_expression);
 				}
 				else if (is_array_pointer(array_type))
@@ -584,8 +585,8 @@ namespace instantiation
 
 					complete::expression::Subscript complete_expression;
 					complete_expression.return_type = value_type;
-					complete_expression.array = allocate(insert_conversion_node(std::move(array), decay(array_type_id), *program));
-					complete_expression.index = allocate(insert_conversion_node(std::move(index), complete::TypeId::int_, *program));
+					try_call(assign_to(complete_expression.array), insert_conversion_node(std::move(array), decay(array_type_id), *program));
+					try_call(assign_to(complete_expression.index), insert_conversion_node(std::move(index), complete::TypeId::int_, *program));
 					return std::move(complete_expression);
 				}
 				else
@@ -596,7 +597,8 @@ namespace instantiation
 					complete::TypeId const param_types[] = { array_type_id, index_type_id };
 					complete::Expression params[] = { std::move(array), std::move(index) };
 
-					FunctionId const function = resolve_function_overloading_and_insert_conversions(named_overload_set("[]"sv, scope_stack), params, param_types, *program);
+					try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(named_overload_set("[]"sv, scope_stack), params, param_types, *program));
+
 					if (function == invalid_function_id) return make_syntax_error("Overload not found for subscript operator.");
 
 					complete::expression::FunctionCall complete_expression;
@@ -653,9 +655,9 @@ namespace instantiation
 					for (size_t i = 1; i < parameters.size(); ++i)
 						parameter_types.push_back(expression_type_id(parameters[i], *program));
 
-					FunctionId const function = resolve_function_overloading_and_insert_conversions(
+					try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(
 						try_get<complete::expression::OverloadSet>(parameters[0])->overload_set,
-						{&parameters[1], parameter_types.size()}, parameter_types, *program);
+						{&parameters[1], parameter_types.size()}, parameter_types, *program));
 
 					if (function == invalid_function_id) return make_syntax_error("Overload not found.");
 					complete::expression::FunctionCall complete_expression;
@@ -673,8 +675,8 @@ namespace instantiation
 			{
 				try_call_decl(complete::Expression operand, instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const operand_type = expression_type_id(operand, *program);
-				FunctionId const function = resolve_function_overloading_and_insert_conversions(
-					operator_overload_set(incomplete_expression.op, scope_stack), { &operand, 1 }, { &operand_type, 1 }, *program);
+				try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(
+					operator_overload_set(incomplete_expression.op, scope_stack), { &operand, 1 }, { &operand_type, 1 }, *program));
 
 				if (function == invalid_function_id) return make_syntax_error("Operator overload not found.");
 
@@ -692,7 +694,8 @@ namespace instantiation
 				try_call(assign_to(operands[1]), instantiate_expression(*incomplete_expression.right, template_parameters, scope_stack, program, current_scope_return_type));
 
 				complete::TypeId const operand_types[] = { expression_type_id(operands[0], *program), expression_type_id(operands[1], *program) };
-				FunctionId const function = resolve_function_overloading_and_insert_conversions(operator_overload_set(op, scope_stack), operands, operand_types, *program);
+				try_call_decl(FunctionId const function,
+					resolve_function_overloading_and_insert_conversions(operator_overload_set(op, scope_stack), operands, operand_types, *program));
 
 				// Special case for built in assignment.
 				if (function == invalid_function_id && op == Operator::assign)
@@ -701,7 +704,7 @@ namespace instantiation
 					if (!operand_types[0].is_mutable) return make_syntax_error("Cannot assign to a constant.");
 					complete::expression::Assignment complete_expression;
 					complete_expression.destination = allocate(std::move(operands[0]));
-					complete_expression.source = allocate(insert_conversion_node(std::move(operands[1]), operand_types[1], decay(operand_types[0]), *program));
+					try_call(assign_to(complete_expression.source), insert_conversion_node(std::move(operands[1]), operand_types[1], decay(operand_types[0]), *program));
 					return std::move(complete_expression);
 				}
 
@@ -729,9 +732,8 @@ namespace instantiation
 			},
 			[&](incomplete::expression::If const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
 			{
-				try_call_decl(complete::Expression condition,
-					instantiate_expression(*incomplete_expression.condition, template_parameters, scope_stack, program, current_scope_return_type));
-				condition = insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program);
+				try_call_decl(complete::Expression condition, instantiate_expression(*incomplete_expression.condition, template_parameters, scope_stack, program, current_scope_return_type));
+				try_call(assign_to(condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
 
 				try_call_decl(complete::Expression then_case, instantiate_expression(*incomplete_expression.then_case, template_parameters, scope_stack, program, current_scope_return_type));
 				try_call_decl(complete::Expression else_case, instantiate_expression(*incomplete_expression.else_case, template_parameters, scope_stack, program, current_scope_return_type));
@@ -740,8 +742,8 @@ namespace instantiation
 				complete::TypeId const else_type = expression_type_id(else_case, *program);
 				complete::TypeId const return_type = common_type(then_type, else_type, *program);
 
-				then_case = insert_conversion_node(std::move(then_case), then_type, return_type, *program);
-				else_case = insert_conversion_node(std::move(else_case), else_type, return_type, *program);
+				try_call(assign_to(then_case), insert_conversion_node(std::move(then_case), then_type, return_type, *program));
+				try_call(assign_to(else_case), insert_conversion_node(std::move(else_case), else_type, return_type, *program));
 
 				complete::expression::If complete_expression;
 				complete_expression.condition = allocate(std::move(condition));
@@ -791,7 +793,7 @@ namespace instantiation
 						try_call_decl(complete::Expression complete_param,
 							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type));
 
-						complete_expression.parameters.push_back(insert_conversion_node(std::move(complete_param), constructed_struct.member_variables[i].type, *program));
+						try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(complete_param), constructed_struct.member_variables[i].type, *program));
 					}
 				}
 				else if (is_array(constructed_type))
@@ -810,7 +812,7 @@ namespace instantiation
 						try_call_decl(complete::Expression complete_param,
 							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type));
 
-						complete_expression.parameters.push_back(insert_conversion_node(std::move(complete_param), array_type, *program));
+						try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(complete_param), array_type, *program));
 					}
 				}
 				else
@@ -922,14 +924,14 @@ namespace instantiation
 					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(*incomplete_statement.assigned_expression)->function;
 
 					complete::Function function;
-					instantiate_function_prototype(incomplete_function, template_parameters, scope_stack, program, out(function));
+					try_call_void(instantiate_function_prototype(incomplete_function, template_parameters, scope_stack, program, out(function)));
 
 					if (does_function_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Function name collides with another name.");
 
 					FunctionId const function_id = add_function(*program, function);
 					top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
 
-					instantiate_function_body(incomplete_function, template_parameters, scope_stack, program, out(function));
+					try_call_void(instantiate_function_body(incomplete_function, template_parameters, scope_stack, program, out(function)));
 					program->functions[function_id.index] = std::move(function);
 
 					return std::nullopt;
@@ -985,9 +987,8 @@ namespace instantiation
 					constant.value.resize(type_size(*program, var_type));
 					constant.name = incomplete_statement.variable_name;
 
-					evaluate_constant_expression(
-						insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program),
-						*program, next_block_scope_offset(scope_stack), constant.value.data());
+					try_call(assign_to(expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
+					evaluate_constant_expression(std::move(expression), *program, next_block_scope_offset(scope_stack), constant.value.data());
 
 					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Constant name collides with another name.");
 
@@ -1005,7 +1006,7 @@ namespace instantiation
 
 					complete::statement::VariableDeclaration complete_statement;
 					complete_statement.variable_offset = var_offset;
-					complete_statement.assigned_expression = insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program);
+					try_call(assign_to(complete_statement.assigned_expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
 					return std::move(complete_statement);
 				}
 			},
@@ -1020,7 +1021,7 @@ namespace instantiation
 			{
 				complete::statement::If complete_statement;
 				try_call_decl(complete::Expression condition, instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type));
-				complete_statement.condition = insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program);
+				try_call(assign_to(complete_statement.condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
 
 				try_call_decl(auto then_case, instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
 				if (!then_case.has_value()) return make_syntax_error("Noop statement not allowed as then case of if statement.");
@@ -1054,7 +1055,7 @@ namespace instantiation
 				complete::statement::While complete_statement;
 
 				try_call_decl(complete::Expression condition, instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type));
-				complete_statement.condition = insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program);
+				try_call(assign_to(complete_statement.condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
 
 				try_call_decl(auto body_statement, instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program, current_scope_return_type));
 				if (!body_statement.has_value()) return make_syntax_error("Noop statement not allowed as body of while loop.");
@@ -1072,7 +1073,7 @@ namespace instantiation
 				complete_statement.init_statement = allocate(*init_statement);
 
 				try_call_decl(complete::Expression condition, instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type));
-				complete_statement.condition = insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program);
+				try_call(assign_to(complete_statement.condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
 
 				try_call(assign_to(complete_statement.end_expression), 
 					instantiate_expression(incomplete_statement.end_expression, template_parameters, scope_stack, program, current_scope_return_type));
@@ -1097,7 +1098,8 @@ namespace instantiation
 					? decay(returned_expression_type)
 					: *current_scope_return_type;
 
-				complete_statement.returned_expression = insert_conversion_node(std::move(complete_statement.returned_expression), returned_expression_type, return_type, *program);
+				try_call(assign_to(complete_statement.returned_expression), 
+					insert_conversion_node(std::move(complete_statement.returned_expression), returned_expression_type, return_type, *program));
 
 				if (*current_scope_return_type == complete::TypeId::deduce)
 					*current_scope_return_type = return_type;
@@ -1136,7 +1138,7 @@ namespace instantiation
 						try_call_decl(complete::Expression initializer,
 							instantiate_expression(*member_variable.initializer_expression, template_parameters, scope_stack, program, current_scope_return_type));
 
-						new_variable.initializer_expression = insert_conversion_node(std::move(initializer), member_type, *program);
+						try_call(assign_to(new_variable.initializer_expression), insert_conversion_node(std::move(initializer), member_type, *program));
 					}
 					else if (is_default_constructible(member_type, *program))
 					{
@@ -1173,7 +1175,7 @@ namespace instantiation
 					extern_function.function_pointer = incomplete_extern_function.function_pointer;
 
 					complete::Function function;
-					instantiate_function_prototype(incomplete_extern_function.prototype, template_parameters, scope_stack, program, out(function));
+					try_call_void(instantiate_function_prototype(incomplete_extern_function.prototype, template_parameters, scope_stack, program, out(function)));
 					extern_function.parameter_size = function.stack_frame_size;
 					extern_function.parameter_alignment = function.stack_frame_alignment;
 					extern_function.return_type = function.return_type;
