@@ -2,7 +2,7 @@
 
 #include <memory>
 
-// unique_ptr but it's copiable and does deep copy.
+// unique_ptr but it's copyable and does deep copy.
 template <typename T>
 struct value_ptr : public std::unique_ptr<T>
 {

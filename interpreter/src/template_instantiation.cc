@@ -183,7 +183,7 @@ namespace instantiation
 				complete::FunctionTemplateParameterType::Pointer pointer_type;
 				try_call(assign_to(pointer_type.pointee), 
 					resolve_function_template_parameter_type(*pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
-				return complete::FunctionTemplateParameterType{pointer_type, false, false};
+				return complete::FunctionTemplateParameterType{std::move(pointer_type), false, false};
 			},
 			[&](incomplete::TypeId::Array const & array) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
 			{
@@ -193,14 +193,14 @@ namespace instantiation
 
 				try_call_decl(complete::Expression size_expr, instantiate_expression(*array.size, resolved_template_parameters, scope_stack, program, nullptr));
 				array_type.size = evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack));
-				return complete::FunctionTemplateParameterType{array_type, false, false};
+				return complete::FunctionTemplateParameterType{std::move(array_type), false, false};
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
 			{
 				complete::FunctionTemplateParameterType::ArrayPointer array_pointer_type;
 				try_call(assign_to(array_pointer_type.pointee),
 					resolve_function_template_parameter_type(*array_pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
-				return complete::FunctionTemplateParameterType{array_pointer_type, false, false};
+				return complete::FunctionTemplateParameterType{std::move(array_pointer_type), false, false};
 			},
 			[](incomplete::TypeId::TemplateInstantiation const & /*template_instantiation*/) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
 			{
@@ -215,7 +215,7 @@ namespace instantiation
 		try_call_decl(complete::FunctionTemplateParameterType type, std::visit(visitor, dependent_type.value));
 		type.is_reference = dependent_type.is_reference;
 		type.is_mutable = dependent_type.is_mutable;
-		return type;
+		return std::move(type);
 	}
 
 	auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
@@ -1070,7 +1070,7 @@ namespace instantiation
 
 				try_call_decl(auto init_statement, instantiate_statement(*incomplete_statement.init_statement, template_parameters, scope_stack, program, current_scope_return_type));
 				if (!init_statement.has_value()) return make_syntax_error("Noop statement not allowed as init statement of for loop.");
-				complete_statement.init_statement = allocate(*init_statement);
+				complete_statement.init_statement = allocate(std::move(*init_statement));
 
 				try_call_decl(complete::Expression condition, instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type));
 				try_call(assign_to(complete_statement.condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));

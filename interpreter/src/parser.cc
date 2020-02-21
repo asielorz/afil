@@ -218,7 +218,7 @@ namespace parser
 		// Look for pointer type
 		if (tokens[index].source == "*"sv)
 		{
-			incomplete::TypeId pointer_type = pointer_type_for(type);
+			incomplete::TypeId pointer_type = pointer_type_for(std::move(type));
 			index++;
 			return parse_mutable_pointer_and_array(tokens, index, type_names, std::move(pointer_type));
 		}
@@ -230,7 +230,7 @@ namespace parser
 
 			if (tokens[index].type == TokenType::close_bracket)
 			{
-				incomplete::TypeId pointer_type = array_pointer_type_for(type);
+				incomplete::TypeId pointer_type = array_pointer_type_for(std::move(type));
 				index++;
 				return parse_mutable_pointer_and_array(tokens, index, type_names, std::move(pointer_type));
 			}
@@ -244,7 +244,7 @@ namespace parser
 			}
 		}
 
-		return type;
+		return std::move(type);
 	}
 
 	auto parse_mutable_pointer_array_and_reference(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept 
@@ -259,7 +259,7 @@ namespace parser
 			index++;
 		}
 
-		return type;
+		return std::move(type);
 	}
 
 	auto parse_template_instantiation_parameter_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
@@ -313,7 +313,7 @@ namespace parser
 				type.is_reference = false;
 				type.value = base_case;
 
-				return parse_mutable_pointer_array_and_reference(tokens, index, type_names, type);
+				return parse_mutable_pointer_array_and_reference(tokens, index, type_names, std::move(type));
 			}
 			case TypeName::Type::struct_template:
 			{
@@ -569,7 +569,7 @@ namespace parser
 
 		try_call(assign_to(if_node.else_case), parse_expression(tokens, index, type_names));
 
-		return if_node;
+		return std::move(if_node);
 	}
 	
 	auto all_branches_return(incomplete::Statement const & statement) noexcept -> bool
@@ -628,20 +628,20 @@ namespace parser
 		{
 			incomplete::expression::Addressof addressof_node;
 			addressof_node.operand = allocate(std::move(operand));
-			return addressof_node;
+			return std::move(addressof_node);
 		}
 		else if (op == Operator::dereference)
 		{
 			incomplete::expression::Dereference deref_node;
 			deref_node.operand = allocate(std::move(operand));
-			return deref_node;
+			return std::move(deref_node);
 		}
 		else
 		{
 			incomplete::expression::UnaryOperatorCall op_node;
 			op_node.op = op;
 			op_node.operand = allocate(std::move(operand));
-			return op_node;
+			return std::move(op_node);
 		}
 	}
 
@@ -670,7 +670,7 @@ namespace parser
 			try_call(assign_to(data_node.operand), parse_expression(tokens, index, type_names));
 			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after operand for data.");
 			index++;
-			return data_node;
+			return std::move(data_node);
 		}
 		else if (tokens[index].source == "size")
 		{
@@ -681,7 +681,7 @@ namespace parser
 			try_call(assign_to(size_node.operand), parse_expression(tokens, index, type_names));
 			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error("Expected ')' after operand for size.");
 			index++;
-			return size_node;
+			return std::move(size_node);
 		}
 		else if (tokens[index].type == TokenType::identifier)
 		{
@@ -694,14 +694,14 @@ namespace parser
 					incomplete::expression::DesignatedInitializerConstructor ctor_node;
 					ctor_node.constructed_type = std::move(*type);
 					try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
-					return ctor_node;
+					return std::move(ctor_node);
 				}
 				else
 				{
 					incomplete::expression::Constructor ctor_node;
 					ctor_node.constructed_type = std::move(*type);
 					try_call(assign_to(ctor_node.parameters), parse_comma_separated_expression_list(tokens, index, type_names));
-					return ctor_node;
+					return std::move(ctor_node);
 				}
 			}
 			else
@@ -786,7 +786,7 @@ namespace parser
 			else break;
 		}
 
-		return tree;
+		return std::move(tree);
 	}
 
 	auto parse_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, SyntaxError>
@@ -872,11 +872,11 @@ namespace parser
 
 		incomplete::statement::VariableDeclaration statement;
 		statement.variable_name = name;
-		statement.assigned_expression = expression;
+		statement.assigned_expression = std::move(expression);
 		statement.type.value = incomplete::TypeId::Deduce();
 		statement.type.is_mutable = is_mutable;
 		statement.type.is_reference = is_reference;
-		return statement;
+		return std::move(statement);
 	}
 
 	auto parse_return_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::Return, SyntaxError>
@@ -887,7 +887,7 @@ namespace parser
 		incomplete::statement::Return statement;
 		try_call(assign_to(statement.returned_expression), parse_expression(tokens, index, type_names));
 
-		return statement;
+		return std::move(statement);
 	}
 
 	auto parse_if_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::If, SyntaxError>
@@ -914,7 +914,7 @@ namespace parser
 			try_call(assign_to(statement.else_case), parse_statement(tokens, index, type_names));
 		}
 
-		return statement;
+		return std::move(statement);
 	}
 
 	auto parse_statement_block(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::StatementBlock, SyntaxError>
@@ -959,7 +959,7 @@ namespace parser
 		// Parse body
 		try_call(assign_to(statement.body), parse_statement(tokens, index, type_names));
 
-		return statement;
+		return std::move(statement);
 	}
 
 	auto parse_for_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::For, SyntaxError>
@@ -1003,7 +1003,7 @@ namespace parser
 
 		type_names.resize(stack_size);
 
-		return for_statement;
+		return std::move(for_statement);
 	}
 
 	template <typename Stmt>
@@ -1110,10 +1110,10 @@ namespace parser
 		index++;
 
 		statement.variable_name = var_name;
-		statement.type = type;
+		statement.type = std::move(type);
 
 		if (tokens[index].type == TokenType::semicolon)
-			return statement;
+			return std::move(statement);
 
 		// The third token is a '='.
 		if (tokens[index].source != "=") return make_syntax_error("Expected '=' or ';' after variable name in declaration.");
@@ -1121,14 +1121,14 @@ namespace parser
 
 		// The rest is the expression assigned to the variable.
 		try_call(assign_to(statement.assigned_expression), parse_expression(tokens, index, type_names));
-		return statement;
+		return std::move(statement);
 	}
 
 	auto parse_expression_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::ExpressionStatement, SyntaxError>
 	{
 		incomplete::statement::ExpressionStatement statement;
 		try_call(assign_to(statement.expression), parse_expression(tokens, index, type_names));
-		return statement;
+		return std::move(statement);
 	}
 
 	auto parse_import_block(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, std::string_view library_name) noexcept 
@@ -1271,7 +1271,7 @@ namespace parser
 		if (tokens[index].type != TokenType::semicolon) return make_syntax_error("Expected ';' after statement.");
 		index++;
 
-		return result;
+		return std::move(result);
 	}
 
 	[[nodiscard]] auto parse_global_scope(
