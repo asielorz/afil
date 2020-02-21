@@ -17,7 +17,7 @@ namespace afil
 	{
 		std::vector<incomplete::Statement> incomplete_program;
 		try_call(assign_to(incomplete_program), parser::parse_source(source, *program));
-		try_call_void(instantiation::instantiate_templates(incomplete_program, program));
+		try_call_void(instantiation::semantic_analysis(incomplete_program, program));
 		return expected<void, SyntaxError>();
 	}
 

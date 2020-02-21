@@ -1241,7 +1241,7 @@ namespace instantiation
 		return std::visit(visitor, incomplete_statement_.as_variant());
 	}
 
-	auto instantiate_templates(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, SyntaxError>
+	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, SyntaxError>
 	{
 		std::vector<complete::ResolvedTemplateParameter> template_parameters;
 		ScopeStack scope_stack;
