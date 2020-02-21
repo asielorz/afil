@@ -153,6 +153,7 @@ namespace complete
 		std::vector<Type> types;
 		std::vector<Struct> structs;
 		std::vector<StructTemplate> struct_templates;
+		std::vector<OverloadSet> overload_set_types;
 		std::vector<Function> functions;
 		std::vector<ExternFunction> extern_functions;
 		std::vector<FunctionTemplate> function_templates;
@@ -222,6 +223,9 @@ namespace complete
 		span<TypeId const> parsed_parameter_types,
 		span<TypeId const> target_parameter_types,
 		Program const & program) noexcept -> expected<void, SyntaxError>;
+
+	auto type_for_overload_set(Program & program, OverloadSet overload_set) noexcept -> TypeId;
+	auto overload_set_for_type(Program const & program, TypeId overload_set_type) noexcept -> OverloadSetView;
 
 } // namespace complete
 

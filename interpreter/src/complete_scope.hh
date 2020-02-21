@@ -20,7 +20,8 @@ namespace complete
 				unsigned is_language_reseved : 1;
 				unsigned is_mutable : 1;
 				unsigned is_reference : 1;
-				unsigned index : 29;
+				unsigned is_function : 1;
+				unsigned index : 28;
 			};
 			unsigned flat_value;
 		};
@@ -35,7 +36,6 @@ namespace complete
 		static TypeId const char_;
 
 		static TypeId const none;
-		static TypeId const function;
 		static TypeId const deduce;
 	};
 

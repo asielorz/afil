@@ -1923,6 +1923,25 @@ TEST_CASE("Functions that take a template instantiation")
 	REQUIRE(tests::parse_and_run(src) == 2);
 }
 
+TEST_CASE("Higher order function templates")
+{
+	auto const src = R"(
+		let invoke = fn<F, T>(F f, T a, T b)
+		{
+			return f(a, b);
+		};
+		
+		let add = fn(int a, int b) { return a + b; };
+
+		let main = fn() -> int
+		{
+			return invoke(add, 4, 5);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 9);
+}
+
 /*****************************************************************
 Backlog
 - contracts

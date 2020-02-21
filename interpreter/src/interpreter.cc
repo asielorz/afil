@@ -233,10 +233,10 @@ namespace interpreter
 					memcpy(pointer_at_address(stack, return_address), array + index * value_type_size, value_type_size);
 				}
 			},
-			[&](expression::OverloadSet const &) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
-			{
-				write(stack, return_address, 0);
-			},
+				//[&](expression::OverloadSet const &) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
+				//{
+				//	write(stack, return_address, 0);
+				//},
 			[&](expression::FunctionCall const & func_call_node)
 			{
 				call_function(func_call_node.function_id, func_call_node.parameters, stack, program, return_address);

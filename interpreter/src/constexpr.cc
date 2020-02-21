@@ -57,7 +57,7 @@ namespace complete
 			[](expression::GlobalVariable const &) { return false; },
 			[&](expression::MemberVariable const & var_node) { return is_constant_expression(*var_node.owner, program, constant_base_index); },
 			[](expression::Constant const &) { return true; },
-			[](expression::OverloadSet const &) { return true; },
+			//[](expression::OverloadSet const &) { return true; },
 			[&](expression::FunctionCall const & func_call_node)
 			{
 				return

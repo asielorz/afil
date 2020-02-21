@@ -515,10 +515,10 @@ namespace instantiation
 						complete_expression.variable_offset = var.variable_offset;
 						return complete_expression;
 					},
-					[](lookup_result::OverloadSet const & var) -> complete::Expression
+					[&](lookup_result::OverloadSet const & var) -> complete::Expression
 					{
-						complete::expression::OverloadSet complete_expression;
-						complete_expression.overload_set = var; // Move?
+						complete::expression::Constant complete_expression;
+						complete_expression.type = type_for_overload_set(*program, var);
 						return complete_expression;
 					},
 					[](auto const &) -> complete::Expression { declare_unreachable(); }
@@ -642,8 +642,11 @@ namespace instantiation
 				try_call_decl(complete::Function complete_function, instantiate_function_template(incomplete_expression.function, template_parameters, scope_stack, program));
 				FunctionId const function_id = add_function(*program, std::move(complete_function));
 
-				complete::expression::OverloadSet complete_expression;
-				complete_expression.overload_set.function_ids.push_back(function_id);
+				complete::OverloadSet overload_set;
+				overload_set.function_ids.push_back(function_id);
+
+				complete::expression::Constant complete_expression;
+				complete_expression.type = type_for_overload_set(*program, std::move(overload_set));
 				return std::move(complete_expression);
 			},
 			[&](incomplete::expression::FunctionTemplate const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
@@ -665,8 +668,11 @@ namespace instantiation
 
 				FunctionTemplateId const template_id =  add_function_template(*program, std::move(new_function_template));
 
-				complete::expression::OverloadSet complete_expression;
-				complete_expression.overload_set.function_template_ids.push_back(template_id);
+				complete::OverloadSet overload_set;
+				overload_set.function_template_ids.push_back(template_id);
+
+				complete::expression::Constant complete_expression;
+				complete_expression.type = type_for_overload_set(*program, std::move(overload_set));
 				return std::move(complete_expression);
 			},
 			[&](incomplete::expression::FunctionCall const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
@@ -676,16 +682,18 @@ namespace instantiation
 				for (incomplete::Expression const & incomplete_param : incomplete_expression.parameters)
 					try_call(parameters.push_back, instantiate_expression(incomplete_param, template_parameters, scope_stack, program, current_scope_return_type));
 
-				if (has_type<complete::expression::OverloadSet>(parameters[0]))
+				complete::TypeId const first_param_type = expression_type_id(parameters[0], *program);
+				if (first_param_type.is_function)
 				{
 					std::vector<complete::TypeId> parameter_types;
 					parameter_types.reserve(parameters.size() - 1);
 					for (size_t i = 1; i < parameters.size(); ++i)
 						parameter_types.push_back(expression_type_id(parameters[i], *program));
 
-					try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(
-						try_get<complete::expression::OverloadSet>(parameters[0])->overload_set,
-						{&parameters[1], parameter_types.size()}, parameter_types, *program));
+					complete::OverloadSetView const overload_set = overload_set_for_type(*program, first_param_type);
+
+					try_call_decl(FunctionId const function, 
+						resolve_function_overloading_and_insert_conversions(overload_set, {&parameters[1], parameter_types.size()}, parameter_types, *program));
 
 					if (function == invalid_function_id) return make_syntax_error("Overload not found.");
 					complete::expression::FunctionCall complete_expression;
@@ -975,11 +983,11 @@ namespace instantiation
 				// Main function, which is somewhat special.
 				if (incomplete_statement.variable_name == "main"sv)
 				{
-					auto const * const overload_set = try_get<complete::expression::OverloadSet>(expression);
-					if (!overload_set) return make_syntax_error("Attempted to use name \"main\" to name something other than a function.");
-					if (overload_set->overload_set.function_template_ids.size() != 0) return make_syntax_error("main cannot be a function template.");
-					if (overload_set->overload_set.function_ids.size() != 1) return make_syntax_error("main function cannot be overloaded.");
-					FunctionId const main_function_id = overload_set->overload_set.function_ids[0];
+					if (!var_type.is_function) return make_syntax_error("Attempted to use name \"main\" to name something other than a function.");
+					complete::OverloadSetView const overload_set = overload_set_for_type(*program, var_type);
+					if (overload_set.function_template_ids.size() != 0) return make_syntax_error("main cannot be a function template.");
+					if (overload_set.function_ids.size() != 1) return make_syntax_error("main function cannot be overloaded.");
+					FunctionId const main_function_id = overload_set.function_ids[0];
 
 					// Main must not take parameters and return int.
 					complete::Function const & main_function = program->functions[main_function_id.index];
@@ -994,16 +1002,16 @@ namespace instantiation
 
 					return std::nullopt;
 				}
-				else if (auto const * const overload_set = try_get<complete::expression::OverloadSet>(expression))
+				else if (var_type.is_function)
 				{
-					if (var_type != complete::TypeId::function) return make_syntax_error("A function must be declared with a let statement.");
-
 					if (does_function_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Function name collides with another name.");
 
-					for (FunctionId const function_id : overload_set->overload_set.function_ids)
+					complete::OverloadSetView const overload_set = overload_set_for_type(*program, var_type);
+
+					for (FunctionId const function_id : overload_set.function_ids)
 						top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
 
-					for (FunctionTemplateId const template_id : overload_set->overload_set.function_template_ids)
+					for (FunctionTemplateId const template_id : overload_set.function_template_ids)
 						top(scope_stack).function_templates.push_back({incomplete_statement.variable_name, template_id});
 
 					return std::nullopt;

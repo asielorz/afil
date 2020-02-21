@@ -152,6 +152,8 @@ namespace complete
 	{
 		if (id.is_reference)
 			return sizeof(void *);
+		else if (id.is_function)
+			return 0;
 		else
 			return type_with_id(program, id).size;
 	}
@@ -390,6 +392,22 @@ namespace complete
 			return program.extern_functions[id.index].is_callable_at_compile_time;
 		else
 			return program.functions[id.index].is_callable_at_compile_time;
+	}
+
+	auto type_for_overload_set(Program & program, OverloadSet overload_set) noexcept -> TypeId
+	{
+		TypeId new_type_id;
+		new_type_id.flat_value = 0;
+		new_type_id.is_function = true;
+		new_type_id.index = static_cast<unsigned>(program.overload_set_types.size());
+		program.overload_set_types.push_back(std::move(overload_set));
+		return new_type_id;
+	}
+
+	auto overload_set_for_type(Program const & program, TypeId overload_set_type) noexcept -> OverloadSetView
+	{
+		assert(overload_set_type.is_function);
+		return program.overload_set_types[overload_set_type.index];
 	}
 
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, SyntaxError>

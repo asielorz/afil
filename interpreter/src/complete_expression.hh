@@ -49,10 +49,10 @@ namespace complete
 			span<char const> value;
 		};
 
-		struct OverloadSet
-		{
-			complete::OverloadSet overload_set;
-		};
+		//struct OverloadSet
+		//{
+		//	complete::OverloadSet overload_set;
+		//};
 
 		struct FunctionCall
 		{
