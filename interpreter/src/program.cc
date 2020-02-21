@@ -463,9 +463,16 @@ namespace complete
 
 		new_type.extra_data = Type::Struct{static_cast<int>(program.structs.size())};
 		program.structs.push_back(std::move(new_struct));
+
+		Type::TemplateInstantiation template_instantiation;
+		template_instantiation.template_id = template_id;
+		template_instantiation.parameters.assign(parameters.begin(), parameters.end());
+		new_type.template_instantiation = std::move(template_instantiation);
+
 		TypeId const new_type_id = TypeId::with_index(static_cast<unsigned>(program.types.size()));
 		program.types.push_back(std::move(new_type));
 		struct_template.cached_instantiations.emplace(std::vector<TypeId>(parameters.begin(), parameters.end()), new_type_id);
+
 		return new_type_id;
 	}
 
@@ -579,9 +586,28 @@ namespace complete
 				else
 					return array_pointer_type_for(expected_pointee, program);
 			},
-			[](FunctionTemplateParameterType::TemplateInstantiation const & /*template_instantiation*/) -> TypeId
+			[&](FunctionTemplateParameterType::TemplateInstantiation const & template_instantiation) -> TypeId
 			{
-				mark_as_to_do("Dependent template instantiations");
+				Type const & type = type_with_id(program, given_parameter);
+				if (!type.template_instantiation.has_value() || type.template_instantiation->template_id != template_instantiation.template_id)
+					return TypeId::none;
+
+				if (template_instantiation.parameters.size() != type.template_instantiation->parameters.size())
+					return TypeId::none;
+
+				size_t const n = template_instantiation.parameters.size();
+				for (size_t i = 0; i < n; ++i)
+				{
+					TypeId const expected_param = expected_type_according_to_pattern(
+						type.template_instantiation->parameters[i],
+						template_instantiation.parameters[i],
+						resolved_dependent_types, program);
+
+					if (expected_param == TypeId::none)
+						return TypeId::none;
+				}
+
+				return decay(given_parameter);
 			}
 		);
 

@@ -34,9 +34,16 @@ namespace complete
 			int struct_index;
 		};
 
+		struct TemplateInstantiation
+		{
+			StructTemplateId template_id;
+			std::vector<TypeId> parameters;
+		};
+
 		int size;
 		int alignment;
 		std::variant<BuiltIn, Pointer, Array, ArrayPointer, Struct> extra_data;
+		std::optional<TemplateInstantiation> template_instantiation;
 	};
 
 	struct Function : Scope

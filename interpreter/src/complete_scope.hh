@@ -77,6 +77,9 @@ namespace complete
 	};
 
 	struct StructTemplateId { unsigned index; };
+	constexpr auto operator == (StructTemplateId a, StructTemplateId b) noexcept -> bool { return a.index == b.index; };
+	constexpr auto operator != (StructTemplateId a, StructTemplateId b) noexcept -> bool { return !(a == b); };
+
 	struct StructTemplateName
 	{
 		std::string name;

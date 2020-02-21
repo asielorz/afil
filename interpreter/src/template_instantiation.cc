@@ -202,9 +202,20 @@ namespace instantiation
 					resolve_function_template_parameter_type(*array_pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 				return complete::FunctionTemplateParameterType{std::move(array_pointer_type), false, false};
 			},
-			[](incomplete::TypeId::TemplateInstantiation const & /*template_instantiation*/) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
+			[&](incomplete::TypeId::TemplateInstantiation const & template_instantiation) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
 			{
-				mark_as_to_do("Dependent template instantiations");
+				auto const template_id = struct_template_with_name(template_instantiation.template_name, scope_stack);
+				if (!template_id.has_value())
+					return make_syntax_error("Struct template not found");
+
+				complete::FunctionTemplateParameterType::TemplateInstantiation template_instantiation_type;
+				template_instantiation_type.template_id = *template_id;
+				template_instantiation_type.parameters.reserve(template_instantiation.parameters.size());
+				for (incomplete::TypeId const & param : template_instantiation.parameters)
+					try_call(template_instantiation_type.parameters.push_back, 
+						resolve_function_template_parameter_type(param, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
+
+				return complete::FunctionTemplateParameterType{std::move(template_instantiation_type), false, false};
 			},
 			[](incomplete::TypeId::Deduce const &) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
 			{
@@ -344,6 +355,23 @@ namespace instantiation
 			return it->type;
 
 		return complete::TypeId::none;
+	}
+
+	auto struct_template_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> std::optional<complete::StructTemplateId>
+	{
+		auto const visitor = overload(
+			[](lookup_result::StructTemplate const & type) -> std::optional<complete::StructTemplateId>
+			{
+				return type.template_id;
+			},
+			[](auto const &) -> std::optional<complete::StructTemplateId>
+			{
+				return std::nullopt;
+			}
+		);
+
+		auto lookup = lookup_name(scope_stack, name);
+		return std::visit(visitor, lookup);
 	}
 
 	auto type_descriptor_for(complete::TypeId type_id, complete::Program const & program) noexcept -> callc::TypeDescriptor

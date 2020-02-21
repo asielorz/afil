@@ -59,6 +59,7 @@ namespace instantiation
 		>;
 	auto type_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> complete::TypeId;
 	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept -> complete::TypeId;
+	auto struct_template_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> std::optional<complete::StructTemplateId>;
 
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type,
