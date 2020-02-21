@@ -106,6 +106,24 @@ namespace parser
 		declare_unreachable();
 	}
 
+	auto parse_operator_tokens(span<lex::Token const> tokens, size_t & index) noexcept -> expected<std::string_view, SyntaxError>
+	{
+		if (tokens[index].type == TokenType::open_bracket)
+		{
+			index++;
+			if (tokens[index].type != TokenType::close_bracket) 
+				return make_syntax_error("Expected operator after '(' in function declaration.");
+			index++;
+			return "[]"sv;
+		}
+		else
+		{
+			if (tokens[index].type != TokenType::operator_) 
+				return make_syntax_error("Expected operator name after keyword \"operator\".");
+			return tokens[index++].source;
+		}
+	}
+
 	auto is_unary_operator(lex::Token const & token) noexcept -> bool
 	{
 		return token.type == TokenType::operator_ &&
@@ -661,6 +679,14 @@ namespace parser
 			return incomplete::expression::Literal<bool>{tokens[index++].source[0] == 't'}; // if it starts with t it must be true, and otherwise it must be false.
 		else if (tokens[index].type == TokenType::literal_string)
 			return incomplete::expression::Literal<std::string>{parse_string_literal(tokens[index++].source)};
+		else if (tokens[index].source == "operator")
+		{
+			index++;
+			try_call_decl(std::string_view const name, parse_operator_tokens(tokens, index));
+			incomplete::expression::Identifier id_node;
+			id_node.name = name;
+			return std::move(id_node);
+		}
 		else if (tokens[index].source == "data")
 		{
 			index++;
@@ -844,18 +870,7 @@ namespace parser
 		if (tokens[index].source == "operator"sv)
 		{
 			index++;
-			if (tokens[index].type == TokenType::open_bracket)
-			{
-				index++;
-				if (tokens[index].type != TokenType::close_bracket) return make_syntax_error("Expected operator after '(' in function declaration.");
-				name = "[]"sv;
-			}
-			else
-			{
-				if (tokens[index].type != TokenType::operator_) return make_syntax_error("Expected operator name after keyword \"operator\".");
-				name = tokens[index].source;
-			}
-			index++;
+			try_call(assign_to(name), parse_operator_tokens(tokens, index));
 		}
 		else
 		{

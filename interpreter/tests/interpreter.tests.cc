@@ -1942,12 +1942,70 @@ TEST_CASE("Higher order function templates")
 	REQUIRE(tests::parse_and_run(src) == 9);
 }
 
+TEST_CASE("Passing an overload set to a template")
+{
+	auto const src = R"(
+		let invoke = fn<F, T>(F f, T a, T b)
+		{
+			return f(a, b);
+		};
+		
+		let add = fn(int a, int b) { return a + b; };
+		let add = fn(float a, float b) { return a + b; };
+
+		let main = fn() -> int
+		{
+			return invoke(add, 4, 5);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 9);
+}
+
+TEST_CASE("Passing a template to a template")
+{
+	auto const src = R"(
+		let invoke = fn<F, T>(F f, T a, T b)
+		{
+			return f(a, b);
+		};
+		
+		let add = fn<T>(T a, T b) { return a + b; };
+
+		let main = fn() -> int
+		{
+			return invoke(add, 4, 5);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 9);
+}
+
+TEST_CASE("Passing an operator overload set to a template")
+{
+	auto const src = R"(
+		let invoke = fn<F, T>(F f, T a, T b)
+		{
+			return f(a, b);
+		};
+		
+		let main = fn() -> int
+		{
+			return invoke(operator+, 4, 5);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 9);
+}
+
 /*****************************************************************
 Backlog
 - contracts
 - concepts
-- a consistent system for typing overload sets
+- semantic analysis on templates based on concepts (depends on concepts)
 - synthesizing arithmetic operators
 - destructor and copy operations
+- reflection
+- currying (maybe, maybe at library level?)
 - some minimalistic standard library
 *****************************************************************/
