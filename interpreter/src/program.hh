@@ -165,6 +165,7 @@ namespace complete
 	auto add_type(Program & program, Type new_type) noexcept -> TypeId;
 	auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
 	auto type_size(Program const & program, TypeId id) noexcept -> int;
+	auto type_alignment(Program const & program, TypeId id) noexcept -> int;
 	auto is_default_constructible(Struct const & type) noexcept -> bool;
 	auto is_default_constructible(TypeId type, Program const & program) noexcept -> bool;
 	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> expression::Constructor;

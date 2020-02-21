@@ -12,12 +12,12 @@ namespace complete
 	TypeId const TypeId::bool_ = {false, false, false, 3};
 	TypeId const TypeId::char_ = {false, false, false, 4};
 
-	TypeId const TypeId::none = {true, false, false, 0};
-	TypeId const TypeId::deduce = {true, false, false, 2};
+	TypeId const TypeId::none = {false, false, false, (1 << 29) - 1};
+	TypeId const TypeId::deduce = {false, false, false, (1 << 29) - 1 };
 
 	auto is_data_type(TypeId id) noexcept -> bool
 	{
-		return !id.is_language_reseved && id.index != TypeId::void_.index;
+		return id.index != TypeId::void_.index && id.index != TypeId::none.index && id.index != TypeId::deduce.index;
 	}
 
 	auto is_convertible(TypeId from, TypeId to, Program const & program) noexcept -> bool
@@ -26,34 +26,41 @@ namespace complete
 		if (from == to)
 			return true;
 
-		if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) &&
-			!from.is_reference && !to.is_reference)
+		// Conversions between same types but different mutable/reference qualifiers.
+		if (from.index == to.index)
 		{
-			TypeId const from_pointee = pointee_type(from, program);
-			TypeId const to_pointee = pointee_type(to, program);
-			if (from_pointee.index == to_pointee.index)
+			// Both T and any reference are convertible to T.
+			if (!to.is_reference)
+				return true;
+
+			// Both T and any reference are convertible to const &
+			if (!to.is_mutable)
+				return true;
+
+			// Mutable reference is convertible to everything.
+			if (from.is_mutable && from.is_reference)
+				return true;
+		}
+		// Conversions between different types.
+		else
+		{
+			// Function types are not convertible to anything.
+			if (from.is_function || to.is_function)
+				return false;
+
+			if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) &&
+				!from.is_reference && !to.is_reference)
 			{
-				// If converting from a mutable pointer or to an immutable pointer of the same type, conversion is allowed.
-				if (!to_pointee.is_mutable && from_pointee.is_mutable)
-					return true;
+				TypeId const from_pointee = pointee_type(from, program);
+				TypeId const to_pointee = pointee_type(to, program);
+				if (from_pointee.index == to_pointee.index)
+				{
+					// If converting from a mutable pointer or to an immutable pointer of the same type, conversion is allowed.
+					if (!to_pointee.is_mutable && from_pointee.is_mutable)
+						return true;
+				}
 			}
 		}
-
-		// No conversions between different types (for now).
-		if (from.index != to.index)
-			return false;
-
-		// Both T and any reference are convertible to T.
-		if (!to.is_reference)
-			return true;
-
-		// Both T and any reference are convertible to const &
-		if (!to.is_mutable)
-			return true;
-
-		// Mutable reference is convertible to everything.
-		if (from.is_mutable && from.is_reference)
-			return true;
 
 		// Otherwise there is no conversion.
 		return false;
@@ -100,7 +107,6 @@ namespace complete
 
 	auto assign_without_qualifiers(TypeId & dst, TypeId src) noexcept -> void
 	{
-		dst.is_language_reseved = src.is_language_reseved;
 		dst.is_function = src.is_function;
 		dst.index = src.index;
 	}

@@ -29,7 +29,6 @@ namespace complete
 				return var_type;
 			},
 			[](expression::Constant const & constant) { return make_reference(constant.type); },
-			//[](expression::OverloadSet const &) { return TypeId::function; },
 			[&](expression::FunctionCall const & func_call_node) { return return_type(program, func_call_node.function_id); },
 			[](expression::RelationalOperatorCall const &) { return TypeId::bool_; },
 			[](expression::Constructor const & ctor_node) { return ctor_node.constructed_type; },

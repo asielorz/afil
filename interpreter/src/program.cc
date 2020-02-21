@@ -144,7 +144,7 @@ namespace complete
 
 	auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &
 	{
-		assert(!id.is_language_reseved);
+		assert(!id.is_function && id.index < program.types.size());
 		return program.types[id.index];
 	}
 
@@ -158,6 +158,16 @@ namespace complete
 			return type_with_id(program, id).size;
 	}
 
+	auto type_alignment(Program const & program, TypeId id) noexcept -> int
+	{
+		if (id.is_reference)
+			return alignof(void *);
+		else if (id.is_function)
+			return 1;
+		else
+			return type_with_id(program, id).alignment;
+	}
+
 	auto is_default_constructible(Struct const & type) noexcept -> bool
 	{
 		return std::all_of(type.member_variables, [](MemberVariable const & var) { return var.initializer_expression.has_value(); });
@@ -165,7 +175,7 @@ namespace complete
 
 	auto is_default_constructible(TypeId type_id, Program const & program) noexcept -> bool
 	{
-		if (type_id.is_language_reseved)
+		if (type_id.is_function)
 			return false;
 
 		Type const & type = type_with_id(program, type_id);

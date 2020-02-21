@@ -17,16 +17,15 @@ namespace complete
 		{
 			struct
 			{
-				unsigned is_language_reseved : 1;
 				unsigned is_mutable : 1;
 				unsigned is_reference : 1;
 				unsigned is_function : 1;
-				unsigned index : 28;
+				unsigned index : 29;
 			};
 			unsigned flat_value;
 		};
 
-		static constexpr auto with_index(unsigned index) noexcept -> TypeId { return TypeId{ false, false, false, index }; }
+		static constexpr auto with_index(unsigned index) noexcept -> TypeId { return TypeId{false, false, false, index}; }
 		static constexpr auto zero_initialized() noexcept -> TypeId { return with_index(0); }
 
 		static TypeId const void_; // TODO: Maybe void can be confusing so think of another name?
@@ -119,16 +118,16 @@ namespace complete
 namespace complete
 {
 	struct Type;
-	auto type_with_id(Program const & program, TypeId id) noexcept -> Type const &;
+	auto type_size(Program const & program, TypeId id) noexcept -> int;
+	auto type_alignment(Program const & program, TypeId id) noexcept -> int;
 
 	template <typename T>
 	auto add_variable_to_scope(
 		std::vector<T> & variables, int & scope_size, int & scope_alignment,
 		std::string_view name, complete::TypeId type_id, int scope_offset, complete::Program const & program) -> int
 	{
-		complete::Type const & type = type_with_id(program, type_id);
-		int const size = type_id.is_reference ? sizeof(void *) : type.size;
-		int const alignment = type_id.is_reference ? alignof(void *) : type.alignment;
+		int const size = type_size(program, type_id);
+		int const alignment = type_alignment(program, type_id);
 
 		T var;
 		var.name = name;
