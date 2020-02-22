@@ -2007,5 +2007,6 @@ Backlog
 - destructor and copy operations
 - reflection
 - currying (maybe, maybe at library level?)
+- separation of the program in modules
 - some minimalistic standard library
 *****************************************************************/
