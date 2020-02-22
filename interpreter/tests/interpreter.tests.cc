@@ -1832,8 +1832,8 @@ TEST_CASE("A program can be parsed incrementally")
 		};
 	)"sv;
 
-	complete::Program program = *afil::parse_source(file1);
-	(void)afil::parse_source(file2, out(program));
+	complete::Program program = tests::assert_get(afil::parse_source(file1));
+	afil::parse_source(file2, out(program));
 	REQUIRE(interpreter::run(program) == 8);
 }
 
