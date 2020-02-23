@@ -19,6 +19,16 @@ namespace tests
 		return std::move(*e);
 	}
 
+	template <typename Error>
+	auto require_ok(expected<void, Error> e) -> void
+	{
+		if (!e.has_value())
+		{
+			INFO(e.error().error_message);
+			REQUIRE(e.has_value());
+		}
+	}
+
 	auto parse_and_run(std::string_view src) -> int
 	{
 		complete::Program const program = assert_get(afil::parse_source(src));
@@ -1833,7 +1843,7 @@ TEST_CASE("A program can be parsed incrementally")
 	)"sv;
 
 	complete::Program program = tests::assert_get(afil::parse_source(file1));
-	afil::parse_source(file2, out(program));
+	tests::require_ok(afil::parse_source(file2, out(program)));
 	REQUIRE(interpreter::run(program) == 8);
 }
 
@@ -1998,6 +2008,20 @@ TEST_CASE("Passing an operator overload set to a template")
 	REQUIRE(tests::parse_and_run(src) == 9);
 }
 
+TEST_CASE("Deduction of array size")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let a = int[](1, 2, 3, 4, 5);
+
+			return size(a);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - contracts
@@ -2006,6 +2030,7 @@ Backlog
 - synthesizing arithmetic operators
 - destructor and copy operations
 - reflection
+- namespaces
 - currying (maybe, maybe at library level?)
 - separation of the program in modules
 - some minimalistic standard library

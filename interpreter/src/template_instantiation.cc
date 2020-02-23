@@ -851,6 +851,24 @@ namespace instantiation
 						try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(complete_param), array_type, *program));
 					}
 				}
+				// Not an actual array pointer but array type with deduced size.
+				else if (is_array_pointer(constructed_type))
+				{
+					int const param_count = static_cast<int>(incomplete_expression.parameters.size());
+
+					complete::TypeId const value_type = pointee_type(constructed_type);
+					complete::TypeId const constructed_array_type = array_type_for(value_type, param_count, *program);
+					complete_expression.constructed_type = constructed_array_type;
+
+					complete_expression.parameters.reserve(param_count);
+					for (int i = 0; i < param_count; ++i)
+					{
+						try_call_decl(complete::Expression complete_param,
+							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type));
+
+						try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(complete_param), value_type, *program));
+					}
+				}
 				else
 				{
 					declare_unreachable();
