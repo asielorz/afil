@@ -23,6 +23,7 @@ namespace complete
 			{"float", {4, 4}},
 			{"bool",  {1, 1}},
 			{"char",  {1, 1}},
+			{"type",  {4, 4}},
 		};
 	}
 
@@ -32,6 +33,7 @@ namespace complete
 	template <> struct index_for_type<float> { static constexpr unsigned value = 2; };
 	template <> struct index_for_type<bool> { static constexpr unsigned value = 3; };
 	template <> struct index_for_type<unsigned char> { static constexpr unsigned value = 4; };
+	template <> struct index_for_type<complete::TypeId> { static constexpr unsigned value = 5; };
 	template <typename T> constexpr unsigned index_for_type_v = index_for_type<T>::value;
 
 	using mpl::BoxedType;

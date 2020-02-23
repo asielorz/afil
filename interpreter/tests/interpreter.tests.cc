@@ -2022,6 +2022,18 @@ TEST_CASE("Deduction of array size")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("Functions that take types as parameters")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			return alignment(int);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
+}
+
 /*****************************************************************
 Backlog
 - contracts
