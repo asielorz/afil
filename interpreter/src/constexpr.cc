@@ -52,6 +52,7 @@ namespace complete
 			[](expression::Literal<int>) { return true; },
 			[](expression::Literal<float>) { return true; },
 			[](expression::Literal<bool>) { return true; },
+			[](expression::Literal<uninit_t>) { return true; },
 			[](expression::StringLiteral const &) { return true; },
 			[&](expression::LocalVariable const & var_node) { return var_node.variable_offset >= constant_base_index; },
 			[](expression::GlobalVariable const &) { return false; },

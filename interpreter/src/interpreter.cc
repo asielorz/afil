@@ -161,6 +161,7 @@ namespace interpreter
 			[&](expression::Literal<int> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<float> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<bool> literal) { write(stack, return_address, literal.value); },
+			[&](expression::Literal<uninit_t>) {},
 			[&](expression::StringLiteral literal) 
 			{
 				write(stack, return_address, literal.value.data(), static_cast<int>(literal.value.size())); 

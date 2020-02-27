@@ -19,6 +19,7 @@ namespace complete
 			[](expression::Literal<float>) { return TypeId::float_; },
 			[](expression::Literal<bool>) { return TypeId::bool_; },
 			[](expression::StringLiteral const & str_node) { return str_node.type; },
+			[](expression::Literal<uninit_t>) { return TypeId::uninit_t; },
 			[](expression::Variable const & var_node) { return make_reference(var_node.variable_type); },
 			[&](expression::MemberVariable const & var_node)
 			{

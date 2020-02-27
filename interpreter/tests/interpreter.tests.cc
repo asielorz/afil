@@ -2022,17 +2022,30 @@ TEST_CASE("Deduction of array size")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
-TEST_CASE("Functions that take types as parameters")
+TEST_CASE("uninit allows for not initializing an object")
 {
 	auto const src = R"(
 		let main = fn() -> int
 		{
-			return alignment(int);
+			int mut a = uninit;
+			return a;
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src) == 4);
+	tests::parse_and_run(src);
 }
+
+//TEST_CASE("Functions that take types as parameters")
+//{
+//	auto const src = R"(
+//		let main = fn() -> int
+//		{
+//			return alignment(int);
+//		};
+//	)"sv;
+//
+//	REQUIRE(tests::parse_and_run(src) == 4);
+//}
 
 /*****************************************************************
 Backlog

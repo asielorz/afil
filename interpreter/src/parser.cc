@@ -679,6 +679,11 @@ namespace parser
 			return incomplete::expression::Literal<bool>{tokens[index++].source[0] == 't'}; // if it starts with t it must be true, and otherwise it must be false.
 		else if (tokens[index].type == TokenType::literal_string)
 			return incomplete::expression::Literal<std::string>{parse_string_literal(tokens[index++].source)};
+		else if (tokens[index].source == "uninit")
+		{
+			index++;
+			return incomplete::expression::Literal<uninit_t>();
+		}
 		else if (tokens[index].source == "operator")
 		{
 			index++;

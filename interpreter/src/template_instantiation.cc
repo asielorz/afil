@@ -490,6 +490,10 @@ namespace instantiation
 				complete_expression.type = array_type_for(complete::TypeId::char_, static_cast<int>(complete_expression.value.size()), *program);
 				return complete_expression;
 			},
+			[](incomplete::expression::Literal<uninit_t> const &) -> expected<complete::Expression, SyntaxError>
+			{
+				return complete::expression::Literal<uninit_t>();
+			},
 			[&](incomplete::expression::Identifier const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
 			{
 				auto const lookup = lookup_name(scope_stack, incomplete_expression.name);
@@ -998,6 +1002,9 @@ namespace instantiation
 				if (decay(var_type) == complete::TypeId::deduce)
 					assign_without_qualifiers(var_type, assigned_expression_type);
 
+				if (decay(var_type) == complete::TypeId::uninit_t)
+					return make_syntax_error("Cannot declare variable of type uninit_t.");
+
 				// Main function, which is somewhat special.
 				if (incomplete_statement.variable_name == "main"sv)
 				{
@@ -1033,6 +1040,19 @@ namespace instantiation
 						top(scope_stack).function_templates.push_back({incomplete_statement.variable_name, template_id});
 
 					return std::nullopt;
+				}
+				else if (assigned_expression_type == complete::TypeId::uninit_t)
+				{
+					if (var_type.is_reference) return make_syntax_error("Cannot initialize a reference with uninit.");
+					if (!var_type.is_mutable) return make_syntax_error("Cannot initialize a constant with uninit.");
+					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Variable name collides with another name.");
+
+					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
+
+					complete::statement::VariableDeclaration complete_statement;
+					complete_statement.variable_offset = var_offset;
+					complete_statement.assigned_expression = std::move(expression);
+					return std::move(complete_statement);
 				}
 				else if (!var_type.is_mutable && is_constant_expression(expression, *program, next_block_scope_offset(scope_stack)))
 				{

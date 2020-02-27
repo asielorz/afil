@@ -1,5 +1,6 @@
 #pragma once
 
+#include "built_in_structures.hh"
 #include "incomplete_scope.hh"
 #include "operator.hh"
 
@@ -111,7 +112,7 @@ namespace incomplete
 		namespace detail
 		{
 			using ExpressionTreeBase = std::variant<
-				Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>,
+				Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<uninit_t>,
 				Dereference, Addressof, Subscript,
 				Identifier, MemberVariable,
 				Function, FunctionTemplate,	

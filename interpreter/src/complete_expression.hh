@@ -1,7 +1,8 @@
 #pragma once
 
-#include "operator.hh"
+#include "built_in_structures.hh"
 #include "function_id.hh"
+#include "operator.hh"
 #include "complete_scope.hh"
 #include "utils/value_ptr.hh"
 #include "utils/span.hh"
@@ -110,7 +111,7 @@ namespace complete
 		namespace detail
 		{
 			using ExpressionTreeBase = std::variant<
-				Literal<int>, Literal<float>, Literal<bool>, StringLiteral,
+				Literal<int>, Literal<float>, Literal<bool>, StringLiteral, Literal<uninit_t>,
 				LocalVariable, GlobalVariable, MemberVariable, Constant,
 				FunctionCall, RelationalOperatorCall, Assignment,
 				Constructor,
