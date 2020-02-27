@@ -16,6 +16,14 @@ namespace incomplete
 			incomplete::TypeId type;
 		};
 
+		struct LetDeclaration
+		{
+			std::string variable_name;
+			Expression assigned_expression;
+			bool is_mutable;
+			bool is_reference;
+		};
+
 		struct ExpressionStatement
 		{
 			Expression expression;
@@ -57,7 +65,6 @@ namespace incomplete
 		struct Break {};
 		struct Continue {};
 
-
 		struct ImportBlock
 		{
 			std::vector<ExternFunction> imported_functions;
@@ -76,7 +83,7 @@ namespace incomplete
 		namespace detail
 		{
 			using StatementBase = std::variant<
-				VariableDeclaration, ExpressionStatement,
+				VariableDeclaration, LetDeclaration, ExpressionStatement,
 				If, StatementBlock, While, For,
 				Return, Break, Continue,
 				StructDeclaration, StructTemplateDeclaration,

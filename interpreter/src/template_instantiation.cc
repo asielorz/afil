@@ -976,10 +976,61 @@ namespace instantiation
 					return std::move(complete_statement);
 				}
 
-				// Hack for recursive functions
-				if (has_type<incomplete::expression::Function>(*incomplete_statement.assigned_expression) && incomplete_statement.variable_name != "main")
+				try_call_decl(complete::Expression expression,
+					instantiate_expression(*incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type));
+				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
+				try_call_decl(complete::TypeId var_type, resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program));
+				if (decay(var_type) == complete::TypeId::deduce)
+					assign_without_qualifiers(var_type, assigned_expression_type);
+
+				if (decay(var_type) == complete::TypeId::uninit_t)
+					return make_syntax_error("Cannot declare variable of type uninit_t.");
+
+				if (!var_type.is_mutable && is_constant_expression(expression, *program, next_block_scope_offset(scope_stack)))
 				{
-					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(*incomplete_statement.assigned_expression)->function;
+					complete::Constant constant;
+					constant.type = var_type;
+					constant.value.resize(type_size(*program, var_type));
+					constant.name = incomplete_statement.variable_name;
+
+					try_call(assign_to(expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
+					evaluate_constant_expression(std::move(expression), *program, next_block_scope_offset(scope_stack), constant.value.data());
+
+					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Constant name collides with another name.");
+
+					top(scope_stack).constants.push_back(std::move(constant));
+
+					return std::nullopt;
+				}
+				else
+				{
+					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Variable name collides with another name.");
+
+					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
+
+					complete::statement::VariableDeclaration complete_statement;
+					complete_statement.variable_offset = var_offset;
+
+					if (assigned_expression_type == complete::TypeId::uninit_t)
+					{
+						if (var_type.is_reference) return make_syntax_error("Cannot initialize a reference with uninit.");
+						if (!var_type.is_mutable) return make_syntax_error("Cannot initialize a constant with uninit.");
+						complete_statement.assigned_expression = std::move(expression);
+					}
+					else
+					{
+						if (!is_convertible(assigned_expression_type, var_type, *program)) return make_syntax_error("Cannot convert to variable type in variable declaration.");
+						try_call(assign_to(complete_statement.assigned_expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
+					}
+					return std::move(complete_statement);
+				}
+			},
+			[&](incomplete::statement::LetDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			{
+				// Hack for recursive functions
+				if (has_type<incomplete::expression::Function>(incomplete_statement.assigned_expression) && incomplete_statement.variable_name != "main")
+				{
+					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(incomplete_statement.assigned_expression)->function;
 
 					complete::Function function;
 					try_call_void(instantiate_function_prototype(incomplete_function, template_parameters, scope_stack, program, out(function)));
@@ -987,7 +1038,7 @@ namespace instantiation
 					if (does_function_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Function name collides with another name.");
 
 					FunctionId const function_id = add_function(*program, function);
-					top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
+					top(scope_stack).functions.push_back({ incomplete_statement.variable_name, function_id });
 
 					try_call_void(instantiate_function_body(incomplete_function, template_parameters, scope_stack, program, out(function)));
 					program->functions[function_id.index] = std::move(function);
@@ -996,11 +1047,9 @@ namespace instantiation
 				}
 
 				try_call_decl(complete::Expression expression,
-					instantiate_expression(*incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type));
+					instantiate_expression(incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
-				try_call_decl(complete::TypeId var_type, resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program));
-				if (decay(var_type) == complete::TypeId::deduce)
-					assign_without_qualifiers(var_type, assigned_expression_type);
+				complete::TypeId const var_type = make_mutable(make_reference(assigned_expression_type, incomplete_statement.is_reference), incomplete_statement.is_mutable);
 
 				if (decay(var_type) == complete::TypeId::uninit_t)
 					return make_syntax_error("Cannot declare variable of type uninit_t.");
@@ -1034,25 +1083,12 @@ namespace instantiation
 					complete::OverloadSetView const overload_set = overload_set_for_type(*program, var_type);
 
 					for (FunctionId const function_id : overload_set.function_ids)
-						top(scope_stack).functions.push_back({incomplete_statement.variable_name, function_id});
+						top(scope_stack).functions.push_back({ incomplete_statement.variable_name, function_id });
 
 					for (FunctionTemplateId const template_id : overload_set.function_template_ids)
-						top(scope_stack).function_templates.push_back({incomplete_statement.variable_name, template_id});
+						top(scope_stack).function_templates.push_back({ incomplete_statement.variable_name, template_id });
 
 					return std::nullopt;
-				}
-				else if (assigned_expression_type == complete::TypeId::uninit_t)
-				{
-					if (var_type.is_reference) return make_syntax_error("Cannot initialize a reference with uninit.");
-					if (!var_type.is_mutable) return make_syntax_error("Cannot initialize a constant with uninit.");
-					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Variable name collides with another name.");
-
-					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
-
-					complete::statement::VariableDeclaration complete_statement;
-					complete_statement.variable_offset = var_offset;
-					complete_statement.assigned_expression = std::move(expression);
-					return std::move(complete_statement);
 				}
 				else if (!var_type.is_mutable && is_constant_expression(expression, *program, next_block_scope_offset(scope_stack)))
 				{

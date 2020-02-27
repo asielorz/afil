@@ -68,15 +68,15 @@ namespace complete
 		return false;
 	}
 
-	auto make_reference(TypeId type) noexcept -> TypeId
+	auto make_reference(TypeId type, bool is_reference) noexcept -> TypeId
 	{
-		type.is_reference = true;
+		type.is_reference = is_reference;
 		return type;
 	}
 
-	auto make_mutable(TypeId type) noexcept -> TypeId
+	auto make_mutable(TypeId type, bool is_mutable) noexcept -> TypeId
 	{
-		type.is_mutable = true;
+		type.is_mutable = is_mutable;
 		return type;
 	}
 

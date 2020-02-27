@@ -847,7 +847,7 @@ namespace parser
 	//******************************************************************************************************************************************************************
 	//******************************************************************************************************************************************************************
 
-	auto parse_let_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::VariableDeclaration, SyntaxError>
+	auto parse_let_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::LetDeclaration, SyntaxError>
 	{
 		// Skip let token.
 		index++;
@@ -890,12 +890,11 @@ namespace parser
 		// If the expression returns a function, bind it to its name and return a noop.
 		try_call_decl(incomplete::Expression expression, parse_expression(tokens, index, type_names));
 
-		incomplete::statement::VariableDeclaration statement;
+		incomplete::statement::LetDeclaration statement;
 		statement.variable_name = name;
 		statement.assigned_expression = std::move(expression);
-		statement.type.value = incomplete::TypeId::Deduce();
-		statement.type.is_mutable = is_mutable;
-		statement.type.is_reference = is_reference;
+		statement.is_mutable = is_mutable;
+		statement.is_reference = is_reference;
 		return std::move(statement);
 	}
 

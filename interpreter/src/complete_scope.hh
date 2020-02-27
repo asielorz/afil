@@ -45,8 +45,8 @@ namespace complete
 
 	auto is_data_type(TypeId id) noexcept -> bool;
 	auto is_convertible(TypeId from, TypeId to, Program const & program) noexcept -> bool;
-	auto make_reference(TypeId type) noexcept->TypeId;
-	auto make_mutable(TypeId type) noexcept->TypeId;
+	auto make_reference(TypeId type, bool is_reference = true) noexcept->TypeId;
+	auto make_mutable(TypeId type, bool is_mutable = true) noexcept->TypeId;
 	auto remove_reference(TypeId type) noexcept->TypeId;
 	auto decay(TypeId type) noexcept->TypeId;
 	auto common_type(TypeId a, TypeId b, Program const & program) noexcept->TypeId; // Returns TypeID::none if there is no common type.
