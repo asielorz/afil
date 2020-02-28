@@ -2052,6 +2052,8 @@ TEST_CASE("uninit allows for not initializing an object")
 
 /*****************************************************************
 Backlog
+- good errors (very tied to modules)
+- separation of the program in modules
 - contracts
 - concepts
 - semantic analysis on templates based on concepts (depends on concepts)
@@ -2060,6 +2062,5 @@ Backlog
 - reflection
 - namespaces
 - currying (maybe, maybe at library level?)
-- separation of the program in modules
 - some minimalistic standard library
 *****************************************************************/

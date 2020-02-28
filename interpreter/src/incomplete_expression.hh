@@ -111,7 +111,7 @@ namespace incomplete
 
 		namespace detail
 		{
-			using ExpressionTreeBase = std::variant<
+			using ExpressionBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<uninit_t>,
 				Dereference, Addressof, Subscript,
 				Identifier, MemberVariable,
@@ -125,12 +125,23 @@ namespace incomplete
 
 	} // namespace expression
 
-	struct Expression : public expression::detail::ExpressionTreeBase
+	//struct Expression : public expression::detail::ExpressionBase
+	//{
+	//	using Base = expression::detail::ExpressionBase;
+	//	using Base::Base;
+	//	constexpr auto as_variant() noexcept -> Base & { return *this; }
+	//	constexpr auto as_variant() const noexcept -> Base const & { return *this; }
+	//};
+	struct Expression
 	{
-		using Base = expression::detail::ExpressionTreeBase;
-		using Base::Base;
-		constexpr auto as_variant() noexcept -> Base & { return *this; }
-		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
+		Expression() noexcept = default;
+		Expression(expression::detail::ExpressionBase var, std::string_view src) noexcept
+			: variant(std::move(var))
+			, source(src)
+		{}
+
+		expression::detail::ExpressionBase variant;
+		std::string_view source;
 	};
 
 	struct MemberVariable

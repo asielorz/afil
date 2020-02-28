@@ -672,17 +672,49 @@ namespace parser
 		else if (tokens[index].type == TokenType::open_brace)
 			return parse_statement_block_expression(tokens, index, type_names);
 		else if (tokens[index].type == TokenType::literal_int)
-			return incomplete::expression::Literal<int>{parse_number_literal<int>(tokens[index++].source)};
+		{
+			auto expr = incomplete::Expression(
+				incomplete::expression::Literal<int>{parse_number_literal<int>(tokens[index].source)},
+				tokens[index].source
+			);
+			index++;
+			return std::move(expr);
+		}
 		else if (tokens[index].type == TokenType::literal_float)
-			return incomplete::expression::Literal<float>{parse_number_literal<float>(tokens[index++].source)};
+		{
+			auto expr = incomplete::Expression(
+				incomplete::expression::Literal<float>{parse_number_literal<float>(tokens[index].source)},
+				tokens[index].source
+			);
+			index++;
+			return std::move(expr);
+		}
 		else if (tokens[index].type == TokenType::literal_bool)
-			return incomplete::expression::Literal<bool>{tokens[index++].source[0] == 't'}; // if it starts with t it must be true, and otherwise it must be false.
+		{
+			auto expr = incomplete::Expression(
+				incomplete::expression::Literal<bool>{tokens[index++].source[0] == 't'},
+				tokens[index].source
+			);
+			index++;
+			return std::move(expr);
+		}
 		else if (tokens[index].type == TokenType::literal_string)
-			return incomplete::expression::Literal<std::string>{parse_string_literal(tokens[index++].source)};
+		{
+			auto expr = incomplete::Expression(
+				incomplete::expression::Literal<std::string>{parse_string_literal(tokens[index++].source)},
+				tokens[index].source
+			);
+			index++;
+			return std::move(expr);
+		}
 		else if (tokens[index].source == "uninit")
 		{
+			auto expr = incomplete::Expression(
+				incomplete::expression::Literal<uninit_t>(),
+				tokens[index].source
+			);
 			index++;
-			return incomplete::expression::Literal<uninit_t>();
+			return std::move(expr);
 		}
 		else if (tokens[index].source == "operator")
 		{

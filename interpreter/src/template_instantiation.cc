@@ -947,7 +947,7 @@ namespace instantiation
 			}
 		);
 
-		return std::visit(visitor, incomplete_expression_.as_variant());
+		return std::visit(visitor, incomplete_expression_.variant);
 	}
 
 	auto instantiate_statement(
@@ -1028,9 +1028,9 @@ namespace instantiation
 			[&](incomplete::statement::LetDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				// Hack for recursive functions
-				if (has_type<incomplete::expression::Function>(incomplete_statement.assigned_expression) && incomplete_statement.variable_name != "main")
+				if (has_type<incomplete::expression::Function>(incomplete_statement.assigned_expression.variant) && incomplete_statement.variable_name != "main")
 				{
-					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(incomplete_statement.assigned_expression)->function;
+					incomplete::Function const & incomplete_function = try_get<incomplete::expression::Function>(incomplete_statement.assigned_expression.variant)->function;
 
 					complete::Function function;
 					try_call_void(instantiate_function_prototype(incomplete_function, template_parameters, scope_stack, program, out(function)));
