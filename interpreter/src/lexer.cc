@@ -87,7 +87,7 @@ namespace lex
 		return chars_skipped;
 	}
 
-	auto skip_comments(std::string_view src, int index) noexcept -> expected<int, SyntaxError>
+	auto skip_comments(std::string_view src, int index) noexcept -> expected<int, PartialSyntaxError>
 	{
 		if (starts_with(src, index, "//"sv))
 		{
@@ -100,14 +100,14 @@ namespace lex
 		else if (starts_with(src, index, "/*"sv))
 		{
 			size_t const comment_end = src.find("*/"sv, index);
-			if (comment_end == std::string_view::npos) return make_syntax_error("A C comment must be closed."); 
+			if (comment_end == std::string_view::npos) return make_syntax_error(src.data() + index, src.data() + index + 2, "A C comment must be closed.");
 			return static_cast<int>(comment_end + 2) - index;
 		}
 		else
 			return 0;
 	}
 
-	auto skip_whitespace_and_comments(std::string_view src, int index) noexcept -> expected<int, SyntaxError>
+	auto skip_whitespace_and_comments(std::string_view src, int index) noexcept -> expected<int, PartialSyntaxError>
 	{
 		int original_index = index;
 		for (;;)
@@ -130,7 +130,7 @@ namespace lex
 		return length;
 	}
 
-	auto token_type_and_length_number(std::string_view src, int index) noexcept -> expected<std::pair<Token::Type, int>, SyntaxError>
+	auto token_type_and_length_number(std::string_view src, int index) noexcept -> expected<std::pair<Token::Type, int>, PartialSyntaxError>
 	{
 		bool dot_read = false;
 		bool exp_read = false;
@@ -154,7 +154,7 @@ namespace lex
 			else if (is_valid_after_literal(src[end]))
 				break;
 			else
-				return make_syntax_error("Unrecognized char in number literal.");
+				return make_syntax_error(src.data() + end, src.data() + end + 1, "Unrecognized char in number literal.");
 		}
 
 		return std::pair<Token::Type, int>{
@@ -196,7 +196,7 @@ namespace lex
 		return length;
 	}
 
-	auto next_token_type_and_length(std::string_view src, int index) noexcept -> expected<std::pair<Token::Type, int>, SyntaxError>
+	auto next_token_type_and_length(std::string_view src, int index) noexcept -> expected<std::pair<Token::Type, int>, PartialSyntaxError>
 	{
 		if (is_number(src[index]))		return token_type_and_length_number(src, index);
 		if (is_arrow(src, index))		return std::pair<Token::Type, int>{Token::Type::arrow,				2};
@@ -215,7 +215,7 @@ namespace lex
 		else							return std::pair<Token::Type, int>{Token::Type::identifier,			token_length_identifier(src, index)};
 	}
 
-	auto tokenize(std::string_view src) noexcept -> expected<std::vector<Token>, SyntaxError>
+	auto tokenize(std::string_view src) noexcept -> expected<std::vector<Token>, PartialSyntaxError>
 	{
 		std::vector<Token> result;
 		try_call_decl(int index, skip_whitespace_and_comments(src, 0));
@@ -233,7 +233,8 @@ namespace lex
 			if (token.type == any_of(Token::Type::literal_int, Token::Type::literal_float) || 
 				token.source == any_of("and"sv, "or"sv, "xor"sv))
 			{
-				if (!end_reached(src, index) && !is_valid_after_literal(src[index])) return make_syntax_error("Expected whitespace, operator or delimiter after literal.");
+				if (!end_reached(src, index) && !is_valid_after_literal(src[index])) 
+					return make_syntax_error(src.data() + index, src.data() + index + 1, "Expected whitespace, operator or delimiter after literal.");
 			}
 
 			try_call_decl(int const comment_length, skip_whitespace_and_comments(src, index));

@@ -52,6 +52,7 @@
     <ClCompile Include="tests\interpreter.tests.cc" />
     <ClCompile Include="tests\main.tests.cc" />
     <ClCompile Include="tests\span.tests.cc" />
+    <ClCompile Include="tests\string.tests.cc" />
     <ClCompile Include="tests\value_ptr.tests.cc" />
     <ClCompile Include="tests\variant.tests.cc" />
   </ItemGroup>

@@ -20,14 +20,14 @@ namespace instantiation
 	using ScopeStack = std::vector<CurrentScope>;
 	using ScopeStackView = span<const CurrentScope>;
 
-	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, SyntaxError>;
+	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, PartialSyntaxError>;
 
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program
-	) -> expected<complete::Function, SyntaxError>;
+	) -> expected<complete::Function, PartialSyntaxError>;
 
 	auto instantiate_expression(
 		incomplete::Expression const & incomplete_expression_,
@@ -35,7 +35,7 @@ namespace instantiation
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		optional_out<complete::TypeId> current_scope_return_type
-	) -> expected<complete::Expression, SyntaxError>;
+	) -> expected<complete::Expression, PartialSyntaxError>;
 
 	namespace lookup_result
 	{
@@ -66,6 +66,6 @@ namespace instantiation
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program)
-		-> expected<complete::TypeId, SyntaxError>;
+		-> expected<complete::TypeId, PartialSyntaxError>;
 
 } // namespace instantiation

@@ -198,11 +198,11 @@ namespace complete
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool;
 
-	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, SyntaxError>;
-	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, SyntaxError>;
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, PartialSyntaxError>;
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, PartialSyntaxError>;
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, SyntaxError>;
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, SyntaxError>;
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>;
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>;
 
 	struct OverloadSetView
 	{
@@ -217,13 +217,13 @@ namespace complete
 	};
 	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
-		-> expected<FunctionId, SyntaxError>;
+		-> expected<FunctionId, PartialSyntaxError>;
 
 	[[nodiscard]] auto insert_conversions(
 		span<Expression> parameters,
 		span<TypeId const> parsed_parameter_types,
 		span<TypeId const> target_parameter_types,
-		Program const & program) noexcept -> expected<void, SyntaxError>;
+		Program const & program) noexcept -> expected<void, PartialSyntaxError>;
 
 	auto type_for_overload_set(Program & program, OverloadSet overload_set) noexcept -> TypeId;
 	auto overload_set_for_type(Program const & program, TypeId overload_set_type) noexcept -> OverloadSetView;

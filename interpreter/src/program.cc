@@ -423,7 +423,7 @@ namespace complete
 		return program.overload_set_types[overload_set_type.index];
 	}
 
-	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, SyntaxError>
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, PartialSyntaxError>
 	{
 		FunctionTemplate & function_template = program.function_templates[template_id.index];
 		assert(parameters.size() == function_template.incomplete_function.template_parameters.size());
@@ -454,7 +454,7 @@ namespace complete
 		return instantiated_function_id;
 	}
 
-	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, SyntaxError>
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, PartialSyntaxError>
 	{
 		StructTemplate & struct_template = program.struct_templates[template_id.index];
 
@@ -507,7 +507,7 @@ namespace complete
 		return new_type_id;
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, SyntaxError>
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>
 	{
 		if (from.index == to.index)
 		{
@@ -537,7 +537,7 @@ namespace complete
 		return make_syntax_error("Conversion between types does not exist.");
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, SyntaxError>
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>
 	{
 		return insert_conversion_node(std::move(tree), expression_type_id(tree, program), to, program);
 	}
@@ -762,7 +762,7 @@ namespace complete
 	}
 
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
-		-> expected<FunctionId, SyntaxError>
+		-> expected<FunctionId, PartialSyntaxError>
 	{
 		FunctionId const function_id = resolve_function_overloading(overload_set, parameter_types, program);
 		if (function_id == invalid_function_id)
@@ -779,7 +779,7 @@ namespace complete
 		span<Expression> parameters,
 		span<TypeId const> parsed_parameter_types,
 		span<TypeId const> target_parameter_types,
-		Program const & program) noexcept -> expected<void, SyntaxError>
+		Program const & program) noexcept -> expected<void, PartialSyntaxError>
 	{
 		for (size_t i = 0; i < target_parameter_types.size(); ++i)
 		{

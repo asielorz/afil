@@ -29,6 +29,6 @@ namespace lex
 		std::string_view source;
 		Type type;
 	};
-	auto tokenize(std::string_view src) noexcept -> expected<std::vector<Token>, SyntaxError>;
+	auto tokenize(std::string_view src) noexcept -> expected<std::vector<Token>, PartialSyntaxError>;
 
 } // namespace tr

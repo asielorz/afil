@@ -3,6 +3,7 @@
 #include "afil.hh"
 #include "program.hh"
 #include "pretty_print.hh"
+#include <iostream>
 
 using namespace std::literals;
 
@@ -1892,6 +1893,7 @@ TEST_CASE("Forgetting a variable name will result in a compiler error")
 
 	expected<complete::Program, SyntaxError> program = afil::parse_source(src);
 	REQUIRE(!program.has_value());
+	std::cout << program.error();
 }
 
 TEST_CASE("There is no operator + for booleans")

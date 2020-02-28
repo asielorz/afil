@@ -16,7 +16,7 @@
 
 using namespace std::literals;
 
-auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> expected<void, SyntaxError>
+auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> expected<void, PartialSyntaxError>
 {
 	if (!is_constant_expression(expression, program, constant_base_index)) return make_syntax_error("Cannot evaluate expression at compile time.");
 
@@ -30,7 +30,7 @@ auto evaluate_constant_expression(complete::Expression const & expression, compl
 	return success;
 }
 
-auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> expected<int, SyntaxError>
+auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> expected<int, PartialSyntaxError>
 {
 	try_call(assign_to(expression), insert_conversion_node(std::move(expression), complete::TypeId::int_, program));
 	int result;
@@ -94,21 +94,21 @@ namespace instantiation
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program) 
-		-> expected<complete::TypeId, SyntaxError>
+		-> expected<complete::TypeId, PartialSyntaxError>
 	{
 		auto const visitor = overload(
-			[&](incomplete::TypeId::BaseCase const & base_case) -> expected<complete::TypeId, SyntaxError>
+			[&](incomplete::TypeId::BaseCase const & base_case) -> expected<complete::TypeId, PartialSyntaxError>
 			{
 				complete::TypeId const type = type_with_name(base_case.name, scope_stack, template_parameters);
 				if (type == complete::TypeId::none) return make_syntax_error("Type not found.");
 				return type;
 			},
-			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::TypeId, SyntaxError>
+			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::TypeId, PartialSyntaxError>
 			{
 				try_call_decl(complete::TypeId const pointee, resolve_dependent_type(*pointer.pointee, template_parameters, scope_stack, program));
 				return pointer_type_for(pointee, *program);
 			},
-			[&](incomplete::TypeId::Array const & array) -> expected<complete::TypeId, SyntaxError>
+			[&](incomplete::TypeId::Array const & array) -> expected<complete::TypeId, PartialSyntaxError>
 			{
 				try_call_decl(complete::TypeId const value_type, resolve_dependent_type(*array.value_type, template_parameters, scope_stack, program));
 
@@ -116,12 +116,12 @@ namespace instantiation
 				try_call_decl(int const size, evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack)));
 				return array_type_for(value_type, size, *program);
 			},
-			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> expected<complete::TypeId, SyntaxError>
+			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> expected<complete::TypeId, PartialSyntaxError>
 			{
 				try_call_decl(complete::TypeId const pointee, resolve_dependent_type(*array_pointer.pointee, template_parameters, scope_stack, program));
 				return array_pointer_type_for(pointee, *program);
 			},
-			[&](incomplete::TypeId::TemplateInstantiation const & template_instantiation) -> expected<complete::TypeId, SyntaxError>
+			[&](incomplete::TypeId::TemplateInstantiation const & template_instantiation) -> expected<complete::TypeId, PartialSyntaxError>
 			{
 				auto const visitor = overload(
 					[](lookup_result::StructTemplate result) -> complete::StructTemplateId { return result.template_id; },
@@ -138,7 +138,7 @@ namespace instantiation
 
 				return instantiate_struct_template(*program, template_id, parameters);
 			},
-			[](incomplete::TypeId::Deduce const &) -> expected<complete::TypeId, SyntaxError>
+			[](incomplete::TypeId::Deduce const &) -> expected<complete::TypeId, PartialSyntaxError>
 			{
 				return complete::TypeId::deduce;
 			}
@@ -155,10 +155,10 @@ namespace instantiation
 		std::vector<complete::ResolvedTemplateParameter> & resolved_template_parameters,
 		span<incomplete::TemplateParameter const> unresolved_template_parameters, 
 		ScopeStack & scope_stack, out<complete::Program> program)
-		-> expected<complete::FunctionTemplateParameterType, SyntaxError>
+		-> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 	{
 		auto const visitor = overload(
-			[&](incomplete::TypeId::BaseCase const & base_case) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
+			[&](incomplete::TypeId::BaseCase const & base_case) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
 				complete::TypeId const type = type_with_name(base_case.name, scope_stack, resolved_template_parameters);
 				if (type != complete::TypeId::none)
@@ -178,14 +178,14 @@ namespace instantiation
 
 				declare_unreachable();
 			},
-			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
+			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
 				complete::FunctionTemplateParameterType::Pointer pointer_type;
 				try_call(assign_to(pointer_type.pointee), 
 					resolve_function_template_parameter_type(*pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 				return complete::FunctionTemplateParameterType{std::move(pointer_type), false, false};
 			},
-			[&](incomplete::TypeId::Array const & array) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
+			[&](incomplete::TypeId::Array const & array) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
 				complete::FunctionTemplateParameterType::Array array_type;
 				try_call(assign_to(array_type.value_type), 
@@ -195,14 +195,14 @@ namespace instantiation
 				array_type.size = evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack));
 				return complete::FunctionTemplateParameterType{std::move(array_type), false, false};
 			},
-			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
+			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
 				complete::FunctionTemplateParameterType::ArrayPointer array_pointer_type;
 				try_call(assign_to(array_pointer_type.pointee),
 					resolve_function_template_parameter_type(*array_pointer.pointee, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 				return complete::FunctionTemplateParameterType{std::move(array_pointer_type), false, false};
 			},
-			[&](incomplete::TypeId::TemplateInstantiation const & template_instantiation) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
+			[&](incomplete::TypeId::TemplateInstantiation const & template_instantiation) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
 				auto const template_id = struct_template_with_name(template_instantiation.template_name, scope_stack);
 				if (!template_id.has_value())
@@ -217,7 +217,7 @@ namespace instantiation
 
 				return complete::FunctionTemplateParameterType{std::move(template_instantiation_type), false, false};
 			},
-			[](incomplete::TypeId::Deduce const &) -> expected<complete::FunctionTemplateParameterType, SyntaxError>
+			[](incomplete::TypeId::Deduce const &) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
 				declare_unreachable();
 			}
@@ -394,7 +394,7 @@ namespace instantiation
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		optional_out<complete::TypeId> current_scope_return_type
-	) -> expected<std::optional<complete::Statement>, SyntaxError>;
+	) -> expected<std::optional<complete::Statement>, PartialSyntaxError>;
 
 	[[nodiscard]] auto instantiate_function_prototype(
 		incomplete::FunctionPrototype const & incomplete_function,
@@ -402,7 +402,7 @@ namespace instantiation
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		out<complete::Function> function
-	) -> expected<void, SyntaxError>
+	) -> expected<void, PartialSyntaxError>
 	{
 
 		for (incomplete::FunctionParameter const & parameter : incomplete_function.parameters)
@@ -428,7 +428,7 @@ namespace instantiation
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		out<complete::Function> function
-	) -> expected<void, SyntaxError>
+	) -> expected<void, PartialSyntaxError>
 	{
 		scope_stack.push_back({ &*function, ScopeType::function, 0 });
 
@@ -452,7 +452,7 @@ namespace instantiation
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
 		ScopeStack & scope_stack,
 		out<complete::Program> program
-	) -> expected<complete::Function, SyntaxError>
+	) -> expected<complete::Function, PartialSyntaxError>
 	{
 		complete::Function function;
 
@@ -468,33 +468,33 @@ namespace instantiation
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		optional_out<complete::TypeId> current_scope_return_type
-	) -> expected<complete::Expression, SyntaxError>
+	) -> expected<complete::Expression, PartialSyntaxError>
 	{
 		auto const visitor = overload(
-			[](incomplete::expression::Literal<int> const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[](incomplete::expression::Literal<int> const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				return complete::expression::Literal<int>{incomplete_expression.value};
 			},
-			[](incomplete::expression::Literal<float> const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[](incomplete::expression::Literal<float> const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				return complete::expression::Literal<float>{incomplete_expression.value};
 			},
-			[](incomplete::expression::Literal<bool> const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[](incomplete::expression::Literal<bool> const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				return complete::expression::Literal<bool>{incomplete_expression.value};
 			},
-			[&](incomplete::expression::Literal<std::string> const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::Literal<std::string> const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				complete::expression::StringLiteral complete_expression;
 				complete_expression.value = incomplete_expression.value;
 				complete_expression.type = array_type_for(complete::TypeId::char_, static_cast<int>(complete_expression.value.size()), *program);
 				return complete_expression;
 			},
-			[](incomplete::expression::Literal<uninit_t> const &) -> expected<complete::Expression, SyntaxError>
+			[](incomplete::expression::Literal<uninit_t> const &) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				return complete::expression::Literal<uninit_t>();
 			},
-			[&](incomplete::expression::Identifier const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::Identifier const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				auto const lookup = lookup_name(scope_stack, incomplete_expression.name);
 				auto const lookup_visitor = overload(
@@ -529,7 +529,7 @@ namespace instantiation
 				);
 				return std::visit(lookup_visitor, lookup);
 			},
-			[&](incomplete::expression::MemberVariable const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::MemberVariable const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				complete::expression::MemberVariable complete_expression;
 				try_call(assign_to(complete_expression.owner), instantiate_expression(*incomplete_expression.owner, template_parameters, scope_stack, program, current_scope_return_type));
@@ -548,7 +548,7 @@ namespace instantiation
 
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::Addressof const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::Addressof const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				try_call_decl(complete::Expression operand, instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const operand_type = expression_type_id(operand, *program);
@@ -560,7 +560,7 @@ namespace instantiation
 				complete_expression.return_type = pointer_type;
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::Dereference const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::Dereference const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				try_call_decl(complete::Expression operand, instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const operand_type_id = expression_type_id(operand, *program);
@@ -589,7 +589,7 @@ namespace instantiation
 					return std::move(complete_expression);
 				}
 			},
-			[&](incomplete::expression::Subscript const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::Subscript const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				try_call_decl(complete::Expression array, instantiate_expression(*incomplete_expression.array, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const array_type_id = expression_type_id(array, *program);
@@ -641,7 +641,7 @@ namespace instantiation
 					return std::move(complete_expression);
 				}
 			},
-			[&](incomplete::expression::Function const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::Function const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				try_call_decl(complete::Function complete_function, instantiate_function_template(incomplete_expression.function, template_parameters, scope_stack, program));
 				FunctionId const function_id = add_function(*program, std::move(complete_function));
@@ -653,7 +653,7 @@ namespace instantiation
 				complete_expression.type = type_for_overload_set(*program, std::move(overload_set));
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::FunctionTemplate const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::FunctionTemplate const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				complete::FunctionTemplate new_function_template;
 				new_function_template.scope_template_parameters = template_parameters;
@@ -679,7 +679,7 @@ namespace instantiation
 				complete_expression.type = type_for_overload_set(*program, std::move(overload_set));
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::FunctionCall const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::FunctionCall const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				std::vector<complete::Expression> parameters;
 				parameters.reserve(incomplete_expression.parameters.size());
@@ -711,7 +711,7 @@ namespace instantiation
 					mark_as_to_do("Overload of operator function call");
 				}
 			},
-			[&](incomplete::expression::UnaryOperatorCall const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::UnaryOperatorCall const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				try_call_decl(complete::Expression operand, instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const operand_type = expression_type_id(operand, *program);
@@ -725,7 +725,7 @@ namespace instantiation
 				complete_expression.parameters.push_back(std::move(operand));
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::BinaryOperatorCall const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::BinaryOperatorCall const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				Operator const op = incomplete_expression.op;
 
@@ -770,7 +770,7 @@ namespace instantiation
 					return std::move(complete_expression);
 				}
 			},
-			[&](incomplete::expression::If const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::If const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				try_call_decl(complete::Expression condition, instantiate_expression(*incomplete_expression.condition, template_parameters, scope_stack, program, current_scope_return_type));
 				try_call(assign_to(condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
@@ -791,7 +791,7 @@ namespace instantiation
 				complete_expression.else_case = allocate(std::move(else_case));
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::StatementBlock const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::StatementBlock const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				complete::expression::StatementBlock complete_expression;
 				complete_expression.return_type = complete::TypeId::deduce;
@@ -806,7 +806,7 @@ namespace instantiation
 			
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::Constructor const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::Constructor const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				try_call_decl(complete::TypeId const constructed_type_id, resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, program));
 
@@ -880,7 +880,7 @@ namespace instantiation
 
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::DesignatedInitializerConstructor const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::DesignatedInitializerConstructor const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				try_call_decl(complete::TypeId const constructed_type_id, resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, program));
 				complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
@@ -922,7 +922,7 @@ namespace instantiation
 				complete_expression.parameters = std::move(complete_parameters);
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::DataCall const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::DataCall const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				complete::expression::ReinterpretCast complete_expression;
 				try_call(assign_to(complete_expression.operand), instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
@@ -935,7 +935,7 @@ namespace instantiation
 				complete_expression.return_type = array_pointer_type_for(value_type, *program);
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::SizeCall const & incomplete_expression) -> expected<complete::Expression, SyntaxError>
+			[&](incomplete::expression::SizeCall const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				complete::expression::Literal<int> complete_expression;
 				try_call_decl(complete::Expression operand, instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
@@ -956,10 +956,10 @@ namespace instantiation
 		ScopeStack & scope_stack,
 		out<complete::Program> program,
 		optional_out<complete::TypeId> current_scope_return_type
-	) -> expected<std::optional<complete::Statement>, SyntaxError>
+	) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 	{
 		auto const visitor = overload(
-			[&](incomplete::statement::VariableDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::VariableDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				// Case in which nothing is assigned to the declaration. Must be a variable of a default constructible type.
 				if (!incomplete_statement.assigned_expression.has_value())
@@ -1025,7 +1025,7 @@ namespace instantiation
 					return std::move(complete_statement);
 				}
 			},
-			[&](incomplete::statement::LetDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::LetDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				// Hack for recursive functions
 				if (has_type<incomplete::expression::Function>(incomplete_statement.assigned_expression) && incomplete_statement.variable_name != "main")
@@ -1120,14 +1120,14 @@ namespace instantiation
 					return std::move(complete_statement);
 				}
 			},
-			[&](incomplete::statement::ExpressionStatement const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::ExpressionStatement const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				complete::statement::ExpressionStatement complete_statement;
 				try_call(assign_to(complete_statement.expression), 
 					instantiate_expression(incomplete_statement.expression, template_parameters, scope_stack, program, current_scope_return_type));
 				return std::move(complete_statement);
 			},
-			[&](incomplete::statement::If const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::If const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				complete::statement::If complete_statement;
 				try_call_decl(complete::Expression condition, instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type));
@@ -1145,7 +1145,7 @@ namespace instantiation
 
 				return std::move(complete_statement);
 			},
-			[&](incomplete::statement::StatementBlock const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::StatementBlock const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				complete::statement::StatementBlock complete_statement;
 				auto const guard = push_block_scope(scope_stack, complete_statement.scope);
@@ -1160,7 +1160,7 @@ namespace instantiation
 
 				return std::move(complete_statement);
 			},
-			[&](incomplete::statement::While const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::While const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				complete::statement::While complete_statement;
 
@@ -1173,7 +1173,7 @@ namespace instantiation
 
 				return std::move(complete_statement);
 			},
-			[&](incomplete::statement::For const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::For const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				complete::statement::For complete_statement;
 				auto const guard = push_block_scope(scope_stack, complete_statement.scope);
@@ -1194,7 +1194,7 @@ namespace instantiation
 
 				return std::move(complete_statement);
 			},
-			[&](incomplete::statement::Return const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::Return const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				if (scope_stack.back().type == ScopeType::global) return make_syntax_error("A return statement cannot appear at the global scope.");
 
@@ -1216,15 +1216,15 @@ namespace instantiation
 
 				return std::move(complete_statement);
 			},
-			[](incomplete::statement::Break const &) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[](incomplete::statement::Break const &) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				return complete::statement::Break();
 			},
-			[](incomplete::statement::Continue const &) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[](incomplete::statement::Continue const &) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				return complete::statement::Continue();
 			},
-			[&](incomplete::statement::StructDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::StructDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				complete::Type new_type;
 				new_type.size = 0;
@@ -1265,7 +1265,7 @@ namespace instantiation
 
 				return std::nullopt;
 			},
-			[&](incomplete::statement::StructTemplateDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::StructTemplateDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				if (does_name_collide(scope_stack, incomplete_statement.declared_struct_template.name)) return make_syntax_error("Struct template name collides with another name.");
 
@@ -1277,7 +1277,7 @@ namespace instantiation
 
 				return std::nullopt;
 			},
-			[&](incomplete::statement::ImportBlock const & incomplete_statement) -> expected<std::optional<complete::Statement>, SyntaxError>
+			[&](incomplete::statement::ImportBlock const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				for (incomplete::ExternFunction const & incomplete_extern_function : incomplete_statement.imported_functions)
 				{
@@ -1323,7 +1323,7 @@ namespace instantiation
 		return std::visit(visitor, incomplete_statement_.as_variant());
 	}
 
-	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, SyntaxError>
+	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, PartialSyntaxError>
 	{
 		std::vector<complete::ResolvedTemplateParameter> template_parameters;
 		ScopeStack scope_stack;
