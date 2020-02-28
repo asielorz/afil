@@ -1660,6 +1660,7 @@ TEST_CASE("import allows to import C functions from DLLs")
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 5);
+	putchar('\n');
 }
 
 TEST_CASE("Constant expressions")
@@ -1893,7 +1894,6 @@ TEST_CASE("Forgetting a variable name will result in a compiler error")
 
 	expected<complete::Program, SyntaxError> program = afil::parse_source(src);
 	REQUIRE(!program.has_value());
-	std::cout << program.error();
 }
 
 TEST_CASE("There is no operator + for booleans")
