@@ -58,7 +58,7 @@ auto complete_syntax_error(PartialSyntaxError const & partial_error, std::string
 
 auto operator << (std::ostream & os, SyntaxError const & error) noexcept -> std::ostream &
 {
-	os << "Error: (" << error.filename << ':' << error.row << ':' << error.column << ") " << error.error_message << '\n';
+	os << error.filename << ':' << error.row << ':' << error.column << ": error: " << error.error_message << '\n';
 	os << error.line_with_error << '\n';
 	for (int i = 0; i < error.column; ++i) os << ' ';
 	os << '^';
