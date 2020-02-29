@@ -42,3 +42,20 @@ auto replace(std::string_view string, std::string_view old_substr, std::string_v
 
 	return result;
 }
+
+auto make_string_view(char const first[], char const last[]) noexcept -> std::string_view
+{
+	assert(last >= first);
+	auto const size = last - first;
+	return std::string_view(first, size);
+}
+
+auto begin_ptr(std::string_view sv) noexcept -> char const *
+{
+	return sv.data();
+}
+
+auto end_ptr(std::string_view sv) noexcept -> char const *
+{
+	return sv.data() + sv.size();
+}

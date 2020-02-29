@@ -150,15 +150,15 @@ namespace parser
 	auto insert_expression(incomplete::Expression & tree, incomplete::Expression & new_node) noexcept -> void
 	{
 		using incomplete::expression::BinaryOperatorCall;
-		BinaryOperatorCall & tree_op = std::get<BinaryOperatorCall>(tree);
-		BinaryOperatorCall & new_op = std::get<BinaryOperatorCall>(new_node);
+		BinaryOperatorCall & tree_op = std::get<BinaryOperatorCall>(tree.variant);
+		BinaryOperatorCall & new_op = std::get<BinaryOperatorCall>(new_node.variant);
 
 		if (precedence(new_op.op) <= precedence(tree_op.op))
 		{
 			new_op.left = allocate(std::move(tree));
 			tree = std::move(new_node);
 		}
-		else if (!has_type<BinaryOperatorCall>(*tree_op.right))
+		else if (!has_type<BinaryOperatorCall>(tree_op.right->variant))
 		{
 			new_op.left = std::move(tree_op.right);
 			tree_op.right = allocate(std::move(new_node));
@@ -167,7 +167,7 @@ namespace parser
 			insert_expression(*tree_op.right, new_node);
 	}
 
-	auto resolve_operator_precedence(span<incomplete::Expression> operands, span<Operator const> operators) noexcept -> incomplete::Expression
+	auto resolve_operator_precedence(span<incomplete::Expression> operands, span<std::string_view const> operators) noexcept -> incomplete::Expression
 	{
 		using incomplete::expression::BinaryOperatorCall;
 
@@ -177,14 +177,14 @@ namespace parser
 			return std::move(operands[0]);
 		}
 
-		incomplete::Expression root = BinaryOperatorCall{ operators[0],
+		incomplete::Expression root = incomplete::Expression(BinaryOperatorCall{parse_operator(operators[0]),
 				allocate(std::move(operands[0])),
 				allocate(std::move(operands[1]))
-		};
+		}, operators[0]);
 
 		for (size_t i = 1; i < operators.size(); ++i)
 		{
-			auto new_node = incomplete::Expression(BinaryOperatorCall{operators[i], nullptr, allocate(std::move(operands[i + 1]))});
+			auto new_node = incomplete::Expression(BinaryOperatorCall{parse_operator(operators[i]), nullptr, allocate(std::move(operands[i + 1]))}, operators[i]);
 			insert_expression(root, new_node);
 		}
 
@@ -530,7 +530,8 @@ namespace parser
 		return success;
 	}
 
-	auto parse_function_template_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>
+	auto parse_function_template_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
+		-> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
 		incomplete::FunctionTemplate function;
 		try_call(assign_to(function.template_parameters), parse_template_parameter_list(tokens, index));
@@ -547,7 +548,7 @@ namespace parser
 		return incomplete::expression::FunctionTemplate{std::move(function)};
 	}
 
-	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>
+	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
 		// Skip fn token.
 		index++;
@@ -634,7 +635,7 @@ namespace parser
 		return node;
 	}
 
-	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>
+	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
 		Operator const op = parse_operator(tokens[index].source);
 		index++;
@@ -663,7 +664,7 @@ namespace parser
 		}
 	}
 
-	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>
+	auto parse_expression_variant(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
 		if (tokens[index].source == "fn")
 			return parse_function_expression(tokens, index, type_names);
@@ -672,49 +673,17 @@ namespace parser
 		else if (tokens[index].type == TokenType::open_brace)
 			return parse_statement_block_expression(tokens, index, type_names);
 		else if (tokens[index].type == TokenType::literal_int)
-		{
-			auto expr = incomplete::Expression(
-				incomplete::expression::Literal<int>{parse_number_literal<int>(tokens[index].source)},
-				tokens[index].source
-			);
-			index++;
-			return std::move(expr);
-		}
+			return incomplete::expression::Literal<int>(parse_number_literal<int>(tokens[index++].source));
 		else if (tokens[index].type == TokenType::literal_float)
-		{
-			auto expr = incomplete::Expression(
-				incomplete::expression::Literal<float>{parse_number_literal<float>(tokens[index].source)},
-				tokens[index].source
-			);
-			index++;
-			return std::move(expr);
-		}
+			return incomplete::expression::Literal<float>(parse_number_literal<float>(tokens[index++].source));
 		else if (tokens[index].type == TokenType::literal_bool)
-		{
-			auto expr = incomplete::Expression(
-				incomplete::expression::Literal<bool>{tokens[index++].source[0] == 't'},
-				tokens[index].source
-			);
-			index++;
-			return std::move(expr);
-		}
+			return incomplete::expression::Literal<bool>(tokens[index++].source[0] == 't');
 		else if (tokens[index].type == TokenType::literal_string)
-		{
-			auto expr = incomplete::Expression(
-				incomplete::expression::Literal<std::string>{parse_string_literal(tokens[index++].source)},
-				tokens[index].source
-			);
-			index++;
-			return std::move(expr);
-		}
+			return incomplete::expression::Literal<std::string>(parse_string_literal(tokens[index++].source));
 		else if (tokens[index].source == "uninit")
 		{
-			auto expr = incomplete::Expression(
-				incomplete::expression::Literal<uninit_t>(),
-				tokens[index].source
-			);
 			index++;
-			return std::move(expr);
+			return incomplete::expression::Literal<uninit_t>();
 		}
 		else if (tokens[index].source == "operator")
 		{
@@ -775,7 +744,15 @@ namespace parser
 				return id_node;
 			}
 		}
-		else if (tokens[index].type == TokenType::open_parenthesis)
+		else if (is_unary_operator(tokens[index]))
+			return parse_unary_operator(tokens, index, type_names);
+		else
+			return make_syntax_error(tokens[index], "Unrecognized token. Expected expression.");
+	}
+
+	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>
+	{
+		if (tokens[index].type == TokenType::open_parenthesis)
 		{
 			index++;
 			auto expr = parse_expression(tokens, index, type_names);
@@ -786,10 +763,13 @@ namespace parser
 
 			return expr;
 		}
-		else if (is_unary_operator(tokens[index]))
-			return parse_unary_operator(tokens, index, type_names);
 		else
-			return make_syntax_error(tokens[index], "Unrecognized token. Expected expression.");
+		{
+			auto const expr_source_start = begin_ptr(tokens[index].source);
+			try_call_decl(incomplete::expression::Variant var, parse_expression_variant(tokens, index, type_names));
+			auto const expr_source_end = end_ptr(tokens[index - 1].source);
+			return incomplete::Expression(std::move(var), make_string_view(expr_source_start, expr_source_end));
+		}
 	}
 
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>
@@ -807,44 +787,54 @@ namespace parser
 				std::string_view const member_name = tokens[index].source;
 				index++;
 
+				auto const expr_source_start = begin_ptr(tree.source);
+				auto const expr_source_end = end_ptr(member_name);
+
 				incomplete::expression::MemberVariable var_node;
 				var_node.name = member_name;
 				var_node.owner = allocate(std::move(tree));
-				tree = std::move(var_node);
+				tree = incomplete::Expression(std::move(var_node), make_string_view(expr_source_start, expr_source_end));
 			}
 			// Subscript
 			else if (tokens[index].type == TokenType::open_bracket)
 			{
 				try_call_decl(std::vector<incomplete::Expression> params, parse_comma_separated_expression_list(tokens, index, type_names, TokenType::open_bracket, TokenType::close_bracket));
 
+				auto const expr_source_start = begin_ptr(tree.source);
+				auto const expr_source_end = end_ptr(tokens[index - 1].source);
+
 				if (params.size() == 1)
 				{
 					incomplete::expression::Subscript node;
 					node.array = allocate(std::move(tree));
 					node.index = allocate(std::move(params[0]));
-					tree = std::move(node);
+					tree = incomplete::Expression(std::move(node), make_string_view(expr_source_start, expr_source_end));
 				}
 				else
 				{
 					incomplete::expression::FunctionCall node;
 					node.parameters.reserve(params.size() + 2);
-					node.parameters.push_back(incomplete::expression::Identifier{"[]"});
+					node.parameters.push_back(incomplete::Expression(incomplete::expression::Identifier{"[]"}, make_string_view(expr_source_start, expr_source_end)));
 					node.parameters.push_back(std::move(tree));
 					for (auto & param : params)
 						node.parameters.push_back(std::move(param));
-					tree = std::move(node);
+					tree = incomplete::Expression(std::move(node), make_string_view(expr_source_start, expr_source_end));
 				}
 			}
 			// Function call
 			else if (tokens[index].type == TokenType::open_parenthesis)
 			{
 				try_call_decl(std::vector<incomplete::Expression> params, parse_comma_separated_expression_list(tokens, index, type_names));
+
+				auto const expr_source_start = begin_ptr(tree.source);
+				auto const expr_source_end = end_ptr(tokens[index - 1].source);
+
 				incomplete::expression::FunctionCall node;
 				node.parameters.reserve(params.size() + 1);
 				node.parameters.push_back(std::move(tree));
 				for (auto & param : params)
 					node.parameters.push_back(std::move(param));
-				tree = std::move(node);
+				tree = incomplete::Expression(std::move(node), make_string_view(expr_source_start, expr_source_end));
 			}
 			else break;
 		}
@@ -855,7 +845,7 @@ namespace parser
 	auto parse_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>
 	{
 		std::vector<incomplete::Expression> operands;
-		std::vector<Operator> operators;
+		std::vector<std::string_view> operators;
 
 		while (index < tokens.size())
 		{
@@ -864,7 +854,7 @@ namespace parser
 			// If the next token is an operator, parse the operator and repeat. Otherwise end the loop and return the expression.
 			if (index < tokens.size() && tokens[index].type == TokenType::operator_)
 			{
-				operators.push_back(parse_operator(tokens[index].source));
+				operators.push_back(tokens[index].source);
 				index++;
 			}
 			else break;

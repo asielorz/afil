@@ -56,3 +56,7 @@ auto is_null_terminated(std::string_view str) noexcept -> bool;
 auto load_whole_file(std::string_view path) noexcept -> std::string;
 auto load_whole_file(std::filesystem::path path) noexcept -> std::string;
 auto replace(std::string_view string, std::string_view old_substr, std::string_view new_substr) noexcept -> std::string;
+
+auto make_string_view(char const first[], char const last[]) noexcept -> std::string_view;
+auto begin_ptr(std::string_view sv) noexcept -> char const *;
+auto end_ptr(std::string_view sv) noexcept -> char const *;

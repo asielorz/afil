@@ -17,6 +17,9 @@ namespace incomplete
 		template <typename T>
 		struct Literal
 		{
+			Literal() noexcept = default;
+			Literal(T val) noexcept : value(std::move(val)) {}
+
 			T value;
 		};
 
@@ -109,38 +112,28 @@ namespace incomplete
 			value_ptr<Expression> operand;
 		};
 
-		namespace detail
-		{
-			using ExpressionBase = std::variant<
-				Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<uninit_t>,
-				Dereference, Addressof, Subscript,
-				Identifier, MemberVariable,
-				Function, FunctionTemplate,	
-				FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
-				If, StatementBlock,
-				Constructor, DesignatedInitializerConstructor,
-				DataCall, SizeCall
-			>;
-		}
+		using Variant = std::variant<
+			Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<uninit_t>,
+			Dereference, Addressof, Subscript,
+			Identifier, MemberVariable,
+			Function, FunctionTemplate,	
+			FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
+			If, StatementBlock,
+			Constructor, DesignatedInitializerConstructor,
+			DataCall, SizeCall
+		>;
 
 	} // namespace expression
 
-	//struct Expression : public expression::detail::ExpressionBase
-	//{
-	//	using Base = expression::detail::ExpressionBase;
-	//	using Base::Base;
-	//	constexpr auto as_variant() noexcept -> Base & { return *this; }
-	//	constexpr auto as_variant() const noexcept -> Base const & { return *this; }
-	//};
 	struct Expression
 	{
 		Expression() noexcept = default;
-		Expression(expression::detail::ExpressionBase var, std::string_view src) noexcept
+		Expression(expression::Variant var, std::string_view src) noexcept
 			: variant(std::move(var))
 			, source(src)
 		{}
 
-		expression::detail::ExpressionBase variant;
+		expression::Variant variant;
 		std::string_view source;
 	};
 
