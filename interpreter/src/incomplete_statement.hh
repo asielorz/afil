@@ -80,24 +80,26 @@ namespace incomplete
 			StructTemplate declared_struct_template;
 		};
 
-		namespace detail
-		{
-			using StatementBase = std::variant<
-				VariableDeclaration, LetDeclaration, ExpressionStatement,
-				If, StatementBlock, While, For,
-				Return, Break, Continue,
-				StructDeclaration, StructTemplateDeclaration,
-				ImportBlock
-			>;
-		} // namespace detail
+		using Variant = std::variant<
+			VariableDeclaration, LetDeclaration, ExpressionStatement,
+			If, StatementBlock, While, For,
+			Return, Break, Continue,
+			StructDeclaration, StructTemplateDeclaration,
+			ImportBlock
+		>;
+
 	} // namespace statement
 
-	struct Statement : public statement::detail::StatementBase
+	struct Statement
 	{
-		using Base = statement::detail::StatementBase;
-		using Base::Base;
-		constexpr auto as_variant() noexcept -> Base & { return *this; }
-		constexpr auto as_variant() const noexcept -> Base const & { return *this; }
+		Statement() noexcept = default;
+		Statement(statement::Variant var, std::string_view src) noexcept
+			: variant(std::move(var))
+			, source(src)
+		{}
+
+		statement::Variant variant;
+		std::string_view source;
 	};
 
 } // namespace incomplete

@@ -55,7 +55,7 @@ namespace parser
 
 	struct TypeName
 	{
-		std::string name;
+		std::string_view name;
 		enum struct Type { type, struct_template, template_parameter } type;
 	};
 
@@ -591,22 +591,22 @@ namespace parser
 		return std::move(if_node);
 	}
 	
-	auto all_branches_return(incomplete::Statement const & statement) noexcept -> bool
+	auto all_branches_return(incomplete::statement::Variant const & statement) noexcept -> bool
 	{
 		auto const visitor = overload(
 			[](auto const &) { return false; }, // Default case, does not return
 			[](incomplete::statement::Return const &) { return true; },
 			[&](incomplete::statement::If const & if_node)
 			{
-				return all_branches_return(*if_node.then_case)
-					&& all_branches_return(*if_node.else_case);
+				return all_branches_return(if_node.then_case->variant)
+					&& all_branches_return(if_node.else_case->variant);
 			},
 			[&](incomplete::statement::StatementBlock  const & block_node)
 			{
-				return all_branches_return(block_node.statements.back());
+				return all_branches_return(block_node.statements.back().variant);
 			}
 		);
-		return std::visit(visitor, statement.as_variant());
+		return std::visit(visitor, statement);
 	}
 
 	auto parse_statement_block_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
@@ -626,7 +626,7 @@ namespace parser
 		type_names.resize(stack_size);
 
 		// Ensure that all branches return.
-		if (!all_branches_return(node.statements.back())) return make_syntax_error(tokens[index], "Not all branches of statement block expression return.");
+		if (!all_branches_return(node.statements.back().variant)) return make_syntax_error(tokens[index], "Not all branches of statement block expression return.");
 
 		// Skip closing brace.
 		if (tokens[index].type != TokenType::close_brace) return make_syntax_error(tokens[index], "Expected '}' at the end of statement block expression.");
@@ -1021,8 +1021,8 @@ namespace parser
 
 		// Parse init statement. Must be an expression or a declaration.
 		try_call_decl(incomplete::Statement init_statement, parse_statement(tokens, index, type_names));
-		if (!(has_type<incomplete::statement::VariableDeclaration>(init_statement) || 
-			  has_type<incomplete::statement::ExpressionStatement>(init_statement)))
+		if (!(has_type<incomplete::statement::VariableDeclaration>(init_statement.variant) || 
+			  has_type<incomplete::statement::ExpressionStatement>(init_statement.variant)))
 			return make_syntax_error(tokens[index], "init-statement of a for statement must be a variable declaration or an expression.");
 		for_statement.init_statement = allocate(std::move(init_statement));
 
@@ -1126,7 +1126,7 @@ namespace parser
 		return incomplete::statement::StructTemplateDeclaration{struct_template};
 	}
 
-	auto parse_struct_declaration(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Statement, PartialSyntaxError>
+	auto parse_struct_declaration(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::Variant, PartialSyntaxError>
 	{
 		// Skip struct token.
 		index++;
@@ -1255,7 +1255,11 @@ namespace parser
 
 		if (tokens[index].type == TokenType::open_brace)
 		{
-			try_call(global_initialization_statements->push_back, parse_import_block(tokens, index, type_names, file_name));
+			auto const block_source_start = begin_ptr(tokens[index].source);
+			try_call_decl(incomplete::statement::ImportBlock import_block, parse_import_block(tokens, index, type_names, file_name));
+			auto const block_source_end = end_ptr(tokens[index - 1].source);
+
+			global_initialization_statements->push_back(incomplete::Statement(std::move(import_block), make_string_view(block_source_start, block_source_end)));
 		}
 		else
 		{
@@ -1276,9 +1280,10 @@ namespace parser
 		return success;
 	}
 
-	auto parse_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Statement, PartialSyntaxError>
+	auto parse_statement_variant(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
+		-> expected<incomplete::statement::Variant, PartialSyntaxError>
 	{
-		incomplete::Statement result;
+		incomplete::statement::Variant result;
 
 		if (tokens[index].source == "let")
 			try_call(assign_to(result), parse_let_statement(tokens, index, type_names))
@@ -1315,6 +1320,14 @@ namespace parser
 		return std::move(result);
 	}
 
+	auto parse_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Statement, PartialSyntaxError>
+	{
+		auto const expr_source_start = begin_ptr(tokens[index].source);
+		try_call_decl(incomplete::statement::Variant var, parse_statement_variant(tokens, index, type_names));
+		auto const expr_source_end = end_ptr(tokens[index - 1].source);
+		return incomplete::Statement(std::move(var), make_string_view(expr_source_start, expr_source_end));
+	}
+
 	[[nodiscard]] auto parse_global_scope(
 		std::string_view src,
 		std::vector<TypeName> & type_names,
@@ -1334,7 +1347,10 @@ namespace parser
 			else
 			{
 				try_call_decl(incomplete::Statement statement, parse_statement(tokens, index, type_names));
-				if (has_type<incomplete::statement::ExpressionStatement>(statement)) return make_syntax_error(tokens[index], "An expression statement is not allowed at the global scope.");
+
+				if (has_type<incomplete::statement::ExpressionStatement>(statement.variant)) 
+					return make_syntax_error(tokens[index], "An expression statement is not allowed at the global scope.");
+
 				global_initialization_statements->push_back(std::move(statement));
 			}
 		}

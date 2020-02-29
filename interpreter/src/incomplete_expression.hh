@@ -25,12 +25,12 @@ namespace incomplete
 
 		struct Identifier
 		{
-			std::string name;
+			std::string_view name;
 		};
 
 		struct MemberVariable
 		{
-			std::string name;
+			std::string_view name;
 			value_ptr<Expression> owner;
 		};
 
@@ -139,14 +139,14 @@ namespace incomplete
 
 	struct MemberVariable
 	{
-		std::string name;
+		std::string_view name;
 		TypeId type;
 		std::optional<Expression> initializer_expression;
 	};
 
 	struct Struct
 	{
-		std::string name;
+		std::string_view name;
 		std::vector<MemberVariable> member_variables;
 	};
 
@@ -157,7 +157,7 @@ namespace incomplete
 
 	struct DesignatedInitializer
 	{
-		std::string member_name;
+		std::string_view member_name;
 		Expression assigned_expression;
 	};
 

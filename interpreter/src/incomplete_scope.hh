@@ -47,7 +47,7 @@ namespace incomplete
 
 	struct Variable
 	{
-		std::string name;
+		std::string_view name;
 		std::optional<TypeId> type;
 	};
 
@@ -58,13 +58,13 @@ namespace incomplete
 
 	struct TemplateParameter
 	{
-		std::string name;
+		std::string_view name;
 	};
 
 	struct Statement;
 	struct FunctionParameter
 	{
-		std::string name;
+		std::string_view name;
 		TypeId type;
 	};
 
@@ -84,7 +84,7 @@ namespace incomplete
 
 	struct ExternFunction
 	{
-		std::string name;
+		std::string_view name;
 		incomplete::FunctionPrototype prototype;
 		void const * function_pointer;
 	};

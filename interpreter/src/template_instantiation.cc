@@ -100,7 +100,8 @@ namespace instantiation
 			[&](incomplete::TypeId::BaseCase const & base_case) -> expected<complete::TypeId, PartialSyntaxError>
 			{
 				complete::TypeId const type = type_with_name(base_case.name, scope_stack, template_parameters);
-				if (type == complete::TypeId::none) return make_syntax_error("Type not found.");
+				if (type == complete::TypeId::none) 
+					return make_syntax_error("Type not found.");
 				return type;
 			},
 			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::TypeId, PartialSyntaxError>
@@ -536,10 +537,12 @@ namespace instantiation
 
 				complete::TypeId const owner_type_id = decay(expression_type_id(*complete_expression.owner, *program));
 				complete::Type const & owner_type = type_with_id(*program, owner_type_id);
-				if (!is_struct(owner_type)) return make_syntax_error("Cannot access member of non struct type.");
+				if (!is_struct(owner_type)) 
+					return make_syntax_error(incomplete_expression.owner->source, "Cannot access member of non struct type.");
 				complete::Struct const & owner_struct = *struct_for_type(*program, owner_type);
 				int const member_index = find_member_variable(owner_struct, incomplete_expression.name);
-				if (member_index == -1) return make_syntax_error("Member not found.");
+				if (member_index == -1) 
+					return make_syntax_error(incomplete_expression.name, "Member not found.");
 
 				complete_expression.variable_offset = owner_struct.member_variables[member_index].offset;
 				complete_expression.variable_type = owner_struct.member_variables[member_index].type;
@@ -552,7 +555,8 @@ namespace instantiation
 			{
 				try_call_decl(complete::Expression operand, instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const operand_type = expression_type_id(operand, *program);
-				if (!operand_type.is_reference)  return make_syntax_error("Attempted to take address of temporary.");
+				if (!operand_type.is_reference)  
+					return make_syntax_error(incomplete_expression_.source, "Attempted to take address of temporary.");
 				complete::TypeId const pointer_type = pointer_type_for(remove_reference(operand_type), *program);
 
 				complete::expression::ReinterpretCast complete_expression;
@@ -581,7 +585,8 @@ namespace instantiation
 					try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(
 						operator_overload_set(Operator::dereference, scope_stack), { &operand, 1 }, { &operand_type_id, 1 }, *program));
 
-					if (function == invalid_function_id) return make_syntax_error("Overload not found for dereference operator.");
+					if (function == invalid_function_id) 
+						return make_syntax_error(incomplete_expression_.source, "Overload not found for dereference operator.");
 
 					complete::expression::FunctionCall complete_expression;
 					complete_expression.function_id = function;
@@ -631,7 +636,8 @@ namespace instantiation
 
 					try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(named_overload_set("[]"sv, scope_stack), params, param_types, *program));
 
-					if (function == invalid_function_id) return make_syntax_error("Overload not found for subscript operator.");
+					if (function == invalid_function_id) 
+						return make_syntax_error(incomplete_expression_.source, "Overload not found for subscript operator.");
 
 					complete::expression::FunctionCall complete_expression;
 					complete_expression.function_id = function;
@@ -699,7 +705,8 @@ namespace instantiation
 					try_call_decl(FunctionId const function, 
 						resolve_function_overloading_and_insert_conversions(overload_set, {&parameters[1], parameter_types.size()}, parameter_types, *program));
 
-					if (function == invalid_function_id) return make_syntax_error("Overload not found.");
+					if (function == invalid_function_id)
+						return make_syntax_error(incomplete_expression.parameters[0].source, "Overload not found.");
 					complete::expression::FunctionCall complete_expression;
 					complete_expression.function_id = function;
 					complete_expression.parameters = std::move(parameters);
@@ -718,7 +725,8 @@ namespace instantiation
 				try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(
 					operator_overload_set(incomplete_expression.op, scope_stack), { &operand, 1 }, { &operand_type, 1 }, *program));
 
-				if (function == invalid_function_id) return make_syntax_error("Operator overload not found.");
+				if (function == invalid_function_id) 
+					return make_syntax_error(incomplete_expression_.source, "Operator overload not found.");
 
 				complete::expression::FunctionCall complete_expression;
 				complete_expression.function_id = function;
@@ -740,15 +748,18 @@ namespace instantiation
 				// Special case for built in assignment.
 				if (function == invalid_function_id && op == Operator::assign)
 				{
-					if (!operand_types[0].is_reference) return make_syntax_error("Cannot assign to a temporary.");
-					if (!operand_types[0].is_mutable) return make_syntax_error("Cannot assign to a constant.");
+					if (!operand_types[0].is_reference)
+						return make_syntax_error(incomplete_expression.left->source, "Cannot assign to a temporary.");
+					if (!operand_types[0].is_mutable) 
+						return make_syntax_error(incomplete_expression.left->source, "Cannot assign to a constant.");
 					complete::expression::Assignment complete_expression;
 					complete_expression.destination = allocate(std::move(operands[0]));
 					try_call(assign_to(complete_expression.source), insert_conversion_node(std::move(operands[1]), operand_types[1], decay(operand_types[0]), *program));
 					return std::move(complete_expression);
 				}
 
-				if (function == invalid_function_id) return make_syntax_error("Operator overload not found.");
+				if (function == invalid_function_id) 
+					return make_syntax_error(incomplete_expression_.source, "Operator overload not found.");
 
 				if (op == Operator::not_equal || op == Operator::less || op == Operator::less_equal || op == Operator::greater || op == Operator::greater_equal)
 				{
@@ -812,7 +823,8 @@ namespace instantiation
 
 				if (incomplete_expression.parameters.size() == 0) // Default constructor
 				{
-					if (!is_default_constructible(constructed_type_id, *program)) return make_syntax_error("Incorrect number of arguments for struct constructor.");
+					if (!is_default_constructible(constructed_type_id, *program)) 
+						return make_syntax_error(incomplete_expression_.source, "Cannot construct with 0 parameters a type that is not default constructible.");
 					return synthesize_default_constructor(constructed_type_id, *program);
 				}
 
@@ -824,7 +836,8 @@ namespace instantiation
 				{
 					complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
 
-					if (constructed_struct.member_variables.size() != incomplete_expression.parameters.size()) return make_syntax_error("Incorrect number of arguments for struct constructor.");
+					if (constructed_struct.member_variables.size() != incomplete_expression.parameters.size())
+						return make_syntax_error(incomplete_expression_.source, "Incorrect number of arguments for struct constructor.");
 
 					size_t const n = incomplete_expression.parameters.size();
 					complete_expression.parameters.reserve(n);
@@ -844,7 +857,7 @@ namespace instantiation
 					int const param_count = static_cast<int>(incomplete_expression.parameters.size());
 
 					if (incomplete_expression.parameters.size() != 1 && param_count != array_size)
-						return make_syntax_error("Incorrect number of arguments for array constructor.");
+						return make_syntax_error(incomplete_expression_.source, "Incorrect number of arguments for array constructor.");
 
 					complete_expression.parameters.reserve(param_count);
 					for (int i = 0; i < param_count; ++i)
@@ -885,8 +898,10 @@ namespace instantiation
 				try_call_decl(complete::TypeId const constructed_type_id, resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, program));
 				complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
 
-				if (!is_struct(constructed_type)) return make_syntax_error("Designated initializers may only be used on structs.");
-				if (constructed_type_id.is_reference) return make_syntax_error("Designated initializers cannot be used to initialize a reference.");
+				if (!is_struct(constructed_type)) 
+					return make_syntax_error(incomplete_expression_.source, "Designated initializers may only be used on structs.");
+				if (constructed_type_id.is_reference) 
+					return make_syntax_error(incomplete_expression_.source, "Designated initializers cannot be used to initialize a reference.");
 
 				complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
 
@@ -897,8 +912,10 @@ namespace instantiation
 				for (incomplete::DesignatedInitializer const & initializer : incomplete_expression.parameters)
 				{
 					int const member_variable_index = find_member_variable(constructed_struct, initializer.member_name);
-					if (member_variable_index == -1) return make_syntax_error("Expected member name after '.' in designated initializer.");
-					if (expression_initialized[member_variable_index]) return make_syntax_error("Same member initialized twice in designated initializer.");
+					if (member_variable_index == -1)
+						return make_syntax_error(initializer.member_name, "Expected member name after '.' in designated initializer.");
+					if (expression_initialized[member_variable_index]) 
+						return make_syntax_error(initializer.member_name, "Same member initialized twice in designated initializer.");
 
 					try_call(assign_to(complete_parameters[member_variable_index]),
 						instantiate_expression(initializer.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type));
@@ -912,7 +929,8 @@ namespace instantiation
 					if (!expression_initialized[i])
 					{
 						complete::MemberVariable const & variable = constructed_struct.member_variables[i];
-						if (!variable.initializer_expression.has_value()) return make_syntax_error("Uninitialized member is not default constructible in designated initializer.");
+						if (!variable.initializer_expression.has_value()) 
+							return make_syntax_error(incomplete_expression_.source, "Uninitialized member is not default constructible in designated initializer.");
 						complete_parameters[i] = *variable.initializer_expression;
 					}
 				}
@@ -928,8 +946,12 @@ namespace instantiation
 				try_call(assign_to(complete_expression.operand), instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const operand_type_id = expression_type_id(*complete_expression.operand, *program);
 				complete::Type const & operand_type = type_with_id(*program, operand_type_id);
-				if (!is_array(operand_type)) return make_syntax_error("Operand of data must be of array type.");
-				if (!operand_type_id.is_reference) return make_syntax_error("Operand of data must be of reference to array type.");
+
+				if (!is_array(operand_type))
+					return make_syntax_error(incomplete_expression.operand->source, "Operand of data must be of array type.");
+				if (!operand_type_id.is_reference) 
+					return make_syntax_error(incomplete_expression.operand->source, "Operand of data must be of reference to array type.");
+
 				complete::TypeId value_type = array_value_type(operand_type);
 				value_type.is_mutable = operand_type_id.is_mutable;
 				complete_expression.return_type = array_pointer_type_for(value_type, *program);
@@ -941,7 +963,10 @@ namespace instantiation
 				try_call_decl(complete::Expression operand, instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
 				complete::TypeId const operand_type_id = expression_type_id(operand, *program);
 				complete::Type const & operand_type = type_with_id(*program, operand_type_id);
-				if (!is_array(operand_type)) return make_syntax_error("Operand of data must be of array type.");
+
+				if (!is_array(operand_type)) 
+					return make_syntax_error(incomplete_expression.operand->source, "Operand of size must be of array type.");
+
 				complete_expression.value = array_size(operand_type);
 				return std::move(complete_expression);
 			}
@@ -965,9 +990,11 @@ namespace instantiation
 				if (!incomplete_statement.assigned_expression.has_value())
 				{
 					try_call_decl(complete::TypeId const var_type, resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program));
-					if (!is_default_constructible(var_type, *program)) return make_syntax_error("A function must be declared with a let statement.");
+					if (!is_default_constructible(var_type, *program)) 
+						return make_syntax_error(incomplete_statement.variable_name, "Type is not default constructible.");
 
-					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Variable name collides with another name.");
+					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) 
+						return make_syntax_error(incomplete_statement.variable_name, "Variable name collides with another name.");
 					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
 
 					complete::statement::VariableDeclaration complete_statement;
@@ -984,7 +1011,7 @@ namespace instantiation
 					assign_without_qualifiers(var_type, assigned_expression_type);
 
 				if (decay(var_type) == complete::TypeId::uninit_t)
-					return make_syntax_error("Cannot declare variable of type uninit_t.");
+					return make_syntax_error(incomplete_statement.variable_name, "Cannot declare variable of type uninit_t.");
 
 				if (!var_type.is_mutable && is_constant_expression(expression, *program, next_block_scope_offset(scope_stack)))
 				{
@@ -996,7 +1023,8 @@ namespace instantiation
 					try_call(assign_to(expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
 					evaluate_constant_expression(std::move(expression), *program, next_block_scope_offset(scope_stack), constant.value.data());
 
-					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Constant name collides with another name.");
+					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) 
+						return make_syntax_error(incomplete_statement.variable_name, "Constant name collides with another name.");
 
 					top(scope_stack).constants.push_back(std::move(constant));
 
@@ -1004,7 +1032,8 @@ namespace instantiation
 				}
 				else
 				{
-					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Variable name collides with another name.");
+					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) 
+						return make_syntax_error(incomplete_statement.variable_name, "Variable name collides with another name.");
 
 					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
 
@@ -1013,13 +1042,16 @@ namespace instantiation
 
 					if (assigned_expression_type == complete::TypeId::uninit_t)
 					{
-						if (var_type.is_reference) return make_syntax_error("Cannot initialize a reference with uninit.");
-						if (!var_type.is_mutable) return make_syntax_error("Cannot initialize a constant with uninit.");
+						if (var_type.is_reference) 
+							return make_syntax_error(incomplete_statement.assigned_expression->source, "Cannot initialize a reference with uninit.");
+						if (!var_type.is_mutable)
+							return make_syntax_error(incomplete_statement.assigned_expression->source, "Cannot initialize a constant variable with uninit.");
 						complete_statement.assigned_expression = std::move(expression);
 					}
 					else
 					{
-						if (!is_convertible(assigned_expression_type, var_type, *program)) return make_syntax_error("Cannot convert to variable type in variable declaration.");
+						if (!is_convertible(assigned_expression_type, var_type, *program))
+							return make_syntax_error(incomplete_statement.assigned_expression->source, "Cannot convert to variable type in variable declaration.");
 						try_call(assign_to(complete_statement.assigned_expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
 					}
 					return std::move(complete_statement);
@@ -1035,7 +1067,8 @@ namespace instantiation
 					complete::Function function;
 					try_call_void(instantiate_function_prototype(incomplete_function, template_parameters, scope_stack, program, out(function)));
 
-					if (does_function_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Function name collides with another name.");
+					if (does_function_name_collide(scope_stack, incomplete_statement.variable_name)) 
+						return make_syntax_error(incomplete_statement.variable_name, "Function name collides with another name.");
 
 					FunctionId const function_id = add_function(*program, function);
 					top(scope_stack).functions.push_back({ incomplete_statement.variable_name, function_id });
@@ -1052,24 +1085,30 @@ namespace instantiation
 				complete::TypeId const var_type = make_mutable(make_reference(assigned_expression_type, incomplete_statement.is_reference), incomplete_statement.is_mutable);
 
 				if (decay(var_type) == complete::TypeId::uninit_t)
-					return make_syntax_error("Cannot declare variable of type uninit_t.");
+					return make_syntax_error(incomplete_statement.assigned_expression.source, "Cannot declare variable of type uninit_t.");
 
 				// Main function, which is somewhat special.
 				if (incomplete_statement.variable_name == "main"sv)
 				{
-					if (!var_type.is_function) return make_syntax_error("Attempted to use name \"main\" to name something other than a function.");
+					if (!var_type.is_function) 
+						return make_syntax_error(incomplete_statement.assigned_expression.source, "Attempted to use name \"main\" to name something other than a function.");
 					complete::OverloadSetView const overload_set = overload_set_for_type(*program, var_type);
-					if (overload_set.function_template_ids.size() != 0) return make_syntax_error("main cannot be a function template.");
-					if (overload_set.function_ids.size() != 1) return make_syntax_error("main function cannot be overloaded.");
+					if (overload_set.function_template_ids.size() != 0)
+						return make_syntax_error(incomplete_statement.assigned_expression.source, "main cannot be a function template.");
+					if (overload_set.function_ids.size() != 1)
+						return make_syntax_error(incomplete_statement.assigned_expression.source, "main function cannot be overloaded.");
 					FunctionId const main_function_id = overload_set.function_ids[0];
 
 					// Main must not take parameters and return int.
 					complete::Function const & main_function = program->functions[main_function_id.index];
-					if (main_function.return_type != complete::TypeId::int_) return make_syntax_error("Main must return int.");
-					if (main_function.parameter_count != 0) return make_syntax_error("Main cannot take parameters.");
+					if (main_function.return_type != complete::TypeId::int_) 
+						return make_syntax_error(incomplete_statement.assigned_expression.source, "Main must return int.");
+					if (main_function.parameter_count != 0) 
+						return make_syntax_error(incomplete_statement.assigned_expression.source, "Main cannot take parameters.");
 
 					// There can only be one main function.
-					if (program->main_function != invalid_function_id) return make_syntax_error("Redefinition of main function. There can only be one main function.");
+					if (program->main_function != invalid_function_id) 
+						return make_syntax_error(incomplete_statement.variable_name, "Redefinition of main function. There can only be one main function.");
 
 					// Bind the function as the program's main function.
 					program->main_function = main_function_id;
@@ -1078,7 +1117,8 @@ namespace instantiation
 				}
 				else if (var_type.is_function)
 				{
-					if (does_function_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Function name collides with another name.");
+					if (does_function_name_collide(scope_stack, incomplete_statement.variable_name)) 
+						return make_syntax_error(incomplete_statement.variable_name, "Function name collides with another name.");
 
 					complete::OverloadSetView const overload_set = overload_set_for_type(*program, var_type);
 
@@ -1100,7 +1140,8 @@ namespace instantiation
 					try_call(assign_to(expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
 					evaluate_constant_expression(std::move(expression), *program, next_block_scope_offset(scope_stack), constant.value.data());
 
-					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Constant name collides with another name.");
+					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) 
+						return make_syntax_error(incomplete_statement.variable_name, "Constant name collides with another name.");
 
 					top(scope_stack).constants.push_back(std::move(constant));
 
@@ -1108,9 +1149,11 @@ namespace instantiation
 				}
 				else
 				{
-					if (!is_convertible(assigned_expression_type, var_type, *program)) return make_syntax_error("Cannot convert to variable type in variable declaration.");
+					if (!is_convertible(assigned_expression_type, var_type, *program)) 
+						return make_syntax_error(incomplete_statement.assigned_expression.source, "Cannot convert to variable type in variable declaration.");
 
-					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) return make_syntax_error("Variable name collides with another name.");
+					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) 
+						return make_syntax_error(incomplete_statement.variable_name, "Variable name collides with another name.");
 
 					int const var_offset = add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
 
@@ -1134,12 +1177,14 @@ namespace instantiation
 				try_call(assign_to(complete_statement.condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
 
 				try_call_decl(auto then_case, instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
-				if (!then_case.has_value()) return make_syntax_error("Noop statement not allowed as then case of if statement.");
+				if (!then_case.has_value())
+					return make_syntax_error(incomplete_statement.then_case->source, "Noop statement not allowed as then case of if statement.");
 				complete_statement.then_case = allocate(std::move(*then_case));
 				if (incomplete_statement.else_case != nullptr)
 				{
 					try_call_decl(auto else_case, instantiate_statement(*incomplete_statement.else_case, template_parameters, scope_stack, program, current_scope_return_type));
-					if (!else_case.has_value()) return make_syntax_error("Noop statement not allowed as else case of if statement.");
+					if (!else_case.has_value()) 
+						return make_syntax_error(incomplete_statement.else_case->source, "Noop statement not allowed as else case of if statement.");
 					complete_statement.else_case = allocate(std::move(*else_case));
 				}
 
@@ -1168,7 +1213,8 @@ namespace instantiation
 				try_call(assign_to(complete_statement.condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
 
 				try_call_decl(auto body_statement, instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program, current_scope_return_type));
-				if (!body_statement.has_value()) return make_syntax_error("Noop statement not allowed as body of while loop.");
+				if (!body_statement.has_value())
+					return make_syntax_error(incomplete_statement.body->source, "Noop statement not allowed as body of while loop.");
 				complete_statement.body = allocate(std::move(*body_statement));
 
 				return std::move(complete_statement);
@@ -1179,7 +1225,8 @@ namespace instantiation
 				auto const guard = push_block_scope(scope_stack, complete_statement.scope);
 
 				try_call_decl(auto init_statement, instantiate_statement(*incomplete_statement.init_statement, template_parameters, scope_stack, program, current_scope_return_type));
-				if (!init_statement.has_value()) return make_syntax_error("Noop statement not allowed as init statement of for loop.");
+				if (!init_statement.has_value()) 
+					return make_syntax_error(incomplete_statement.init_statement->source, "Noop statement not allowed as init statement of for loop.");
 				complete_statement.init_statement = allocate(std::move(*init_statement));
 
 				try_call_decl(complete::Expression condition, instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type));
@@ -1189,14 +1236,16 @@ namespace instantiation
 					instantiate_expression(incomplete_statement.end_expression, template_parameters, scope_stack, program, current_scope_return_type));
 
 				try_call_decl(auto body_statement, instantiate_statement(*incomplete_statement.body, template_parameters, scope_stack, program, current_scope_return_type));
-				if (!body_statement.has_value()) return make_syntax_error("Noop statement not allowed as body of for loop.");
+				if (!body_statement.has_value()) 
+					return make_syntax_error(incomplete_statement.body->source, "Noop statement not allowed as body of for loop.");
 				complete_statement.body = allocate(std::move(*body_statement));
 
 				return std::move(complete_statement);
 			},
 			[&](incomplete::statement::Return const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
-				if (scope_stack.back().type == ScopeType::global) return make_syntax_error("A return statement cannot appear at the global scope.");
+				if (scope_stack.back().type == ScopeType::global)
+					return make_syntax_error(incomplete_statement_.source, "A return statement cannot appear at the global scope.");
 
 				complete::statement::Return complete_statement;
 				try_call(assign_to(complete_statement.returned_expression),
@@ -1236,9 +1285,12 @@ namespace instantiation
 				for (incomplete::MemberVariable const & member_variable : incomplete_statement.declared_struct.member_variables)
 				{
 					try_call_decl(complete::TypeId const member_type, resolve_dependent_type(member_variable.type, template_parameters, scope_stack, program));
-					if (!is_data_type(member_type)) return make_syntax_error("Member variable cannot be void.");
-					if (member_type.is_reference) return make_syntax_error("Member variable cannot be reference.");
-					if (member_type.is_mutable) return make_syntax_error("Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
+					if (!is_data_type(member_type)) 
+						return make_syntax_error(member_variable.name, "Member variable cannot be void.");
+					if (member_type.is_reference) 
+						return make_syntax_error(member_variable.name, "Member variable cannot be reference.");
+					if (member_type.is_mutable) 
+						return make_syntax_error(member_variable.name, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
 
 					add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, member_variable.name, member_type, 0, *program);
 
@@ -1256,24 +1308,26 @@ namespace instantiation
 					}
 				}
 
-				if (does_name_collide(scope_stack, incomplete_statement.declared_struct.name)) return make_syntax_error("Struct name collides with another name.");
+				if (does_name_collide(scope_stack, incomplete_statement.declared_struct.name)) 
+					return make_syntax_error(incomplete_statement.declared_struct.name, "Struct name collides with another name.");
 
 				new_type.extra_data = complete::Type::Struct{ static_cast<int>(program->structs.size()) };
 				complete::TypeId const new_type_id = add_type(*program, std::move(new_type));
 				program->structs.push_back(std::move(new_struct));
-				top(scope_stack).types.push_back({incomplete_statement.declared_struct.name, new_type_id});
+				top(scope_stack).types.push_back({std::string(incomplete_statement.declared_struct.name), new_type_id});
 
 				return std::nullopt;
 			},
 			[&](incomplete::statement::StructTemplateDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
-				if (does_name_collide(scope_stack, incomplete_statement.declared_struct_template.name)) return make_syntax_error("Struct template name collides with another name.");
+				if (does_name_collide(scope_stack, incomplete_statement.declared_struct_template.name)) 
+					return make_syntax_error(incomplete_statement.declared_struct_template.name, "Struct template name collides with another name.");
 
 				complete::StructTemplate new_template;
 				new_template.incomplete_struct = incomplete_statement.declared_struct_template;
 				new_template.scope_template_parameters = template_parameters;
 				auto const id = add_struct_template(*program, std::move(new_template));
-				top(scope_stack).struct_templates.push_back({incomplete_statement.declared_struct_template.name, id});
+				top(scope_stack).struct_templates.push_back({std::string(incomplete_statement.declared_struct_template.name), id});
 
 				return std::nullopt;
 			},
@@ -1311,16 +1365,17 @@ namespace instantiation
 					function_id.index = static_cast<int>(program->extern_functions.size());
 					program->extern_functions.push_back(std::move(extern_function));
 
-					if (does_function_name_collide(scope_stack, incomplete_extern_function.name)) return make_syntax_error("Extern function name collides with another name.");
+					if (does_function_name_collide(scope_stack, incomplete_extern_function.name)) 
+						return make_syntax_error(incomplete_extern_function.name, "Extern function name collides with another name.");
 
-					top(scope_stack).functions.push_back({incomplete_extern_function.name, function_id});
+					top(scope_stack).functions.push_back({std::string(incomplete_extern_function.name), function_id});
 				}
 
 				return std::nullopt;
 			}
 		);
 
-		return std::visit(visitor, incomplete_statement_.as_variant());
+		return std::visit(visitor, incomplete_statement_.variant);
 	}
 
 	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, PartialSyntaxError>
@@ -1335,7 +1390,7 @@ namespace instantiation
 			if (complete_statement)
 			{
 				if (!has_type<complete::statement::VariableDeclaration>(*complete_statement))
-					return make_syntax_error("Only variable declarations, function declarations and struct declarations allowed at global scope.");
+					return make_syntax_error(incomplete_statement.source, "Only variable declarations, function declarations and struct declarations allowed at global scope.");
 				
 				complete_program->global_initialization_statements.push_back(std::move(*complete_statement));
 			}

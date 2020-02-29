@@ -438,7 +438,7 @@ namespace complete
 			all_template_parameters.push_back(id);
 
 		for (size_t i = 0; i < parameters.size(); ++i) 
-			all_template_parameters.push_back({function_template.incomplete_function.template_parameters[i].name, parameters[i]});
+			all_template_parameters.push_back({std::string(function_template.incomplete_function.template_parameters[i].name), parameters[i]});
 
 		TODO("The complete scope stack.");
 		instantiation::ScopeStack scope_stack;
@@ -473,7 +473,7 @@ namespace complete
 			all_template_parameters.push_back(id);
 
 		for (size_t i = 0; i < parameters.size(); ++i)
-			all_template_parameters.push_back({struct_template.incomplete_struct.template_parameters[i].name, parameters[i]});
+			all_template_parameters.push_back({std::string(struct_template.incomplete_struct.template_parameters[i].name), parameters[i]});
 
 		TODO("The complete scope stack.");
 		instantiation::ScopeStack scope_stack;
