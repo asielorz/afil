@@ -38,8 +38,15 @@ Posible solución:
 	Nuevos tipos de id que tienen un identificador de módulo además de índice en el array.
 	Posibilidad: índice del módulo en la lista de módulos de los que depende este + índice en el array.
 	link hace la traducción de estos ids intermedios a los tipos de id que estamos usando ahora.
+
+Parsear:
+	El algoritmo de parseo recorre recursivamente los archivos construyendo la jerarquía de dependencias.
+	Se obliga a que todos los import estén arriba del todo. Luego se ordenan para poder ejecutarlos de forma
+	que al parsear cada archivo todas sus dependencias estén resueltas, y se genera un vector de incomplete::Module.
+	Luego esto se usa para generar el vector de complete::Module en el mismo orden de dependencias.
+
 ********************************************************************************************************/
-#if 1
+#if 0
 struct ModuleId
 {
 	// ????
