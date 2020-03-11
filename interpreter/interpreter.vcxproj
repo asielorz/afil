@@ -59,6 +59,7 @@
   <ItemGroup>
     <ClInclude Include="src\afil.hh" />
     <ClInclude Include="src\built_in_structures.hh" />
+    <ClInclude Include="src\module.hh" />
     <ClInclude Include="src\utils\algorithm.hh" />
     <ClInclude Include="src\complete_expression.hh" />
     <ClInclude Include="src\complete_scope.hh" />
