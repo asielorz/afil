@@ -499,34 +499,37 @@ namespace instantiation
 			{
 				auto const lookup = lookup_name(scope_stack, incomplete_expression.name);
 				auto const lookup_visitor = overload(
-					[](lookup_result::Variable const & var) -> complete::Expression
+					[](lookup_result::Variable const & var) -> expected<complete::Expression, PartialSyntaxError>
 					{
 						complete::expression::LocalVariable complete_expression;
 						complete_expression.variable_type = var.variable_type;
 						complete_expression.variable_offset = var.variable_offset;
 						return complete_expression;
 					},
-					[](lookup_result::Constant const & var) -> complete::Expression
+					[](lookup_result::Constant const & var) -> expected<complete::Expression, PartialSyntaxError>
 					{
 						complete::expression::Constant complete_expression;
 						complete_expression.type = var.constant->type;
 						complete_expression.value = var.constant->value;
 						return complete_expression;
 					},
-					[](lookup_result::GlobalVariable const & var) -> complete::Expression
+					[](lookup_result::GlobalVariable const & var) -> expected<complete::Expression, PartialSyntaxError>
 					{
 						complete::expression::GlobalVariable complete_expression;
 						complete_expression.variable_type = var.variable_type;
 						complete_expression.variable_offset = var.variable_offset;
 						return complete_expression;
 					},
-					[&](lookup_result::OverloadSet const & var) -> complete::Expression
+					[&](lookup_result::OverloadSet const & var) -> expected<complete::Expression, PartialSyntaxError>
 					{
 						complete::expression::Constant complete_expression;
 						complete_expression.type = type_for_overload_set(*program, var);
 						return complete_expression;
 					},
-					[](auto const &) -> complete::Expression { declare_unreachable(); }
+					[&](auto const &) -> expected<complete::Expression, PartialSyntaxError>
+					{
+						return make_syntax_error(incomplete_expression.name, "Undeclared identifier.");
+					}
 				);
 				return std::visit(lookup_visitor, lookup);
 			},
@@ -676,7 +679,7 @@ namespace instantiation
 					));
 				}
 
-				FunctionTemplateId const template_id =  add_function_template(*program, std::move(new_function_template));
+				FunctionTemplateId const template_id = add_function_template(*program, std::move(new_function_template));
 
 				complete::OverloadSet overload_set;
 				overload_set.function_template_ids.push_back(template_id);
@@ -703,7 +706,7 @@ namespace instantiation
 					complete::OverloadSetView const overload_set = overload_set_for_type(*program, first_param_type);
 
 					try_call_decl(FunctionId const function, 
-						resolve_function_overloading_and_insert_conversions(overload_set, {&parameters[1], parameter_types.size()}, parameter_types, *program));
+						resolve_function_overloading_and_insert_conversions(overload_set, {parameters.data() + 1, parameter_types.size()}, parameter_types, *program));
 
 					if (function == invalid_function_id)
 						return make_syntax_error(incomplete_expression.parameters[0].source, "Overload not found.");
@@ -1378,20 +1381,125 @@ namespace instantiation
 		return std::visit(visitor, incomplete_statement_.variant);
 	}
 
+	struct ProgramState
+	{
+		size_t types;
+		size_t structs;
+		size_t struct_templates;
+		size_t overload_set_types;
+		size_t functions;
+		size_t extern_functions;
+		size_t function_templates;
+		FunctionId main_function;
+
+		// Global scope
+		int global_scope_stack_frame_size;
+		int global_scope_stack_frame_alignment;
+		size_t global_scope_variables;
+		size_t global_scope_constants;
+		size_t global_scope_functions;
+		size_t global_scope_types;
+		size_t global_scope_function_templates;
+		size_t global_scope_struct_templates;
+	};
+	auto capture_state(complete::Program const & program) noexcept -> ProgramState
+	{
+		ProgramState program_state;
+
+		program_state.types = program.types.size();
+		program_state.structs = program.structs.size();
+		program_state.struct_templates = program.struct_templates.size();
+		program_state.overload_set_types = program.overload_set_types.size();
+		program_state.functions = program.functions.size();
+		program_state.extern_functions = program.extern_functions.size();
+		program_state.function_templates = program.function_templates.size();
+		program_state.main_function = program.main_function;
+
+		program_state.global_scope_stack_frame_size = program.global_scope.stack_frame_size;
+		program_state.global_scope_stack_frame_alignment = program.global_scope.stack_frame_alignment;
+		program_state.global_scope_variables = program.global_scope.variables.size();
+		program_state.global_scope_constants = program.global_scope.constants.size();
+		program_state.global_scope_functions = program.global_scope.functions.size();
+		program_state.global_scope_types = program.global_scope.types.size();
+		program_state.global_scope_function_templates = program.global_scope.function_templates.size();
+		program_state.global_scope_struct_templates = program.global_scope.struct_templates.size();
+
+		return program_state;
+	}
+
+	auto restore_state(out<complete::Program> program, ProgramState const & program_state) noexcept -> void
+	{
+		program->types.resize(program_state.types);
+		program->structs.resize(program_state.structs);
+		program->struct_templates.resize(program_state.struct_templates);
+		program->overload_set_types.resize(program_state.overload_set_types);
+		program->functions.resize(program_state.functions);
+		program->extern_functions.resize(program_state.extern_functions);
+		program->function_templates.resize(program_state.function_templates);
+		program->main_function = program_state.main_function;
+
+		program->global_scope.stack_frame_size = program_state.global_scope_stack_frame_size;
+		program->global_scope.stack_frame_alignment = program_state.global_scope_stack_frame_alignment;
+		program->global_scope.variables.resize(program_state.global_scope_variables);
+		program->global_scope.constants.resize(program_state.global_scope_constants);
+		program->global_scope.functions.resize(program_state.global_scope_functions);
+		program->global_scope.types.resize(program_state.global_scope_types);
+		program->global_scope.function_templates.resize(program_state.global_scope_function_templates);
+		program->global_scope.struct_templates.resize(program_state.global_scope_struct_templates);
+	}
+
 	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, PartialSyntaxError>
 	{
 		std::vector<complete::ResolvedTemplateParameter> template_parameters;
 		ScopeStack scope_stack;
 		scope_stack.push_back({&complete_program->global_scope, ScopeType::global, 0});
 
-		for (incomplete::Statement const & incomplete_statement : incomplete_program)
+		std::vector<std::variant<std::nullopt_t, complete::Statement, PartialSyntaxError>> complete_statements(incomplete_program.size(), std::nullopt);
+		std::vector<size_t> unparsed_statements(incomplete_program.size());
+		std::iota(unparsed_statements.begin(), unparsed_statements.end(), size_t(0));
+
+		size_t correctly_parsed;
+		do
 		{
-			try_call_decl(auto complete_statement, instantiate_statement(incomplete_statement, template_parameters, scope_stack, out(complete_program), nullptr));
-			if (complete_statement)
+			size_t const size_before = unparsed_statements.size();
+			filter_in_place(unparsed_statements, [&](size_t i)
+			{
+				ProgramState const program_state = capture_state(*complete_program);
+
+				auto complete_statement = instantiate_statement(incomplete_program[i], template_parameters, scope_stack, out(complete_program), nullptr);
+				if (complete_statement.has_value())
+				{
+					if (complete_statement->has_value())
+						complete_statements[i] = std::move(complete_statement->value());
+					else
+						complete_statements[i] = std::nullopt;
+
+					return false;
+				}
+				else
+				{
+					complete_statements[i] = std::move(complete_statement.error());
+					// Reset scope stack and program since they may have been left in an invalid state after aborting compilation.
+					scope_stack.resize(1);
+					template_parameters.clear();
+					restore_state(complete_program, program_state);
+					return true;
+				}
+			});
+			correctly_parsed = unparsed_statements.size() - size_before;
+		} while (correctly_parsed > 0);
+
+		// If any statement was left without parsing, compilation failed.
+		if (unparsed_statements.size() > 0)
+			return Error(std::get<PartialSyntaxError>(complete_statements[unparsed_statements[0]])); TODO("Returning multiple errors");
+
+		for (size_t i = 0; i < incomplete_program.size(); ++i)
+		{
+			if (complete::Statement * complete_statement = try_get<complete::Statement>(complete_statements[i]))
 			{
 				if (!has_type<complete::statement::VariableDeclaration>(*complete_statement))
-					return make_syntax_error(incomplete_statement.source, "Only variable declarations, function declarations and struct declarations allowed at global scope.");
-				
+					return make_syntax_error(incomplete_program[i].source, "Only variable declarations, function declarations and struct declarations allowed at global scope.");
+
 				complete_program->global_initialization_statements.push_back(std::move(*complete_statement));
 			}
 		}

@@ -77,3 +77,22 @@ namespace std
 	}
 
 } // namespace std
+
+template <typename ForwardIt, typename Pred>
+ForwardIt filter_in_place(ForwardIt first, ForwardIt last, Pred p)
+{
+	ForwardIt kept = first;
+	for (; first != last; ++first)
+	{
+		if (p(*first))
+			*kept++ = std::move(*first);
+	}
+	return kept;
+}
+
+template <typename Container, typename Pred>
+void filter_in_place(Container & v, Pred p)
+{
+	auto new_end = filter_in_place(v.begin(), v.end(), p);
+	v.erase(new_end, v.end());
+}

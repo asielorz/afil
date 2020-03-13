@@ -1849,38 +1849,38 @@ TEST_CASE("A program can be parsed incrementally")
 	REQUIRE(interpreter::run(program) == 8);
 }
 
-TEST_CASE("Importing source files from code")
-{
-	auto const src = R"(
-		import "test_files/ivec2.afil";
-		
-		let main = fn() -> int
-		{
-			let v = ivec2(4, 5) + ivec2(-1, 3);
-			return v.y;
-		};
-	)"sv;
-
-	REQUIRE(tests::parse_and_run(src) == 8);
-}
-
-TEST_CASE("Importing the same file repeatedly is idempotent")
-{
-	auto const src = R"(
-		import "test_files/ivec2.afil";
-		import "test_files/ivec2.afil";
-		import "test_files/ivec2.afil";
-		import "test_files/ivec2.afil";
-		
-		let main = fn() -> int
-		{
-			let v = ivec2(4, 5) + ivec2(-1, 3);
-			return v.y;
-		};
-	)"sv;
-
-	REQUIRE(tests::parse_and_run(src) == 8);
-}
+//TEST_CASE("Importing source files from code")
+//{
+//	auto const src = R"(
+//		import "test_files/ivec2.afil";
+//		
+//		let main = fn() -> int
+//		{
+//			let v = ivec2(4, 5) + ivec2(-1, 3);
+//			return v.y;
+//		};
+//	)"sv;
+//
+//	REQUIRE(tests::parse_and_run(src) == 8);
+//}
+//
+//TEST_CASE("Importing the same file repeatedly is idempotent")
+//{
+//	auto const src = R"(
+//		import "test_files/ivec2.afil";
+//		import "test_files/ivec2.afil";
+//		import "test_files/ivec2.afil";
+//		import "test_files/ivec2.afil";
+//		
+//		let main = fn() -> int
+//		{
+//			let v = ivec2(4, 5) + ivec2(-1, 3);
+//			return v.y;
+//		};
+//	)"sv;
+//
+//	REQUIRE(tests::parse_and_run(src) == 8);
+//}
 
 TEST_CASE("Forgetting a variable name will result in a compiler error")
 {
@@ -2035,6 +2035,29 @@ TEST_CASE("uninit allows for not initializing an object")
 	)"sv;
 
 	tests::parse_and_run(src);
+}
+
+TEST_CASE("Order of declarations doesn't matter")
+{
+	auto const src = R"(
+		let B = fn() -> int
+		{
+			// A defined below!!!
+			return A();
+		};
+
+		let A = fn() -> int
+		{
+			return 4;
+		};
+
+		let main = fn() -> int
+		{
+			return B();
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
 }
 
 //TEST_CASE("Functions that take types as parameters")
