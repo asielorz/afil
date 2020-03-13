@@ -35,6 +35,7 @@
     <ClCompile Include="src\operator.cc" />
     <ClCompile Include="src\pretty_print.cc" />
     <ClCompile Include="src\program.cc" />
+    <ClCompile Include="src\scan_dependencies.cc" />
     <ClCompile Include="src\template_instantiation.cc" />
     <ClCompile Include="src\utils\callc.cc" />
     <ClCompile Include="src\incomplete_expression.cc" />

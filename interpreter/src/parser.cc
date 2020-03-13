@@ -1135,7 +1135,7 @@ namespace parser
 			return parse_struct_template_declaration(tokens, index, type_names);
 
 		try_call_decl(incomplete::Struct declared_struct, parse_struct(tokens, index, type_names));
-		type_names.push_back({ declared_struct.name, TypeName::Type::type});
+		type_names.push_back({declared_struct.name, TypeName::Type::type});
 		return incomplete::statement::StructDeclaration{std::move(declared_struct)};
 	}
 
@@ -1271,7 +1271,7 @@ namespace parser
 			// If the file has not been imported.
 			if (std::find(imported_files, canonical_file_name) == imported_files.end())
 			{
-				std::string const source = load_whole_file(canonical_file_name);
+				std::string const source = *load_whole_file(canonical_file_name);
 				imported_files.push_back(std::move(canonical_file_name));
 				try_call_void(parse_global_scope(source, type_names, imported_files, global_initialization_statements));
 			}

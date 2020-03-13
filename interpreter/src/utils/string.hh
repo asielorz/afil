@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <filesystem>
+#include <optional>
 
 template <typename T>
 auto to_string(T const & t) noexcept -> decltype(std::to_string(t))
@@ -53,8 +54,8 @@ auto make_null_terminated(std::string_view str) noexcept -> std::array<char, N>
 }
 
 auto is_null_terminated(std::string_view str) noexcept -> bool;
-auto load_whole_file(std::string_view path) noexcept -> std::string;
-auto load_whole_file(std::filesystem::path path) noexcept -> std::string;
+auto load_whole_file(std::string_view path) noexcept -> std::optional<std::string>;
+auto load_whole_file(std::filesystem::path path) noexcept -> std::optional<std::string>;
 auto replace(std::string_view string, std::string_view old_substr, std::string_view new_substr) noexcept -> std::string;
 
 auto make_string_view(char const first[], char const last[]) noexcept -> std::string_view;

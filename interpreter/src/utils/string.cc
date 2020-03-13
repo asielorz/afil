@@ -6,19 +6,23 @@ auto is_null_terminated(std::string_view str) noexcept -> bool
 	return str.data()[str.size()] == '\0';
 }
 
-auto load_whole_file(std::string_view path) noexcept -> std::string
+auto load_whole_file(std::string_view path) noexcept -> std::optional<std::string>
 {
 	auto const null_terminated_path = make_null_terminated(path);
 	std::ifstream file(null_terminated_path.data());
-	assert(file);
-	return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+	if (file.is_open())
+		return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+	else
+		return std::nullopt;
 }
 
-auto load_whole_file(std::filesystem::path path) noexcept -> std::string
+auto load_whole_file(std::filesystem::path path) noexcept -> std::optional<std::string>
 {
 	std::ifstream file(path);
-	assert(file);
-	return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+	if (file.is_open())
+		return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+	else
+		return std::nullopt;
 }
 
 auto replace(std::string_view string, std::string_view old_substr, std::string_view new_substr) noexcept -> std::string
