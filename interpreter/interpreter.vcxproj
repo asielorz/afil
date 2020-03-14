@@ -35,7 +35,7 @@
     <ClCompile Include="src\operator.cc" />
     <ClCompile Include="src\pretty_print.cc" />
     <ClCompile Include="src\program.cc" />
-    <ClCompile Include="src\scan_dependencies.cc" />
+    <ClCompile Include="src\incomplete_module.cc" />
     <ClCompile Include="src\template_instantiation.cc" />
     <ClCompile Include="src\utils\callc.cc" />
     <ClCompile Include="src\incomplete_expression.cc" />
@@ -61,6 +61,7 @@
   <ItemGroup>
     <ClInclude Include="src\afil.hh" />
     <ClInclude Include="src\built_in_structures.hh" />
+    <ClInclude Include="src\incomplete_module.hh" />
     <ClInclude Include="src\module.hh" />
     <ClInclude Include="src\utils\algorithm.hh" />
     <ClInclude Include="src\complete_expression.hh" />

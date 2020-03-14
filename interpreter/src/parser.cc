@@ -1,6 +1,6 @@
 #include "parser.hh"
 #include "incomplete_statement.hh"
-#include "program.hh"
+#include "incomplete_module.hh"
 #include "syntax_error.hh"
 #include "lexer.hh"
 #include "utils/algorithm.hh"
@@ -53,11 +53,18 @@ namespace parser
 		"xor",
 	};
 
-	struct TypeName
+	auto built_in_type_names() noexcept -> std::vector<TypeName>
 	{
-		std::string_view name;
-		enum struct Type { type, struct_template, template_parameter } type;
-	};
+		return {
+			{"void",		TypeName::Type::type},
+			{"int",			TypeName::Type::type},
+			{"float",		TypeName::Type::type},
+			{"bool",		TypeName::Type::type},
+			{"char",		TypeName::Type::type},
+			{"type",		TypeName::Type::type},
+			{"uninit_t",	TypeName::Type::type}
+		};
+	}
 
 	template <typename C>
 	auto is_name_locally_taken(std::string_view name_to_test, C const & registered_names) noexcept -> bool
@@ -1292,8 +1299,8 @@ namespace parser
 	[[nodiscard]] auto parse_global_scope(
 		span<lex::Token const> tokens,
 		std::vector<TypeName> & type_names,
-		out<std::vector<incomplete::Statement>> global_initialization_statements
-	) noexcept -> expected<void, PartialSyntaxError>
+		std::vector<incomplete::Statement> global_initialization_statements
+	) noexcept -> expected<std::vector<incomplete::Statement>, PartialSyntaxError>
 	{
 		size_t index = 0;
 		while (index < tokens.size())
@@ -1303,30 +1310,57 @@ namespace parser
 			if (has_type<incomplete::statement::ExpressionStatement>(statement.variant)) 
 				return make_syntax_error(tokens[index], "An expression statement is not allowed at the global scope.");
 
-			global_initialization_statements->push_back(std::move(statement));
+			global_initialization_statements.push_back(std::move(statement));
 		}
+
+		return global_initialization_statements;
+	}
+
+	[[nodiscard]] auto parse_module(span<incomplete::Module> modules, int index) noexcept -> expected<void, SyntaxError>
+	{
+		std::vector<lex::Token> tokens;
+		for (auto const & file : modules[index].files)
+		{
+			auto new_tokens = lex::tokenize(file.source, std::move(tokens));
+			if (new_tokens.has_value())
+				tokens = std::move(*new_tokens);
+			else
+				return Error(complete_syntax_error(new_tokens.error(), file.source, file.filename));
+		}
+
+		std::vector<TypeName> type_names = built_in_type_names();
+		scan_type_names(modules, index, out(type_names));
+		size_t const imported_type_count = type_names.size();
+
+
+		auto statements = parse_global_scope(tokens, type_names);
+		if (!statements.has_value())
+		{
+			std::string_view const source_with_error = statements.error().error_in_source;
+			auto const file = std::find_if(modules[index].files, [=](const incomplete::Module::File & file)
+			{
+				return is_contained_in(file.source, source_with_error);
+			});
+			assert(file != modules[index].files.end());
+
+			return Error(complete_syntax_error(std::move(statements.error()), file->source, file->filename));
+		}
+
+		type_names.erase(type_names.begin(), type_names.begin() + imported_type_count);
+		modules[index].type_names = std::move(type_names);
+		modules[index].statements = std::move(*statements);
 
 		return success;
 	}
 
-	auto parse_source(std::string_view src, complete::Program const & program) noexcept -> expected<std::vector<incomplete::Statement>, PartialSyntaxError>
+	[[nodiscard]] auto parse_modules(span<incomplete::Module> modules) noexcept -> expected<void, SyntaxError>
 	{
-		std::vector<incomplete::Statement> global_initialization_statements;
+		try_call_decl(std::vector<int> const sorted_modules, sort_modules_by_dependencies(modules));
 
-		try_call_decl(auto const tokens, lex::tokenize(src));
+		for (int i : sorted_modules)
+			try_call_void(parse_module(modules, i));
 
-		std::vector<TypeName> type_names;
-		type_names.reserve(16 + program.global_scope.types.size() + program.global_scope.struct_templates.size());
-
-		for (complete::TypeName const & name : program.global_scope.types)
-			type_names.push_back({name.name, TypeName::Type::type});
-
-		for (complete::StructTemplateName const & name : program.global_scope.struct_templates)
-			type_names.push_back({name.name, TypeName::Type::struct_template});
-
-		try_call_void(parse_global_scope(tokens, type_names, out(global_initialization_statements)));
-
-		return std::move(global_initialization_statements);
+		return success;
 	}
 
-}
+} // namespace parser

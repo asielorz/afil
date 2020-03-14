@@ -76,6 +76,12 @@ namespace std
 		return equal(begin(range1), end(range1), begin(range2), end(range2), p);
 	}
 
+	template <typename ForwardRange, typename T>
+	auto iota(ForwardRange & range, T value) -> decltype(std::iota(begin(range), end(range), value))
+	{
+		return std::iota(begin(range), end(range), value);
+	}
+
 } // namespace std
 
 template <typename ForwardIt, typename Pred>

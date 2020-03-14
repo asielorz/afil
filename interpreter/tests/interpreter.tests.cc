@@ -1,5 +1,8 @@
 #include <catch2/catch.hpp>
 #include "interpreter.hh"
+#include "incomplete_module.hh"
+#include "parser.hh"
+#include "template_instantiation.hh"
 #include "afil.hh"
 #include "program.hh"
 #include "pretty_print.hh"
@@ -30,20 +33,34 @@ namespace tests
 		}
 	}
 
+	auto parse_source(std::string_view src) -> expected<complete::Program, SyntaxError>
+	{
+		incomplete::Module module_for_source;
+		module_for_source.files.push_back({"<source>", std::string(src)});
+		try_call_void(parser::parse_modules({&module_for_source, 1}));
+
+		complete::Program program;
+		auto semantic_analysis_result = instantiation::semantic_analysis(module_for_source.statements, out(program));
+		if (!semantic_analysis_result.has_value())
+			return Error(complete_syntax_error(semantic_analysis_result.error(), module_for_source.files[0].source));
+		else
+			return std::move(program);
+	}
+
 	auto parse_and_run(std::string_view src) -> int
 	{
-		complete::Program const program = assert_get(afil::parse_source(src));
+		complete::Program const program = assert_get(parse_source(src));
 		return interpreter::run(program);
 	}
 
-	auto parse_source(std::string_view src) noexcept -> bool
+	auto source_compiles(std::string_view src) noexcept -> bool
 	{
-		return afil::parse_source(src).has_value();
+		return parse_source(src).has_value();
 	}
 
 	auto parse_and_print(std::string_view src) -> void
 	{
-		complete::Program const program = assert_get(afil::parse_source(src));
+		complete::Program const program = assert_get(parse_source(src));
 		printf("%s", pretty_print(program).c_str());
 		system("pause");
 	}
@@ -489,7 +506,7 @@ TEST_CASE("Struct")
 		}
 	)"sv;
 
-	REQUIRE(tests::parse_source(src));
+	REQUIRE(tests::source_compiles(src));
 }
 
 TEST_CASE("A struct can be used inside another struct")
@@ -508,7 +525,7 @@ TEST_CASE("A struct can be used inside another struct")
 		}
 	)"sv;
 
-	REQUIRE(tests::parse_source(src));
+	REQUIRE(tests::source_compiles(src));
 }
 
 TEST_CASE("A struct can be constructed by giving values to each member")
@@ -526,7 +543,7 @@ TEST_CASE("A struct can be constructed by giving values to each member")
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_source(src));
+	REQUIRE(tests::source_compiles(src));
 }
 
 TEST_CASE("Member access")
@@ -1822,66 +1839,6 @@ TEST_CASE("Bitwise left shift")
 	REQUIRE(tests::parse_and_run(src) == (25 << 7));
 }
 
-TEST_CASE("A program can be parsed incrementally")
-{
-	auto const file1 = R"(
-		struct ivec2
-		{
-			int x = 0;
-			int y = 0;
-		}
-		let operator+ = fn(ivec2 a, ivec2 b)
-		{
-			return ivec2(a.x + b.x, a.y + b.y);
-		};
-	)"sv;
-
-	auto const file2 = R"(
-		let main = fn() -> int
-		{
-			let v = ivec2(4, 5) + ivec2(-1, 3);
-			return v.y;
-		};
-	)"sv;
-
-	complete::Program program = tests::assert_get(afil::parse_source(file1));
-	tests::require_ok(afil::parse_source(file2, out(program)));
-	REQUIRE(interpreter::run(program) == 8);
-}
-
-//TEST_CASE("Importing source files from code")
-//{
-//	auto const src = R"(
-//		import "test_files/ivec2.afil";
-//		
-//		let main = fn() -> int
-//		{
-//			let v = ivec2(4, 5) + ivec2(-1, 3);
-//			return v.y;
-//		};
-//	)"sv;
-//
-//	REQUIRE(tests::parse_and_run(src) == 8);
-//}
-//
-//TEST_CASE("Importing the same file repeatedly is idempotent")
-//{
-//	auto const src = R"(
-//		import "test_files/ivec2.afil";
-//		import "test_files/ivec2.afil";
-//		import "test_files/ivec2.afil";
-//		import "test_files/ivec2.afil";
-//		
-//		let main = fn() -> int
-//		{
-//			let v = ivec2(4, 5) + ivec2(-1, 3);
-//			return v.y;
-//		};
-//	)"sv;
-//
-//	REQUIRE(tests::parse_and_run(src) == 8);
-//}
-
 TEST_CASE("Forgetting a variable name will result in a compiler error")
 {
 	auto const src = R"(
@@ -1892,7 +1849,7 @@ TEST_CASE("Forgetting a variable name will result in a compiler error")
 		};
 	)"sv;
 
-	expected<complete::Program, SyntaxError> program = afil::parse_source(src);
+	expected<complete::Program, SyntaxError> program = tests::parse_source(src);
 	REQUIRE(!program.has_value());
 }
 
@@ -1906,7 +1863,7 @@ TEST_CASE("There is no operator + for booleans")
 		};
 	)"sv;
 
-	expected<complete::Program, SyntaxError> program = afil::parse_source(src);
+	expected<complete::Program, SyntaxError> program = tests::parse_source(src);
 	REQUIRE(!program.has_value());
 }
 
