@@ -38,4 +38,6 @@ auto make_complete_syntax_error(
 	std::string_view msg, 
 	std::string_view source, 
 	std::string_view filename = "<source>") noexcept -> Error<SyntaxError>;
+
+auto error_string(SyntaxError const & error) noexcept -> std::string;
 auto operator << (std::ostream & os, SyntaxError const & error) noexcept -> std::ostream &;

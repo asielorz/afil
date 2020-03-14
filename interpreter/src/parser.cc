@@ -1353,14 +1353,14 @@ namespace parser
 		return success;
 	}
 
-	[[nodiscard]] auto parse_modules(span<incomplete::Module> modules) noexcept -> expected<void, SyntaxError>
+	[[nodiscard]] auto parse_modules(span<incomplete::Module> modules) noexcept -> expected<std::vector<int>, SyntaxError>
 	{
 		try_call_decl(std::vector<int> const sorted_modules, sort_modules_by_dependencies(modules));
 
 		for (int i : sorted_modules)
 			try_call_void(parse_module(modules, i));
 
-		return success;
+		return sorted_modules;
 	}
 
 } // namespace parser

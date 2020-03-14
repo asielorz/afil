@@ -16,6 +16,10 @@ auto run_tests() noexcept -> int
 
 auto program_main_(int argc, char const * const argv[]) -> int;
 
+#ifdef main
+#define UNIT_TESTS
+#endif
+
 #undef main
 auto main(int argc, char const * const argv[]) -> int
 {

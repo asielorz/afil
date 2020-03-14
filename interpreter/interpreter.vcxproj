@@ -102,6 +102,9 @@
   <ItemGroup>
     <None Include="src\interpreter.inl" />
     <None Include="src\utils\callc.inl" />
+    <None Include="test_files\main.afil" />
+    <None Include="test_files\main.afilm" />
+    <None Include="test_files\math.afilm" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
@@ -218,7 +221,7 @@
       <ConformanceMode>false</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>UNIT_TESTS;%(PreprocessorDefinitions);main=program_main_</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);main=program_main_;UNIT_TESTS</PreprocessorDefinitions>
       <SupportJustMyCode>false</SupportJustMyCode>
       <AdditionalIncludeDirectories>$(ProjectDir)\src\;$(SolutionDir)\extern\</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
@@ -246,7 +249,7 @@
       <ConformanceMode>false</ConformanceMode>
       <TreatWarningAsError>true</TreatWarningAsError>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>UNIT_TESTS;%(PreprocessorDefinitions);main=program_main_</PreprocessorDefinitions>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);main=program_main_;UNIT_TESTS</PreprocessorDefinitions>
       <SupportJustMyCode>false</SupportJustMyCode>
       <AdditionalIncludeDirectories>$(ProjectDir)\src\;$(SolutionDir)\extern\</AdditionalIncludeDirectories>
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>

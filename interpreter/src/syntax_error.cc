@@ -65,13 +65,16 @@ auto make_complete_syntax_error(
 	return Error(complete_syntax_error(std::move(make_syntax_error(error_in_source, msg).value), source, filename));
 }
 
+auto error_string(SyntaxError const & error) noexcept -> std::string
+{
+	return join(
+		error.filename, ':', error.row, ':', error.column, ": error: ", error.error_message, '\n',
+		error.line_with_error, '\n',
+		std::string(error.column, ' '), '^', std::string(error.error_length - 1, '~'), '\n'
+	);
+}
+
 auto operator << (std::ostream & os, SyntaxError const & error) noexcept -> std::ostream &
 {
-	os << error.filename << ':' << error.row << ':' << error.column << ": error: " << error.error_message << '\n';
-	os << error.line_with_error << '\n';
-	for (int i = 0; i < error.column; ++i) os << ' ';
-	os << '^';
-	for (int i = 0; i < error.error_length - 1; ++i) os << '~';
-	os << '\n';
-	return os;
+	return os << error_string(error);
 }

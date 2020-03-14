@@ -56,6 +56,7 @@ namespace incomplete
 	}
 
 	constexpr std::string_view import_keyword = "import";
+	constexpr std::string_view file_keyword = "file";
 	constexpr std::string_view module_extension = ".afilm";
 
 	[[nodiscard]] auto scan_dependencies(
@@ -65,7 +66,7 @@ namespace incomplete
 		std::map<std::filesystem::path, int> & already_scanned_modules,
 		std::map<std::filesystem::path, std::string_view> & already_loaded_files) noexcept -> expected<void, SyntaxError>
 	{
-		incomplete::Module & current_module = modules.emplace_back();
+		auto const current_module_index = &modules.emplace_back() - modules.data();
 
 		std::string_view source = ignore_empty_lines(module_source);
 
@@ -76,12 +77,12 @@ namespace incomplete
 			if (starts_with(first_line, import_keyword))
 			{
 				std::string_view const dependency_name = ignore_whitespace(first_line.substr(import_keyword.size()));
-				std::filesystem::path canonical_path = std::filesystem::canonical(join(dependency_name, module_extension));
+				std::filesystem::path canonical_path = std::filesystem::canonical(module_path_from_name(dependency_name));
 
 				auto const it = already_scanned_modules.find(canonical_path);
 				if (it != already_scanned_modules.end())
 				{
-					current_module.dependencies.push_back(it->second);
+					modules[current_module_index].dependencies.push_back(it->second);
 				}
 				else
 				{
@@ -90,14 +91,14 @@ namespace incomplete
 						return make_complete_syntax_error(module_name, "Could not open module file.", module_source, module_name);
 
 					int const dependency_index = static_cast<int>(modules.size());
-					current_module.dependencies.push_back(dependency_index);
+					modules[current_module_index].dependencies.push_back(dependency_index);
 					already_scanned_modules[std::move(canonical_path)] = dependency_index;
 					try_call_void(scan_dependencies(dependency_name, std::move(*dependency_source), modules, already_scanned_modules, already_loaded_files));
 				}
 			}
-			else if (starts_with(first_line, "file"))
+			else if (starts_with(first_line, file_keyword))
 			{
-				std::string_view const file_name = ignore_whitespace(first_line.substr(import_keyword.size()));
+				std::string_view const file_name = ignore_whitespace(first_line.substr(file_keyword.size()));
 				std::filesystem::path canonical_path = std::filesystem::canonical(file_name);
 
 				auto const it = already_loaded_files.find(canonical_path);
@@ -108,13 +109,15 @@ namespace incomplete
 				if (!file_source.has_value())
 					return make_complete_syntax_error(first_line, join("Could not open file ", canonical_path), module_source, module_name);
 
-				current_module.files.push_back({ std::string(file_name), std::move(*file_source) });
+				modules[current_module_index].files.push_back({ std::string(file_name), std::move(*file_source) });
 				already_loaded_files[std::move(canonical_path)] = module_name;
 			}
 			else
 			{
 				return make_complete_syntax_error(first_line, "Expected file or import in module file.", module_source, module_name);
 			}
+
+			source = ignore_empty_lines(source);
 		}
 
 		return success;
@@ -137,6 +140,11 @@ namespace incomplete
 
 		for (int const dependency_index : modules[index].dependencies)
 			scan_type_names(modules, dependency_index, type_names);
+	}
+
+	auto module_path_from_name(std::string_view module_name) noexcept -> std::string
+	{
+		return join(module_name, module_extension);
 	}
 
 } // namespace incomplete

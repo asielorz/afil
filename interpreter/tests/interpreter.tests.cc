@@ -2043,11 +2043,11 @@ TEST_CASE("A program may be composed of several modules")
 	modules[0].files.push_back({"ivec2.afil", std::string(file1)});
 	modules[1].files.push_back({"main.afil", std::string(file2)});
 	modules[1].dependencies.push_back(0);
-	tests::require_ok(parser::parse_modules(modules));
+	auto const parse_order = tests::assert_get(parser::parse_modules(modules));
 
 	complete::Program program;
-	for (incomplete::Module const & incomplete_module : modules)
-		tests::require_ok(instantiation::semantic_analysis(incomplete_module.statements, out(program)));
+	for (int i : parse_order)
+		tests::require_ok(instantiation::semantic_analysis(modules[i].statements, out(program)));
 
 	REQUIRE(interpreter::run(program) == 8);
 }

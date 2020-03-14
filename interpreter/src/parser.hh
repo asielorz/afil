@@ -16,7 +16,7 @@ namespace parser
 		enum struct Type { type, struct_template, template_parameter } type;
 	};
 
-	[[nodiscard]] auto parse_modules(span<incomplete::Module> modules) noexcept -> expected<void, SyntaxError>;
+	[[nodiscard]] auto parse_modules(span<incomplete::Module> modules) noexcept -> expected<std::vector<int>, SyntaxError>;
 
 	[[nodiscard]] auto parse_global_scope(
 		span<lex::Token const> tokens,
