@@ -2017,6 +2017,41 @@ TEST_CASE("Order of declarations doesn't matter")
 	REQUIRE(tests::parse_and_run(src) == 4);
 }
 
+TEST_CASE("A program may be composed of several modules")
+{
+	auto const file1 = R"(
+		struct ivec2
+		{
+			int x = 0;
+			int y = 0;
+		}
+		let operator+ = fn(ivec2 a, ivec2 b)
+		{
+			return ivec2(a.x + b.x, a.y + b.y);
+		};
+	)"sv;
+
+	auto const file2 = R"(
+		let main = fn() -> int
+		{
+			let v = ivec2(4, 5) + ivec2(-1, 3);
+			return v.y;
+		};
+	)"sv;
+
+	incomplete::Module modules[2];
+	modules[0].files.push_back({"ivec2.afil", std::string(file1)});
+	modules[1].files.push_back({"main.afil", std::string(file2)});
+	modules[1].dependencies.push_back(0);
+	tests::require_ok(parser::parse_modules(modules));
+
+	complete::Program program;
+	for (incomplete::Module const & incomplete_module : modules)
+		tests::require_ok(instantiation::semantic_analysis(incomplete_module.statements, out(program)));
+
+	REQUIRE(interpreter::run(program) == 8);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(

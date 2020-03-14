@@ -10,6 +10,6 @@ namespace complete { struct Program; }
 namespace afil
 {
 
-	[[nodiscard]] auto parse_module(std::string_view module_name, std::string_view source) noexcept -> expected<complete::Program, SyntaxError>;
+	[[nodiscard]] auto parse_module(std::string_view module_name, std::string_view source) noexcept->expected<complete::Program, SyntaxError>;
 
 } // namespace afil
