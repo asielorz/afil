@@ -56,6 +56,15 @@ auto complete_syntax_error(PartialSyntaxError const & partial_error, std::string
 	}
 }
 
+auto make_complete_syntax_error(
+	std::string_view error_in_source,
+	std::string_view msg,
+	std::string_view source,
+	std::string_view filename) noexcept->Error<SyntaxError>
+{
+	return Error(complete_syntax_error(std::move(make_syntax_error(error_in_source, msg).value), source, filename));
+}
+
 auto operator << (std::ostream & os, SyntaxError const & error) noexcept -> std::ostream &
 {
 	os << error.filename << ':' << error.row << ':' << error.column << ": error: " << error.error_message << '\n';

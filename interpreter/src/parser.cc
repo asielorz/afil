@@ -1165,16 +1165,24 @@ namespace parser
 		return std::move(statement);
 	}
 
-	auto parse_expression_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::ExpressionStatement, PartialSyntaxError>
+	auto parse_expression_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
+		-> expected<incomplete::statement::ExpressionStatement, PartialSyntaxError>
 	{
 		incomplete::statement::ExpressionStatement statement;
 		try_call(assign_to(statement.expression), parse_expression(tokens, index, type_names));
 		return std::move(statement);
 	}
 
-	auto parse_import_block(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, std::string_view library_name) noexcept 
+	auto parse_import_block(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
 		-> expected<incomplete::statement::ImportBlock, PartialSyntaxError>
 	{
+		// Skip import keyword.
+		index++;
+
+		if (tokens[index].type != TokenType::literal_string) return make_syntax_error(tokens[index], "Expected string literal with library name after import.");
+		std::string const library_name = parse_string_literal(tokens[index].source);
+		index++;
+
 		if (tokens[index].type != TokenType::open_brace) return make_syntax_error(tokens[index], "Expected { after library name.");
 		index++;
 
@@ -1231,55 +1239,6 @@ namespace parser
 		return import_block;
 	}
 
-	[[nodiscard]] auto parse_global_scope(
-		std::string_view src,
-		std::vector<TypeName> & type_names,
-		std::vector<std::filesystem::path> & imported_files,
-		out<std::vector<incomplete::Statement>> global_initialization_statements
-	) noexcept -> expected<void, PartialSyntaxError>;
-
-	[[nodiscard]] auto parse_import_declaration(
-		span<lex::Token const> tokens, 
-		size_t & index, 
-		std::vector<TypeName> & type_names,
-		std::vector<std::filesystem::path> & imported_files,
-		out<std::vector<incomplete::Statement>> global_initialization_statements
-	) noexcept -> expected<void, PartialSyntaxError>
-	{
-		// Skip import keyword.
-		index++;
-
-		if (tokens[index].type != TokenType::literal_string) return make_syntax_error(tokens[index], "Expected string literal with library name after import.");
-		std::string const file_name = parse_string_literal(tokens[index].source);
-		index++;
-
-		if (tokens[index].type == TokenType::open_brace)
-		{
-			auto const block_source_start = begin_ptr(tokens[index].source);
-			try_call_decl(incomplete::statement::ImportBlock import_block, parse_import_block(tokens, index, type_names, file_name));
-			auto const block_source_end = end_ptr(tokens[index - 1].source);
-
-			global_initialization_statements->push_back(incomplete::Statement(std::move(import_block), make_string_view(block_source_start, block_source_end)));
-		}
-		else
-		{
-			if (tokens[index].type != TokenType::semicolon) return make_syntax_error(tokens[index], "Expected semicolon after file name in import declaration.");
-			index++;
-
-			std::filesystem::path canonical_file_name = std::filesystem::canonical(file_name);
-
-			// If the file has not been imported.
-			if (std::find(imported_files, canonical_file_name) == imported_files.end())
-			{
-				std::string const source = *load_whole_file(canonical_file_name);
-				imported_files.push_back(std::move(canonical_file_name));
-				try_call_void(parse_global_scope(source, type_names, imported_files, global_initialization_statements));
-			}
-		}
-
-		return success;
-	}
-
 	auto parse_statement_variant(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
 		-> expected<incomplete::statement::Variant, PartialSyntaxError>
 	{
@@ -1289,7 +1248,7 @@ namespace parser
 			try_call(assign_to(result), parse_let_statement(tokens, index, type_names))
 		else if (tokens[index].source == "return")
 			try_call(assign_to(result), parse_return_statement(tokens, index, type_names))
-		// With if, {}, while and for statements, return to avoid checking for final ';' because it is not needed.
+			// With if, {}, while and for statements, return to avoid checking for final ';' because it is not needed.
 		else if (tokens[index].source == "if")
 			return parse_if_statement(tokens, index, type_names);
 		else if (tokens[index].type == TokenType::open_brace)
@@ -1304,6 +1263,8 @@ namespace parser
 			result = parse_break_or_continue_statement<incomplete::statement::Continue>(tokens, index, type_names);
 		else if (tokens[index].source == "struct")
 			return parse_struct_declaration(tokens, index, type_names);
+		else if (tokens[index].source == "import")
+			return parse_import_block(tokens, index, type_names);
 		else
 		{
 			try_call_decl(auto parsed_type, parse_type_name(tokens, index, type_names));
@@ -1329,30 +1290,20 @@ namespace parser
 	}
 
 	[[nodiscard]] auto parse_global_scope(
-		std::string_view src,
+		span<lex::Token const> tokens,
 		std::vector<TypeName> & type_names,
-		std::vector<std::filesystem::path> & imported_files,
 		out<std::vector<incomplete::Statement>> global_initialization_statements
 	) noexcept -> expected<void, PartialSyntaxError>
 	{
-		try_call_decl(auto const tokens, lex::tokenize(src));
-
 		size_t index = 0;
 		while (index < tokens.size())
 		{
-			if (tokens[index].source == "import")
-			{
-				try_call_void(parse_import_declaration(tokens, index, type_names, imported_files, global_initialization_statements));
-			}
-			else
-			{
-				try_call_decl(incomplete::Statement statement, parse_statement(tokens, index, type_names));
+			try_call_decl(incomplete::Statement statement, parse_statement(tokens, index, type_names));
 
-				if (has_type<incomplete::statement::ExpressionStatement>(statement.variant)) 
-					return make_syntax_error(tokens[index], "An expression statement is not allowed at the global scope.");
+			if (has_type<incomplete::statement::ExpressionStatement>(statement.variant)) 
+				return make_syntax_error(tokens[index], "An expression statement is not allowed at the global scope.");
 
-				global_initialization_statements->push_back(std::move(statement));
-			}
+			global_initialization_statements->push_back(std::move(statement));
 		}
 
 		return success;
@@ -1361,6 +1312,8 @@ namespace parser
 	auto parse_source(std::string_view src, complete::Program const & program) noexcept -> expected<std::vector<incomplete::Statement>, PartialSyntaxError>
 	{
 		std::vector<incomplete::Statement> global_initialization_statements;
+
+		try_call_decl(auto const tokens, lex::tokenize(src));
 
 		std::vector<TypeName> type_names;
 		type_names.reserve(16 + program.global_scope.types.size() + program.global_scope.struct_templates.size());
@@ -1371,9 +1324,7 @@ namespace parser
 		for (complete::StructTemplateName const & name : program.global_scope.struct_templates)
 			type_names.push_back({name.name, TypeName::Type::struct_template});
 
-		std::vector<std::filesystem::path> imported_files;
-
-		try_call_void(parse_global_scope(src, type_names, imported_files, out(global_initialization_statements)));
+		try_call_void(parse_global_scope(tokens, type_names, out(global_initialization_statements)));
 
 		return std::move(global_initialization_statements);
 	}

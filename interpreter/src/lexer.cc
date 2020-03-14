@@ -215,9 +215,8 @@ namespace lex
 		else							return std::pair<Token::Type, int>{Token::Type::identifier,			token_length_identifier(src, index)};
 	}
 
-	auto tokenize(std::string_view src) noexcept -> expected<std::vector<Token>, PartialSyntaxError>
+	auto tokenize(std::string_view src, std::vector<Token> tokens) noexcept -> expected<std::vector<Token>, PartialSyntaxError>
 	{
-		std::vector<Token> result;
 		try_call_decl(int index, skip_whitespace_and_comments(src, 0));
 
 		while (!end_reached(src, index))
@@ -239,10 +238,10 @@ namespace lex
 
 			try_call_decl(int const comment_length, skip_whitespace_and_comments(src, index));
 			index += comment_length;
-			result.push_back(token);
+			tokens.push_back(token);
 		}
 
-		return std::move(result);
+		return std::move(tokens);
 	}
 
 } // namespace tr

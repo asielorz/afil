@@ -51,7 +51,7 @@ struct span<T const> : public ::detail::span_impl<T const>
 {
 	constexpr span() noexcept : detail::span_impl<T const>(nullptr, 0) {}
 	constexpr span(T const data_[], size_t size_) noexcept : detail::span_impl<T const>(data_, size_) {}
-	constexpr span(span<T> s) noexcept : detail::span_impl<T>(s.data(), s.size()) {}
+	constexpr span(span<T> s) noexcept : detail::span_impl<T const>(s.data(), s.size()) {}
 	template <size_t N>	constexpr span(T(&data_)[N]) noexcept : detail::span_impl<T const>(data_, N) {}
 	template <size_t N>	constexpr span(T const(&data_)[N]) noexcept : detail::span_impl<T const>(data_, N) {}
 	template <size_t N>	constexpr span(std::array<T, N> const & array) noexcept : detail::span_impl<T const>(array.data(), N) {}

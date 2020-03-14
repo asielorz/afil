@@ -32,5 +32,10 @@ auto make_syntax_error(
 	lex::Token token,
 	std::string_view msg) noexcept -> Error<PartialSyntaxError>;
 
-auto complete_syntax_error(PartialSyntaxError const & partial_error, std::string_view source, std::string_view filename = "<source>") noexcept -> SyntaxError;
+auto complete_syntax_error(PartialSyntaxError const & partial_error, std::string_view source, std::string_view filename = "<source>") noexcept->SyntaxError;
+auto make_complete_syntax_error(
+	std::string_view error_in_source,
+	std::string_view msg, 
+	std::string_view source, 
+	std::string_view filename = "<source>") noexcept -> Error<SyntaxError>;
 auto operator << (std::ostream & os, SyntaxError const & error) noexcept -> std::ostream &;

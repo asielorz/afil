@@ -63,3 +63,72 @@ auto end_ptr(std::string_view sv) noexcept -> char const *
 {
 	return sv.data() + sv.size();
 }
+
+auto count_lines(std::string_view text) noexcept -> int
+{
+	// Empty string has 0 lines.
+	if (text.empty())
+		return 0;
+	else
+		return static_cast<int>(1 + std::count(begin(text), end(text), '\n'));
+}
+
+auto split_first_line(std::string_view text) noexcept -> std::pair<std::string_view, std::string_view>
+{
+	auto const newline = text.find('\n');
+
+	if (newline == std::string_view::npos)
+		return { text, std::string_view() };
+	else
+		return { text.substr(0, newline), text.substr(newline + 1) };
+}
+
+auto extract_first_line(std::string_view & text) noexcept -> std::string_view
+{
+	auto const[line, rest] = split_first_line(text);
+	text = rest;
+	return line;
+}
+
+auto ignore_empty_lines(std::string_view text) noexcept -> std::string_view
+{
+	while (!text.empty())
+	{
+		auto const[line, rest] = split_first_line(text);
+		if (!std::all_of(begin(line), end(line), is_whitespace))
+			return text;
+		text = rest;
+	}
+	return text;
+}
+
+auto ignore_starting_whitespace(std::string_view text) noexcept -> std::string_view
+{
+	size_t i = 0;
+	while (i < text.size() && is_whitespace_or_newline(text[i]))
+		++i;
+	return text.substr(i);
+}
+
+auto ignore_trailing_whitespace(std::string_view text) noexcept -> std::string_view
+{
+	size_t i = text.size();
+	while (i > 0 && is_whitespace_or_newline(text[i - 1]))
+		--i;
+	return text.substr(0, i);
+}
+
+auto ignore_whitespace(std::string_view text) noexcept -> std::string_view
+{
+	return ignore_starting_whitespace(ignore_trailing_whitespace(text));
+}
+
+auto starts_with(std::string_view string, std::string_view prefix) noexcept -> bool
+{
+	return std::equal(begin(prefix), end(prefix), string.data());
+}
+
+auto is_contained_in(std::string_view string, std::string_view substr) noexcept -> bool
+{
+	return substr.data() >= string.data() && end_ptr(substr) <= end_ptr(string);
+}
