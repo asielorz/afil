@@ -1316,7 +1316,19 @@ namespace parser
 		return global_initialization_statements;
 	}
 
-	[[nodiscard]] auto parse_module(span<incomplete::Module> modules, int index) noexcept -> expected<void, SyntaxError>
+	auto scan_type_names(
+		span<incomplete::Module const> modules,
+		span<std::vector<parser::TypeName> const> module_type_names, int index,
+		out<std::vector<parser::TypeName>> type_names) noexcept -> void
+	{
+		for (parser::TypeName const & type_name : module_type_names[index])
+			type_names->push_back(type_name);
+
+		for (int const dependency_index : modules[index].dependencies)
+			scan_type_names(modules, module_type_names, dependency_index, type_names);
+	}
+
+	[[nodiscard]] auto parse_module(span<incomplete::Module> modules, int index, span<std::vector<TypeName>> module_type_names) noexcept -> expected<void, SyntaxError>
 	{
 		std::vector<lex::Token> tokens;
 		for (auto const & file : modules[index].files)
@@ -1329,9 +1341,8 @@ namespace parser
 		}
 
 		std::vector<TypeName> type_names = built_in_type_names();
-		scan_type_names(modules, index, out(type_names));
+		scan_type_names(modules, module_type_names, index, out(type_names));
 		size_t const imported_type_count = type_names.size();
-
 
 		auto statements = parse_global_scope(tokens, type_names);
 		if (!statements.has_value())
@@ -1347,7 +1358,7 @@ namespace parser
 		}
 
 		type_names.erase(type_names.begin(), type_names.begin() + imported_type_count);
-		modules[index].type_names = std::move(type_names);
+		module_type_names[index] = std::move(type_names);
 		modules[index].statements = std::move(*statements);
 
 		return success;
@@ -1356,9 +1367,10 @@ namespace parser
 	[[nodiscard]] auto parse_modules(span<incomplete::Module> modules) noexcept -> expected<std::vector<int>, SyntaxError>
 	{
 		try_call_decl(std::vector<int> const sorted_modules, sort_modules_by_dependencies(modules));
+		std::vector<std::vector<TypeName>> module_type_names(modules.size());
 
 		for (int i : sorted_modules)
-			try_call_void(parse_module(modules, i));
+			try_call_void(parse_module(modules, i, module_type_names));
 
 		return sorted_modules;
 	}

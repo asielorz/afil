@@ -2,7 +2,9 @@
 #include "program.hh"
 #include "syntax_error.hh"
 #include "incomplete_statement.hh"
+#include "incomplete_module.hh"
 #include "complete_expression.hh"
+#include "complete_module.hh"
 #include "interpreter.hh"
 #include "constexpr.hh"
 #include "utils/algorithm.hh"
@@ -1462,7 +1464,7 @@ namespace instantiation
 		do
 		{
 			size_t const size_before = unparsed_statements.size();
-			filter_in_place(unparsed_statements, [&](size_t i)
+			erase_if(unparsed_statements, [&](size_t i)
 			{
 				ProgramState const program_state = capture_state(*complete_program);
 
@@ -1474,7 +1476,7 @@ namespace instantiation
 					else
 						complete_statements[i] = std::nullopt;
 
-					return false;
+					return true;
 				}
 				else
 				{
@@ -1483,7 +1485,7 @@ namespace instantiation
 					scope_stack.resize(1);
 					template_parameters.clear();
 					restore_state(complete_program, program_state);
-					return true;
+					return false;
 				}
 			});
 			correctly_parsed = unparsed_statements.size() - size_before;
@@ -1505,6 +1507,79 @@ namespace instantiation
 		}
 
 		return success;
+	}
+
+	auto semantic_analysis(
+		span<incomplete::Statement const> incomplete_module,
+		span<complete::Module const * const> dependencies) noexcept->expected<complete::Module, PartialSyntaxError>
+	{
+		complete::Module complete_module;
+
+		std::vector<complete::ResolvedTemplateParameter> template_parameters;
+		ScopeStack scope_stack;
+		scope_stack.push_back({ &complete_program->global_scope, ScopeType::global, 0 });
+
+		std::vector<std::variant<std::nullopt_t, complete::Statement, PartialSyntaxError>> complete_statements(incomplete_program.size(), std::nullopt);
+		std::vector<size_t> unparsed_statements(incomplete_program.size());
+		std::iota(unparsed_statements.begin(), unparsed_statements.end(), size_t(0));
+
+		size_t correctly_parsed;
+		do
+		{
+			size_t const size_before = unparsed_statements.size();
+			erase_if(unparsed_statements, [&](size_t i)
+			{
+				ProgramState const program_state = capture_state(*complete_program);
+
+				auto complete_statement = instantiate_statement(incomplete_program[i], template_parameters, scope_stack, out(complete_program), nullptr);
+				if (complete_statement.has_value())
+				{
+					if (complete_statement->has_value())
+						complete_statements[i] = std::move(complete_statement->value());
+					else
+						complete_statements[i] = std::nullopt;
+
+					return true;
+				}
+				else
+				{
+					complete_statements[i] = std::move(complete_statement.error());
+					// Reset scope stack and program since they may have been left in an invalid state after aborting compilation.
+					scope_stack.resize(1);
+					template_parameters.clear();
+					restore_state(complete_program, program_state);
+					return false;
+				}
+			});
+			correctly_parsed = unparsed_statements.size() - size_before;
+		} while (correctly_parsed > 0);
+
+		// If any statement was left without parsing, compilation failed.
+		if (unparsed_statements.size() > 0)
+			return Error(std::get<PartialSyntaxError>(complete_statements[unparsed_statements[0]])); TODO("Returning multiple errors");
+
+		for (size_t i = 0; i < incomplete_program.size(); ++i)
+		{
+			if (complete::Statement * complete_statement = try_get<complete::Statement>(complete_statements[i]))
+			{
+				if (!has_type<complete::statement::VariableDeclaration>(*complete_statement))
+					return make_syntax_error(incomplete_program[i].source, "Only variable declarations, function declarations and struct declarations allowed at global scope.");
+
+				complete_program->global_initialization_statements.push_back(std::move(*complete_statement));
+			}
+		}
+
+		return complete_module;
+	}
+
+	auto semantic_analysis(
+		span<incomplete::Module const> incomplete_modules,
+		span<int const> parse_order) noexcept->expected<std::vector<complete::Module>, PartialSyntaxError>
+	{
+		for (int i : parse_order)
+		{
+
+		}
 	}
 
 } // namespace instantiation

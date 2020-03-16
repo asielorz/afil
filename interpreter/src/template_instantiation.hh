@@ -7,6 +7,9 @@
 #include <vector>
 #include <variant>
 
+namespace incomplete { struct Module; }
+namespace complete { struct Module; }
+
 namespace instantiation
 {
 	enum struct ScopeType { global, function, block };
@@ -20,7 +23,15 @@ namespace instantiation
 	using ScopeStack = std::vector<CurrentScope>;
 	using ScopeStackView = span<const CurrentScope>;
 
-	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, PartialSyntaxError>;
+	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept->expected<void, PartialSyntaxError>;
+
+	auto semantic_analysis(
+		span<incomplete::Statement const> incomplete_module,
+		span<complete::Module const * const> dependencies) noexcept -> expected<complete::Module, PartialSyntaxError>;
+
+	auto semantic_analysis(
+		span<incomplete::Module const> incomplete_modules, 
+		span<int const> parse_order) noexcept -> expected<std::vector<complete::Module>, PartialSyntaxError>;
 
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,

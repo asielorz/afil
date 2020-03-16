@@ -133,15 +133,6 @@ namespace incomplete
 		return std::move(modules);
 	}
 
-	auto scan_type_names(span<incomplete::Module const> modules, int index, out<std::vector<parser::TypeName>> type_names) noexcept -> void
-	{
-		for (parser::TypeName const & type_name : modules[index].type_names)
-			type_names->push_back(type_name);
-
-		for (int const dependency_index : modules[index].dependencies)
-			scan_type_names(modules, dependency_index, type_names);
-	}
-
 	auto module_path_from_name(std::string_view module_name) noexcept -> std::string
 	{
 		return join(module_name, module_extension);

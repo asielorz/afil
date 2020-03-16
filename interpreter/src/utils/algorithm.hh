@@ -64,6 +64,18 @@ namespace std
 		return sort(begin(range), end(range), comp);
 	}
 
+	template <typename InputRange, typename T>
+	auto remove(InputRange && range, const T & value) -> decltype(remove(begin(range), end(range), value))
+	{
+		return remove(begin(range), end(range), value);
+	}
+
+	template <typename InputRange, typename UnaryPredicate>
+	auto remove_if(InputRange && range, UnaryPredicate p) -> decltype(remove_if(begin(range), end(range), p))
+	{
+		return remove_if(begin(range), end(range), p);
+	}
+
 	template <typename InputRange1, typename InputRange2>
 	auto equal(InputRange1 && range1, InputRange2 && range2) -> decltype(equal(begin(range1), end(range1), begin(range2), end(range2)))
 	{
@@ -84,21 +96,9 @@ namespace std
 
 } // namespace std
 
-template <typename ForwardIt, typename Pred>
-ForwardIt filter_in_place(ForwardIt first, ForwardIt last, Pred p)
-{
-	ForwardIt kept = first;
-	for (; first != last; ++first)
-	{
-		if (p(*first))
-			*kept++ = std::move(*first);
-	}
-	return kept;
-}
-
 template <typename Container, typename Pred>
-void filter_in_place(Container & v, Pred p)
+void erase_if(Container & v, Pred p)
 {
-	auto new_end = filter_in_place(v.begin(), v.end(), p);
+	auto new_end = std::remove_if(v.begin(), v.end(), p);
 	v.erase(new_end, v.end());
 }
