@@ -38,13 +38,7 @@ namespace tests
 		incomplete::Module module_for_source;
 		module_for_source.files.push_back({"<source>", std::string(src)});
 		try_call_void(parser::parse_modules({&module_for_source, 1}));
-
-		complete::Program program;
-		auto semantic_analysis_result = instantiation::semantic_analysis(module_for_source.statements, out(program));
-		if (!semantic_analysis_result.has_value())
-			return Error(complete_syntax_error(semantic_analysis_result.error(), module_for_source.files[0].source));
-		else
-			return std::move(program);
+		return instantiation::semantic_analysis({&module_for_source, 1}, {0});
 	}
 
 	auto parse_and_run(std::string_view src) -> int
@@ -2044,12 +2038,40 @@ TEST_CASE("A program may be composed of several modules")
 	modules[1].files.push_back({"main.afil", std::string(file2)});
 	modules[1].dependencies.push_back(0);
 	auto const parse_order = tests::assert_get(parser::parse_modules(modules));
-
-	complete::Program program;
-	for (int i : parse_order)
-		tests::require_ok(instantiation::semantic_analysis(modules[i].statements, out(program)));
+	complete::Program const program = tests::assert_get(instantiation::semantic_analysis(modules, parse_order));
 
 	REQUIRE(interpreter::run(program) == 8);
+}
+
+TEST_CASE("A module cannot access symbols from a module it does not depend on")
+{
+	auto const file1 = R"(
+		let add = fn(int a, int b) { return a + b; };
+	)"sv;
+
+	auto const file2 = R"(
+		let subtract = fn(int a, int b) { add(a, -b); };
+	)"sv;
+
+	auto const file3 = R"(
+		let main = fn() -> int
+		{
+			return subtract(5, 2);
+		};
+	)"sv;
+
+	incomplete::Module modules[3];
+	modules[0].files.push_back({     "add.afil", std::string(file1)});
+	modules[1].files.push_back({"subtract.afil", std::string(file2)});
+	modules[2].files.push_back({    "main.afil", std::string(file3)});
+
+	modules[2].dependencies.push_back(0);
+	modules[2].dependencies.push_back(1);
+	// Module 1 does not depend on module 0, which it should.
+
+	auto const parse_order = tests::assert_get(parser::parse_modules(modules));
+	auto const program = instantiation::semantic_analysis(modules, parse_order);
+	REQUIRE(!program.has_value());
 }
 
 //TEST_CASE("Functions that take types as parameters")

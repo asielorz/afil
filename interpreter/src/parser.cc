@@ -1347,14 +1347,8 @@ namespace parser
 		auto statements = parse_global_scope(tokens, type_names);
 		if (!statements.has_value())
 		{
-			std::string_view const source_with_error = statements.error().error_in_source;
-			auto const file = std::find_if(modules[index].files, [=](const incomplete::Module::File & file)
-			{
-				return is_contained_in(file.source, source_with_error);
-			});
-			assert(file != modules[index].files.end());
-
-			return Error(complete_syntax_error(std::move(statements.error()), file->source, file->filename));
+			incomplete::Module::File const & file = file_that_contains(modules[index], statements.error().error_in_source);
+			return Error(complete_syntax_error(std::move(statements.error()), file.source, file.filename));
 		}
 
 		type_names.erase(type_names.begin(), type_names.begin() + imported_type_count);

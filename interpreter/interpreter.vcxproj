@@ -28,7 +28,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\afil.cc" />
-    <ClCompile Include="src\complete_module.cc" />
     <ClCompile Include="src\complete_scope.cc" />
     <ClCompile Include="src\complete_expression.cc" />
     <ClCompile Include="src\constexpr.cc" />
@@ -62,9 +61,8 @@
   <ItemGroup>
     <ClInclude Include="src\afil.hh" />
     <ClInclude Include="src\built_in_structures.hh" />
-    <ClInclude Include="src\complete_module.hh" />
     <ClInclude Include="src\incomplete_module.hh" />
-    <ClInclude Include="src\module.hh" />
+    <ClInclude Include="src\scope_stack.hh" />
     <ClInclude Include="src\utils\algorithm.hh" />
     <ClInclude Include="src\complete_expression.hh" />
     <ClInclude Include="src\complete_scope.hh" />

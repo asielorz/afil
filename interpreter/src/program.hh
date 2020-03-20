@@ -1,11 +1,11 @@
 #pragma once
 
-#include "complete_module.hh"
 #include "complete_statement.hh"
 #include "incomplete_statement.hh"
 #include "complete_scope.hh"
 #include "complete_expression.hh"
 #include "function_id.hh"
+#include "scope_stack.hh"
 #include "syntax_error.hh"
 #include "utils/callc.hh"
 #include <optional>
@@ -13,6 +13,137 @@
 
 namespace complete
 {
+
+	struct Type
+	{
+		struct BuiltIn {};
+		struct Pointer
+		{
+			TypeId value_type;
+		};
+		struct Array
+		{
+			TypeId value_type;
+			int size;
+		};
+		struct ArrayPointer
+		{
+			TypeId value_type;
+		};
+		struct Struct
+		{
+			int struct_index;
+		};
+
+		struct TemplateInstantiation
+		{
+			StructTemplateId template_id;
+			std::vector<TypeId> parameters;
+		};
+
+		int size;
+		int alignment;
+		std::variant<BuiltIn, Pointer, Array, ArrayPointer, Struct> extra_data;
+		std::optional<TemplateInstantiation> template_instantiation;
+	};
+
+	struct Function : Scope
+	{
+		int parameter_count = 0;     // From the variables, how many are arguments. The rest are locals.
+		int parameter_size = 0;	     // Size in bytes needed for parameters.
+		TypeId return_type;
+		std::vector<Statement> statements;
+		bool is_callable_at_compile_time;
+	};
+
+	struct ExternFunction
+	{
+		int parameter_size;
+		int parameter_alignment;
+		TypeId return_type;
+		std::vector<TypeId> parameter_types;
+		callc::CFunctionCaller caller;
+		void const * function_pointer;
+		bool is_callable_at_compile_time;
+	};
+
+	struct MemcmpRanges
+	{
+		using is_transparent = std::true_type;
+
+		template <typename T, typename U>
+		[[nodiscard]] constexpr auto operator () (T const & a, U const & b) const noexcept -> bool
+		{
+			return memcmp(a.data(), b.data(), a.size() * sizeof(*a.data())) < 0;
+		}
+	};
+
+	struct ResolvedTemplateParameter
+	{
+		std::string name;
+		complete::TypeId type;
+	};
+
+	struct FunctionTemplateParameterType
+	{
+		#pragma warning (disable : 4201)
+		struct BaseCase
+		{
+			TypeId type;
+		};
+		struct TemplateParameter
+		{
+			int index;
+		};
+		struct Pointer
+		{
+			value_ptr<FunctionTemplateParameterType> pointee;
+		};
+		struct Array
+		{
+			value_ptr<FunctionTemplateParameterType> value_type;
+			int size;
+		};
+		struct ArrayPointer
+		{
+			value_ptr<FunctionTemplateParameterType> pointee;
+		};
+		struct TemplateInstantiation
+		{
+			StructTemplateId template_id;
+			std::vector<FunctionTemplateParameterType> parameters;
+		};
+
+		std::variant<BaseCase, TemplateParameter, Pointer, Array, ArrayPointer, TemplateInstantiation> value;
+		bool is_mutable : 1;
+		bool is_reference : 1;
+	};
+
+	struct FunctionTemplate
+	{
+		incomplete::FunctionTemplate incomplete_function;
+		std::vector<FunctionTemplateParameterType> parameter_types;
+		std::vector<ResolvedTemplateParameter> scope_template_parameters;
+		instantiation::ScopeStack scope_stack;
+		std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
+	};
+
+	struct MemberVariable : Variable
+	{
+		std::optional<Expression> initializer_expression;
+	};
+	struct Struct
+	{
+		std::vector<MemberVariable> member_variables;
+	};
+
+	struct StructTemplate
+	{
+		incomplete::StructTemplate incomplete_struct;
+		std::vector<ResolvedTemplateParameter> scope_template_parameters;
+		instantiation::ScopeStack scope_stack;
+		std::map<std::vector<TypeId>, TypeId, MemcmpRanges> cached_instantiations;
+	};
 
 	struct Program
 	{
@@ -76,6 +207,17 @@ namespace complete
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>;
 	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>;
 
+	struct OverloadSetView
+	{
+		constexpr OverloadSetView() noexcept = default;
+		OverloadSetView(OverloadSet const & lookup_overload_set) noexcept
+			: function_ids(lookup_overload_set.function_ids)
+			, function_template_ids(lookup_overload_set.function_template_ids)
+		{}
+
+		span<FunctionId const> function_ids;
+		span<FunctionTemplateId const> function_template_ids;
+	};
 	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
 		-> expected<FunctionId, PartialSyntaxError>;

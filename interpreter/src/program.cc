@@ -440,9 +440,7 @@ namespace complete
 		for (size_t i = 0; i < parameters.size(); ++i) 
 			all_template_parameters.push_back({std::string(function_template.incomplete_function.template_parameters[i].name), parameters[i]});
 
-		TODO("The complete scope stack.");
-		instantiation::ScopeStack scope_stack;
-		scope_stack.push_back({&program.global_scope, instantiation::ScopeType::global, 0});
+		instantiation::ScopeStack scope_stack = function_template.scope_stack;
 
 		try_call_decl(Function instantiated_function,
 			instantiation::instantiate_function_template(function_template.incomplete_function, all_template_parameters, scope_stack, out(program)));
@@ -475,9 +473,7 @@ namespace complete
 		for (size_t i = 0; i < parameters.size(); ++i)
 			all_template_parameters.push_back({std::string(struct_template.incomplete_struct.template_parameters[i].name), parameters[i]});
 
-		TODO("The complete scope stack.");
-		instantiation::ScopeStack scope_stack;
-		scope_stack.push_back({&program.global_scope, instantiation::ScopeType::global, 0});
+		instantiation::ScopeStack scope_stack = struct_template.scope_stack;
 
 		// Magic
 		for (incomplete::MemberVariable const & var_template : struct_template.incomplete_struct.member_variables)
@@ -756,7 +752,9 @@ namespace complete
 			{
 				// Ensure that all template parameters have been resolved.
 				assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
-				return *instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
+				auto function_id = instantiate_function_template(program, best_template_candidate.id, {resolved_dependent_types, dependent_type_count});
+				assert(function_id.has_value());
+				return *function_id;
 			}
 		}
 	}

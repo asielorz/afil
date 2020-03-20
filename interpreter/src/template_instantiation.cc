@@ -4,15 +4,15 @@
 #include "incomplete_statement.hh"
 #include "incomplete_module.hh"
 #include "complete_expression.hh"
-#include "complete_module.hh"
 #include "interpreter.hh"
 #include "constexpr.hh"
 #include "utils/algorithm.hh"
 #include "utils/out.hh"
-#include "utils/variant.hh"
 #include "utils/overload.hh"
+#include "utils/string.hh"
 #include "utils/utils.hh"
 #include "utils/unreachable.hh"
+#include "utils/variant.hh"
 #include "utils/warning_macro.hh"
 #include <cassert>
 
@@ -103,7 +103,7 @@ namespace instantiation
 			{
 				complete::TypeId const type = type_with_name(base_case.name, scope_stack, template_parameters);
 				if (type == complete::TypeId::none) 
-					return make_syntax_error("Type not found.");
+					return make_syntax_error(join("Type not found: ", base_case.name));
 				return type;
 			},
 			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::TypeId, PartialSyntaxError>
@@ -530,7 +530,7 @@ namespace instantiation
 					},
 					[&](auto const &) -> expected<complete::Expression, PartialSyntaxError>
 					{
-						return make_syntax_error(incomplete_expression.name, "Undeclared identifier.");
+						return make_syntax_error(incomplete_expression.name, join("Undeclared identifier: ", incomplete_expression.name));
 					}
 				);
 				return std::visit(lookup_visitor, lookup);
@@ -669,6 +669,7 @@ namespace instantiation
 				complete::FunctionTemplate new_function_template;
 				new_function_template.scope_template_parameters = template_parameters;
 				new_function_template.incomplete_function = incomplete_expression.function_template;
+				new_function_template.scope_stack = scope_stack;
 				new_function_template.parameter_types.reserve(incomplete_expression.function_template.parameters.size());
 				for (incomplete::FunctionParameter const & param : incomplete_expression.function_template.parameters)
 				{
@@ -1331,6 +1332,7 @@ namespace instantiation
 				complete::StructTemplate new_template;
 				new_template.incomplete_struct = incomplete_statement.declared_struct_template;
 				new_template.scope_template_parameters = template_parameters;
+				new_template.scope_stack = scope_stack;
 				auto const id = add_struct_template(*program, std::move(new_template));
 				top(scope_stack).struct_templates.push_back({std::string(incomplete_statement.declared_struct_template.name), id});
 
@@ -1450,11 +1452,14 @@ namespace instantiation
 		program->global_scope.struct_templates.resize(program_state.global_scope_struct_templates);
 	}
 
-	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, PartialSyntaxError>
+	[[nodiscard]] auto semantic_analysis(
+		span<incomplete::Statement const> incomplete_program, 
+		out<complete::Program> complete_program, 
+		ScopeStack & scope_stack
+	) noexcept -> expected<void, PartialSyntaxError>
 	{
 		std::vector<complete::ResolvedTemplateParameter> template_parameters;
-		ScopeStack scope_stack;
-		scope_stack.push_back({&complete_program->global_scope, ScopeType::global, 0});
+		size_t const scope_stack_original_size = scope_stack.size();
 
 		std::vector<std::variant<std::nullopt_t, complete::Statement, PartialSyntaxError>> complete_statements(incomplete_program.size(), std::nullopt);
 		std::vector<size_t> unparsed_statements(incomplete_program.size());
@@ -1482,7 +1487,7 @@ namespace instantiation
 				{
 					complete_statements[i] = std::move(complete_statement.error());
 					// Reset scope stack and program since they may have been left in an invalid state after aborting compilation.
-					scope_stack.resize(1);
+					scope_stack.resize(scope_stack_original_size);
 					template_parameters.clear();
 					restore_state(complete_program, program_state);
 					return false;
@@ -1509,77 +1514,72 @@ namespace instantiation
 		return success;
 	}
 
-	auto semantic_analysis(
-		span<incomplete::Statement const> incomplete_module,
-		span<complete::Module const * const> dependencies) noexcept->expected<complete::Module, PartialSyntaxError>
+	auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, PartialSyntaxError>
 	{
-		complete::Module complete_module;
-
-		std::vector<complete::ResolvedTemplateParameter> template_parameters;
 		ScopeStack scope_stack;
-		scope_stack.push_back({ &complete_program->global_scope, ScopeType::global, 0 });
+		scope_stack.push_back({&complete_program->global_scope, ScopeType::global, 0});
+		return semantic_analysis(incomplete_program, complete_program, scope_stack);
+	}
 
-		std::vector<std::variant<std::nullopt_t, complete::Statement, PartialSyntaxError>> complete_statements(incomplete_program.size(), std::nullopt);
-		std::vector<size_t> unparsed_statements(incomplete_program.size());
-		std::iota(unparsed_statements.begin(), unparsed_statements.end(), size_t(0));
+	auto push_global_scopes_of_dependent_modules(
+		span<incomplete::Module const> incomplete_modules,
+		int module_index,
+		span<complete::Scope> module_global_scopes, 
+		out<ScopeStack> scope_stack
+	) noexcept -> void
+	{
+		scope_stack->push_back({&module_global_scopes[module_index], ScopeType::global, 0});
 
-		size_t correctly_parsed;
-		do
-		{
-			size_t const size_before = unparsed_statements.size();
-			erase_if(unparsed_statements, [&](size_t i)
-			{
-				ProgramState const program_state = capture_state(*complete_program);
-
-				auto complete_statement = instantiate_statement(incomplete_program[i], template_parameters, scope_stack, out(complete_program), nullptr);
-				if (complete_statement.has_value())
-				{
-					if (complete_statement->has_value())
-						complete_statements[i] = std::move(complete_statement->value());
-					else
-						complete_statements[i] = std::nullopt;
-
-					return true;
-				}
-				else
-				{
-					complete_statements[i] = std::move(complete_statement.error());
-					// Reset scope stack and program since they may have been left in an invalid state after aborting compilation.
-					scope_stack.resize(1);
-					template_parameters.clear();
-					restore_state(complete_program, program_state);
-					return false;
-				}
-			});
-			correctly_parsed = unparsed_statements.size() - size_before;
-		} while (correctly_parsed > 0);
-
-		// If any statement was left without parsing, compilation failed.
-		if (unparsed_statements.size() > 0)
-			return Error(std::get<PartialSyntaxError>(complete_statements[unparsed_statements[0]])); TODO("Returning multiple errors");
-
-		for (size_t i = 0; i < incomplete_program.size(); ++i)
-		{
-			if (complete::Statement * complete_statement = try_get<complete::Statement>(complete_statements[i]))
-			{
-				if (!has_type<complete::statement::VariableDeclaration>(*complete_statement))
-					return make_syntax_error(incomplete_program[i].source, "Only variable declarations, function declarations and struct declarations allowed at global scope.");
-
-				complete_program->global_initialization_statements.push_back(std::move(*complete_statement));
-			}
-		}
-
-		return complete_module;
+		for (int dependency_index : incomplete_modules[module_index].dependencies)
+			push_global_scopes_of_dependent_modules(incomplete_modules, dependency_index, module_global_scopes, scope_stack);
 	}
 
 	auto semantic_analysis(
 		span<incomplete::Module const> incomplete_modules,
-		span<int const> parse_order) noexcept->expected<std::vector<complete::Module>, PartialSyntaxError>
+		span<int const> parse_order
+	) noexcept -> expected<complete::Program, SyntaxError>
 	{
+		complete::Program program;
+		std::vector<complete::Scope> module_global_scopes(incomplete_modules.size());
+
+		ScopeStack scope_stack;
+		scope_stack.push_back({&program.global_scope, ScopeType::global, 0});
+
 		for (int i : parse_order)
 		{
-
+			scope_stack.resize(1);
+			push_global_scopes_of_dependent_modules(incomplete_modules, i, module_global_scopes, out(scope_stack));
+			auto analysis_result = semantic_analysis(incomplete_modules[i].statements, out(program), scope_stack);
+			if (!analysis_result)
+			{
+				incomplete::Module::File const & file = file_that_contains(incomplete_modules[i], analysis_result.error().error_in_source);
+				return Error(complete_syntax_error(std::move(analysis_result.error()), file.source, file.filename));
+			}
 		}
+
+		// Fold all scopes into the program's global scope.
+		for (complete::Scope & module_global_scope : module_global_scopes)
+		{
+			for (complete::Constant & constant : module_global_scope.constants)
+				program.global_scope.constants.push_back(std::move(constant));
+
+			for (complete::FunctionName & function : module_global_scope.functions)
+				program.global_scope.functions.push_back(std::move(function));
+
+			for (complete::FunctionTemplateName & function_template : module_global_scope.function_templates)
+				program.global_scope.function_templates.push_back(std::move(function_template));
+
+			for (complete::TypeName & type : module_global_scope.types)
+				program.global_scope.types.push_back(std::move(type));
+
+			for (complete::StructTemplateName & struct_template : module_global_scope.struct_templates)
+				program.global_scope.struct_templates.push_back(std::move(struct_template));
+
+			for (complete::Variable const & var : module_global_scope.variables)
+				add_variable_to_scope(program.global_scope, var.name, var.type, 0, program);
+		}
+
+		return std::move(program);
 	}
 
 } // namespace instantiation

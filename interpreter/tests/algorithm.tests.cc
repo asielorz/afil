@@ -1,5 +1,5 @@
 #include "utils/algorithm.hh"
-#include <catch.hpp>
+#include <catch2/catch.hpp>
 
 TEST_CASE("filter_in_place removes all elements that do not satisfy an algorithm, in place")
 {
