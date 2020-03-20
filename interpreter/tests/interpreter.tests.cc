@@ -2093,6 +2093,45 @@ TEST_CASE("Order of declarations doesn't matter for types either")
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
+#include "c_transpiler.hh"
+
+TEST_CASE("Fibonacci deleteme")
+{
+	auto const src = R"(
+		// Fibonacci function. Computes the ith number of the Fibonacci sequence.
+		let fib = fn (int i) -> int
+		{
+			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
+		};		
+
+		// Main function. Computes the difference between the 8th and the 5th Fibonacci numbers.
+		let main = fn () -> int
+		{
+			let i = fib(5);
+			let j = fib(8);
+
+			// Returns the absolute value of the subtraction of i and j.
+			let difference = fn (int i, int j) -> int
+			{
+				return 
+					if (i > j)
+						i - j
+					else
+						j - i;
+			};
+
+			return difference(i, j);
+		};
+	)"sv;
+
+	complete::Program const & program = tests::assert_get(tests::parse_source(src));
+	std::cout << "**************************************************************************************\n";
+	std::cout << c_transpiler::transpile_to_c(program);
+	std::cout << "**************************************************************************************\n";
+	system("pause");
+}
+
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(

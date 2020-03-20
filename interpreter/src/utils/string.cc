@@ -132,3 +132,8 @@ auto is_contained_in(std::string_view string, std::string_view substr) noexcept 
 {
 	return substr.data() >= string.data() && end_ptr(substr) <= end_ptr(string);
 }
+
+auto indent(int indentation_level) noexcept -> std::string
+{
+	return std::string(indentation_level, '\t');
+}

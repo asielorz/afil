@@ -77,6 +77,8 @@ auto ignore_whitespace(std::string_view text) noexcept -> std::string_view;
 auto starts_with(std::string_view string, std::string_view prefix) noexcept -> bool;
 auto is_contained_in(std::string_view string, std::string_view substr) noexcept -> bool;
 
+auto indent(int indentation_level) noexcept -> std::string;
+
 constexpr auto is_whitespace = [](char c) noexcept -> bool { return c == ' ' || c == '\t'; };
 constexpr auto is_whitespace_or_newline = [](char c) noexcept -> bool { return c == ' ' || c == '\t' || c == '\n'; };
 constexpr auto is_number = [](char c) noexcept -> bool { return (c >= '0' && c <= '9'); };

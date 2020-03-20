@@ -122,11 +122,6 @@ auto print_constant(TypeId type, void const * data) noexcept -> std::string
 		return "???";
 }
 
-auto indent(int indentation_level) noexcept -> std::string
-{
-	return std::string(indentation_level, '\t');
-}
-
 auto relational_operator_name(Operator op) noexcept -> std::string_view
 {
 	switch (op)

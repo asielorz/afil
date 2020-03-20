@@ -31,6 +31,7 @@
     <ClCompile Include="src\complete_scope.cc" />
     <ClCompile Include="src\complete_expression.cc" />
     <ClCompile Include="src\constexpr.cc" />
+    <ClCompile Include="src\c_transpiler.cc" />
     <ClCompile Include="src\interpreter.cc" />
     <ClCompile Include="src\operator.cc" />
     <ClCompile Include="src\pretty_print.cc" />
@@ -51,6 +52,7 @@
     <ClCompile Include="src\utils\utils.cc" />
     <ClCompile Include="tests\algorithm.tests.cc" />
     <ClCompile Include="tests\callc.tests.cc" />
+    <ClCompile Include="tests\c_transpiler.tests.cc" />
     <ClCompile Include="tests\interpreter.tests.cc" />
     <ClCompile Include="tests\main.tests.cc" />
     <ClCompile Include="tests\span.tests.cc" />
@@ -61,6 +63,7 @@
   <ItemGroup>
     <ClInclude Include="src\afil.hh" />
     <ClInclude Include="src\built_in_structures.hh" />
+    <ClInclude Include="src\c_transpiler.hh" />
     <ClInclude Include="src\incomplete_module.hh" />
     <ClInclude Include="src\scope_stack.hh" />
     <ClInclude Include="src\utils\algorithm.hh" />
