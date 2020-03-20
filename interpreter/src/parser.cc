@@ -1296,7 +1296,7 @@ namespace parser
 		return incomplete::Statement(std::move(var), make_string_view(expr_source_start, expr_source_end));
 	}
 
-	[[nodiscard]] auto parse_global_scope(
+	auto parse_global_scope(
 		span<lex::Token const> tokens,
 		std::vector<TypeName> & type_names,
 		std::vector<incomplete::Statement> global_initialization_statements
@@ -1316,12 +1316,56 @@ namespace parser
 		return global_initialization_statements;
 	}
 
+	auto parse_type_names(span<lex::Token const> tokens, std::vector<TypeName> type_names) noexcept -> std::vector<TypeName>
+	{
+		int brace_level = 0;
+
+		for (size_t i = 0; i < tokens.size(); ++i)
+		{
+			if (tokens[i].type == TokenType::open_brace)
+			{
+				brace_level++;
+			}
+			else if (tokens[i].type == TokenType::close_brace)
+			{
+				brace_level--;
+			}
+			else if (brace_level == 0 && tokens[i].source == "struct")
+			{
+				i++;
+				if (i < tokens.size())
+				{
+					if (tokens[i].source == "<")
+					{
+						while (i < tokens.size() && tokens[i].source != ">")
+							i++;
+						i++;
+
+						if (i < tokens.size() && tokens[i].type == TokenType::identifier && !is_keyword(tokens[i].source))
+						{
+							type_names.push_back({tokens[i].source, TypeName::Type::struct_template});
+						}
+					}
+					else
+					{
+						if (tokens[i].type == TokenType::identifier && !is_keyword(tokens[i].source))
+						{
+							type_names.push_back({tokens[i].source, TypeName::Type::type});
+						}
+					}
+				}
+			}
+		}
+
+		return type_names;
+	}
+
 	auto scan_type_names(
 		span<incomplete::Module const> modules,
-		span<std::vector<parser::TypeName> const> module_type_names, int index,
-		out<std::vector<parser::TypeName>> type_names) noexcept -> void
+		span<std::vector<TypeName> const> module_type_names, int index,
+		out<std::vector<TypeName>> type_names) noexcept -> void
 	{
-		for (parser::TypeName const & type_name : module_type_names[index])
+		for (TypeName const & type_name : module_type_names[index])
 			type_names->push_back(type_name);
 
 		for (int const dependency_index : modules[index].dependencies)
@@ -1342,6 +1386,7 @@ namespace parser
 
 		std::vector<TypeName> type_names = built_in_type_names();
 		scan_type_names(modules, module_type_names, index, out(type_names));
+		type_names = parse_type_names(tokens, std::move(type_names));
 		size_t const imported_type_count = type_names.size();
 
 		auto statements = parse_global_scope(tokens, type_names);

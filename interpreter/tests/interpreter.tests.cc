@@ -2074,6 +2074,25 @@ TEST_CASE("A module cannot access symbols from a module it does not depend on")
 	REQUIRE(!program.has_value());
 }
 
+TEST_CASE("Order of declarations doesn't matter for types either")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let v = ivec2(3, 4);
+			return v.x + v.y;
+		};
+
+		struct ivec2
+		{
+			int x;
+			int y;
+		}
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(
