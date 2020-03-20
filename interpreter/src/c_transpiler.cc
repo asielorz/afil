@@ -6,12 +6,53 @@
 #include "utils/out.hh"
 #include "utils/overload.hh"
 #include "utils/unreachable.hh"
+#include "utils/variant.hh"
 #include "utils/warning_macro.hh"
+
+using namespace std::literals;
 
 namespace c_transpiler
 {
 
-	auto transpile_constant(complete::TypeId type, span<char const> bytes, complete::Program const & program) noexcept -> std::string
+	constexpr std::string_view built_in_operator_table[] = {
+		"+"sv,
+		"-"sv,
+		"*"sv,
+		"/"sv,
+		"%"sv,
+		"=="sv,
+		"-"sv,
+		"-"sv,
+		"&"sv,
+		"|"sv,
+		"^"sv,
+		"~"sv,
+		">>"sv,
+		"<<"sv,
+
+		"+"sv,
+		"-"sv,
+		"*"sv,
+		"/"sv,
+		"=="sv,
+		"-"sv,
+		"-"sv,
+
+		"+"sv,
+		"-"sv,
+		"*"sv,
+		"/"sv,
+		"=="sv,
+		"-"sv,
+
+		"&&"sv,
+		"||"sv,
+		"^"sv,
+		"!"sv,
+		"=="sv
+	};
+
+	auto write_constant(complete::TypeId type, span<char const> bytes, complete::Program const & program) noexcept -> std::string
 	{
 		static_cast<void>(program);
 
@@ -62,6 +103,45 @@ namespace c_transpiler
 		return join("type_", decay(type_id).flat_value);
 	}
 
+	auto transpile_expression(complete::Expression const & expr, complete::Program const & program, std::string & c_source) noexcept -> void;
+
+	auto write_function_call(FunctionId function_id, span<complete::Expression const> parameters, complete::Program const & program, std::string & c_source)
+	{
+		if (function_id.is_extern && function_id.index < std::size(built_in_operator_table))
+		{
+			c_source += '(';
+			if (parameters.size() == 1)
+			{
+				c_source += join(' ', built_in_operator_table[function_id.index], ' ');
+				transpile_expression(parameters[0], program, c_source);
+			}
+			else
+			{
+				assert(parameters.size() == 2);
+				transpile_expression(parameters[0], program, c_source);
+				c_source += join(' ', built_in_operator_table[function_id.index], ' ');
+				transpile_expression(parameters[1], program, c_source);
+			}
+			c_source += ')';
+		}
+		else
+		{
+			c_source += function_name(function_id, program);
+			c_source += '(';
+			size_t const param_count = parameters.size();
+			if (param_count > 0)
+			{
+				for (size_t i = 0; i < param_count - 1; ++i)
+				{
+					transpile_expression(parameters[i], program, c_source);
+					c_source += ", ";
+				}
+				transpile_expression(parameters.back(), program, c_source);
+			}
+			c_source += ')';
+		}
+	}
+
 	auto transpile_expression(complete::Expression const & expr, complete::Program const & program, std::string & c_source) noexcept -> void
 	{
 		using namespace complete;
@@ -74,11 +154,11 @@ namespace c_transpiler
 			[&](expression::StringLiteral literal) { c_source += join('"', literal.value, '"'); },
 			[&](expression::LocalVariable const & var_node)
 			{
-				c_source += join("local_", var_node.variable_offset);
+				c_source += join("&local_", var_node.variable_offset);
 			},
 			[&](expression::GlobalVariable const & var_node)
 			{
-				c_source += join("global_", var_node.variable_offset);
+				c_source += join("&global_", var_node.variable_offset);
 			},
 			[&](expression::MemberVariable const & var_node)
 			{
@@ -88,12 +168,30 @@ namespace c_transpiler
 			},
 			[&](expression::Constant const & constant_node)
 			{
-				c_source += transpile_constant(constant_node.type, constant_node.value, program);
+				c_source += write_constant(constant_node.type, constant_node.value, program);
 			},
 			[&](expression::Dereference const & deref_node)
 			{
-				c_source += '*';
-				transpile_expression(*deref_node.expression, program, c_source);
+				if (has_type<expression::Constant>(*deref_node.expression))
+				{
+					transpile_expression(*deref_node.expression, program, c_source);
+				}
+				else
+				{
+					std::string expr_source;
+					transpile_expression(*deref_node.expression, program, expr_source);
+
+					// Cancel dereference addressof
+					if (expr_source[0] == '&')
+					{
+						c_source += expr_source.substr(1);
+					}
+					else
+					{
+						c_source += '*';
+						c_source += expr_source;
+					}
+				}
 			},
 			[&](expression::ReinterpretCast const & addressof_node)
 			{
@@ -108,29 +206,12 @@ namespace c_transpiler
 			},
 			[&](expression::FunctionCall const & func_call_node)
 			{
-				c_source += function_name(func_call_node.function_id, program);
-				c_source += '(';
-				size_t const param_count = func_call_node.parameters.size();
-				if (param_count > 0)
-				{
-					for (size_t i = 0; i < param_count - 1; ++i)
-					{
-						transpile_expression(func_call_node.parameters[i], program, c_source);
-						c_source += ", ";
-					}
-					transpile_expression(func_call_node.parameters.back(), program, c_source);
-				}
-				c_source += ')';
+				write_function_call(func_call_node.function_id, func_call_node.parameters, program, c_source);
 			},
 			[&](expression::RelationalOperatorCall const & op_node)
 			{
 				c_source += '(';
-				c_source += function_name(op_node.function_id, program);
-				c_source += '(';
-				transpile_expression(op_node.parameters[0], program, c_source);
-				c_source += ", ";
-				transpile_expression(op_node.parameters[1], program, c_source);
-				c_source += ')';
+				write_function_call(op_node.function_id, op_node.parameters, program, c_source);
 
 				switch (op_node.op)
 				{
@@ -304,7 +385,7 @@ namespace c_transpiler
 		std::visit(visitor, tree.as_variant());
 	}
 
-	auto transpile_function_prototype(complete::Function const & function, FunctionId function_id, complete::Program const & program, std::string & c_source) noexcept -> void
+	auto write_function_prototype(complete::Function const & function, FunctionId function_id, complete::Program const & program, std::string & c_source) noexcept -> void
 	{
 		c_source += type_name(function.return_type, program);
 		c_source += ' ';
@@ -331,9 +412,9 @@ namespace c_transpiler
 		c_source += ')';
 	}
 
-	auto transpile_function(complete::Function const & function, FunctionId function_id, complete::Program const & program, std::string & c_source) noexcept -> void
+	auto write_function(complete::Function const & function, FunctionId function_id, complete::Program const & program, std::string & c_source) noexcept -> void
 	{
-		transpile_function_prototype(function, function_id, program, c_source);
+		write_function_prototype(function, function_id, program, c_source);
 		c_source += '\n';
 		c_source += "{\n";
 
@@ -372,7 +453,7 @@ namespace c_transpiler
 			auto const id = FunctionId{false, unsigned(&function - program.functions.data())};
 			if (id != program.main_function)
 			{
-				transpile_function_prototype(function, id, program, c_source);
+				write_function_prototype(function, id, program, c_source);
 				c_source += ";\n";
 			}
 		}
@@ -384,7 +465,7 @@ namespace c_transpiler
 		{
 			auto const id = FunctionId{false, unsigned(&function - program.functions.data())};
 
-			transpile_function(function, id, program, c_source);
+			write_function(function, id, program, c_source);
 			c_source += "\n";
 		}
 
