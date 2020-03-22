@@ -17,7 +17,7 @@ namespace tests
 	{
 		if (!e.has_value())
 		{
-			INFO(e.error().error_message);
+			INFO(error_string(e.error()));
 			REQUIRE(e.has_value());
 		}
 		return std::move(*e);
@@ -28,7 +28,7 @@ namespace tests
 	{
 		if (!e.has_value())
 		{
-			INFO(e.error().error_message);
+			INFO(error_string(e.error()));
 			REQUIRE(e.has_value());
 		}
 	}
@@ -2094,39 +2094,54 @@ TEST_CASE("Order of declarations doesn't matter for types either")
 }
 
 #include "c_transpiler.hh"
+#include <fstream>
 
 TEST_CASE("Fibonacci deleteme")
 {
 	auto const src = R"(
-		// Fibonacci function. Computes the ith number of the Fibonacci sequence.
-		let fib = fn (int i) -> int
+		struct vec3
 		{
-			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
-		};		
-
-		// Main function. Computes the difference between the 8th and the 5th Fibonacci numbers.
-		let main = fn () -> int
+			float x;
+			float y;
+			float z;
+		}
+		
+		struct aabb
 		{
-			let i = fib(5);
-			let j = fib(8);
+			vec3 min;
+			vec3 max;
+		}
 
-			// Returns the absolute value of the subtraction of i and j.
-			let difference = fn (int i, int j) -> int
-			{
-				return 
-					if (i > j)
-						i - j
-					else
-						j - i;
-			};
+		let is_in_range = fn(float x, float min, float max) -> bool
+		{
+			return x >= min and x <= max;
+		};
 
-			return difference(i, j);
+		let intersects = fn(aabb box, vec3 point) -> bool
+		{
+			return 
+				is_in_range(point.x, box.min.x, box.max.x) and
+				is_in_range(point.y, box.min.y, box.max.y) and
+				is_in_range(point.z, box.min.z, box.max.z);
+		};
+
+		let main = fn() -> int
+		{
+			aabb mut box = uninit;
+			box.min = vec3(0.0, 0.0, 0.0);
+			box.max = vec3(3.0, 3.0, 3.0);
+			if (intersects(box, vec3(1.0, 1.0, 1.0)))
+				return 0;
+			else
+				return 1;
 		};
 	)"sv;
 
 	complete::Program const & program = tests::assert_get(tests::parse_source(src));
 	std::cout << "**************************************************************************************\n";
 	std::cout << c_transpiler::transpile_to_c(program);
+	std::ofstream file("test_output.c");
+	file << c_transpiler::transpile_to_c(program);
 	std::cout << "**************************************************************************************\n";
 	system("pause");
 }
