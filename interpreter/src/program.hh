@@ -43,6 +43,7 @@ namespace complete
 
 		int size;
 		int alignment;
+		std::string ABI_name;
 		std::variant<BuiltIn, Pointer, Array, ArrayPointer, Struct> extra_data;
 		std::optional<TemplateInstantiation> template_instantiation;
 	};
@@ -177,6 +178,8 @@ namespace complete
 	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> expression::Constructor;
 	auto synthesize_default_constructor(TypeId type_id, Type::Array array_data, Program const & program) noexcept -> expression::Constructor;
 	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expression::Constructor;
+	auto ABI_name(Program & program, TypeId id) noexcept -> std::string &;
+	auto ABI_name(Program const & program, TypeId id) noexcept -> std::string_view;
 
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId;
 	auto is_struct(Type const & type) noexcept -> bool;

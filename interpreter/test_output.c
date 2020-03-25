@@ -3,32 +3,32 @@ typedef struct
 	float member_0;// x
 	float member_4;// y
 	float member_8;// z
-} type_56;
+} vec3;
 
 typedef struct
 {
-	type_56 member_0;// min
-	type_56 member_12;// max
-} type_64;
+	vec3 member_0;// min
+	vec3 member_12;// max
+} aabb;
 
-int is_in_range(float local_0, float local_4, float local_8);
-int intersects(type_64 local_0, type_56 local_24);
+bool is_in_range__float__float__float__bool(float local_0, float local_4, float local_8);
+bool intersects__aabb__vec3__bool(aabb local_0, vec3 local_24);
 
-int is_in_range(float local_0, float local_4, float local_8)
+bool is_in_range__float__float__float__bool(float local_0, float local_4, float local_8)
 {
 	return (((local_0 - local_4) >= 0) && ((local_0 - local_8) <= 0));
 }
 
-int intersects(type_64 local_0, type_56 local_24)
+bool intersects__aabb__vec3__bool(aabb local_0, vec3 local_24)
 {
-	return ((is_in_range(local_24.member_0, local_0.member_0.member_0, local_0.member_12.member_0) && is_in_range(local_24.member_4, local_0.member_0.member_4, local_0.member_12.member_4)) && is_in_range(local_24.member_8, local_0.member_0.member_8, local_0.member_12.member_8));
+	return ((is_in_range__float__float__float__bool(local_24.member_0, local_0.member_0.member_0, local_0.member_12.member_0) && is_in_range__float__float__float__bool(local_24.member_4, local_0.member_0.member_4, local_0.member_12.member_4)) && is_in_range__float__float__float__bool(local_24.member_8, local_0.member_0.member_8, local_0.member_12.member_8));
 }
 
 int main(void)
 {
-	type_64 local_0;
+	aabb local_0;
 	{
-		type_56 expr_temp_0;
+		vec3 expr_temp_0;
 
 		expr_temp_0.member_0 = 0.000000f;
 		expr_temp_0.member_4 = 0.000000f;
@@ -36,7 +36,7 @@ int main(void)
 		local_0.member_0 = expr_temp_0;
 	}
 	{
-		type_56 expr_temp_0;
+		vec3 expr_temp_0;
 
 		expr_temp_0.member_0 = 3.000000f;
 		expr_temp_0.member_4 = 3.000000f;
@@ -46,14 +46,14 @@ int main(void)
 	{
 		int if_condition;
 		{
-			type_64 expr_temp_0;
-			type_56 expr_temp_1;
+			aabb expr_temp_0;
+			vec3 expr_temp_1;
 
 			expr_temp_0 = local_0;
 			expr_temp_1.member_0 = 1.000000f;
 			expr_temp_1.member_4 = 1.000000f;
 			expr_temp_1.member_8 = 1.000000f;
-			if_condition = intersects(expr_temp_0, expr_temp_1);
+			if_condition = intersects__aabb__vec3__bool(expr_temp_0, expr_temp_1);
 		}
 		if (if_condition)
 		{

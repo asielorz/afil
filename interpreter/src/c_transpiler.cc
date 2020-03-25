@@ -77,26 +77,47 @@ namespace c_transpiler
 		mark_as_to_do("Conversion of this type to string is not implemented yet.");
 	}
 
-	auto function_name(FunctionId function_id, complete::Program const & program) noexcept -> std::string
-	{
-		if (function_id == program.main_function)
-			return "main";
-
-		return std::string(ABI_name(program, function_id));
-	}
-
 	auto type_name(complete::TypeId type_id, complete::Program const & program) noexcept -> std::string
 	{
-		if (type_id == complete::TypeId::int_) return "int";
-		if (type_id == complete::TypeId::float_) return "float";
-		if (type_id == complete::TypeId::bool_) return "int";
-		if (type_id == complete::TypeId::char_) return "char";
+		std::string_view const type_ABI_name = ABI_name(program, type_id);
+		if (!type_ABI_name.empty())
+			return std::string(type_ABI_name);
 
 		complete::Type const type = type_with_id(program, type_id);
 		if (is_pointer(type) || is_array_pointer(type))
 			return join(type_name(pointee_type(type), program), " *");
 
 		return join("type_", decay(type_id).flat_value);
+	}
+
+	auto mangle(std::string name, FunctionId function_id, complete::Program const & program) noexcept -> std::string
+	{
+		complete::TypeId const ret = return_type(program, function_id);
+		auto const param_types = parameter_types_of(program, function_id);
+
+		for (complete::TypeId const param : param_types)
+		{
+			name += "__";
+			name += type_name(param, program); // TODO: function that returns ABI name of type (for pointers mainly)
+		}
+		name += "__";
+		name += type_name(ret, program);
+		return name;
+	}
+
+	auto function_name(FunctionId function_id, complete::Program const & program) noexcept -> std::string
+	{
+		if (function_id == program.main_function)
+			return "main";
+
+		std::string function_ABI_name = std::string(ABI_name(program, function_id));
+		if (!function_ABI_name.empty())
+			return mangle(function_ABI_name, function_id, program);
+
+		if (function_id.is_extern)
+			return mangle(join("extern_function_", function_id.index), function_id, program);
+		else
+			return mangle(join("function_", function_id.index), function_id, program);
 	}
 
 	auto write_function_call(FunctionId function_id, span<std::string const> parameters, complete::Program const & program, std::string & c_source)

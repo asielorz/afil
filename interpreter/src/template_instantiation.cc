@@ -76,6 +76,14 @@ namespace instantiation
 			function_ABI_name = name;
 	}
 
+	auto bind_type_name(std::string_view name, complete::TypeId type_id, complete::Program & program, ScopeStack & scope_stack)
+	{
+		top(scope_stack).types.push_back({std::string(name), type_id});
+		std::string & type_ABI_name = ABI_name(program, type_id);
+		if (type_ABI_name.empty())
+			type_ABI_name = name;
+	}
+
 	auto does_name_collide(ScopeStackView scope_stack, std::string_view name) noexcept -> bool
 	{
 		auto const visitor = overload(
@@ -1329,7 +1337,7 @@ namespace instantiation
 				new_type.extra_data = complete::Type::Struct{ static_cast<int>(program->structs.size()) };
 				complete::TypeId const new_type_id = add_type(*program, std::move(new_type));
 				program->structs.push_back(std::move(new_struct));
-				top(scope_stack).types.push_back({std::string(incomplete_statement.declared_struct.name), new_type_id});
+				bind_type_name(incomplete_statement.declared_struct.name, new_type_id, *program, scope_stack);
 
 				return std::nullopt;
 			},

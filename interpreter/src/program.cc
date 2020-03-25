@@ -123,6 +123,7 @@ namespace complete
 		{
 			global_scope.types.push_back({std::string(type.first), {false, false, false, static_cast<unsigned>(types.size())}});
 			types.push_back(type.second);
+			types.back().ABI_name = type.first;
 		}
 
 		//*******************************************************************
@@ -222,6 +223,16 @@ namespace complete
 			return synthesize_default_constructor(type_id, std::get<Type::Array>(type.extra_data), program);
 
 		declare_unreachable();
+	}
+
+	auto ABI_name(Program & program, TypeId id) noexcept -> std::string &
+	{
+		return program.types[id.index].ABI_name;
+	}
+
+	auto ABI_name(Program const & program, TypeId id) noexcept -> std::string_view
+	{
+		return type_with_id(program, id).ABI_name;
 	}
 
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId
