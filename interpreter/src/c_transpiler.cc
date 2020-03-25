@@ -79,16 +79,10 @@ namespace c_transpiler
 
 	auto function_name(FunctionId function_id, complete::Program const & program) noexcept -> std::string
 	{
-		static_cast<void>(program);
-		TODO("Transpiling calls to extern functions");
-
 		if (function_id == program.main_function)
 			return "main";
 
-		if (function_id.is_extern)
-			return join("extern_function_", function_id.index);
-		else
-			return join("function_", function_id.index);
+		return std::string(ABI_name(program, function_id));
 	}
 
 	auto type_name(complete::TypeId type_id, complete::Program const & program) noexcept -> std::string

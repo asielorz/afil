@@ -85,6 +85,7 @@ namespace incomplete
 	struct ExternFunction
 	{
 		std::string_view name;
+		std::string_view ABI_name;
 		incomplete::FunctionPrototype prototype;
 		void const * function_pointer;
 	};

@@ -1231,6 +1231,7 @@ namespace parser
 
 			incomplete::ExternFunction extern_function;
 			extern_function.name = function_name;
+			extern_function.ABI_name = extern_symbol_name;
 			extern_function.prototype = std::move(function_prototype);
 			extern_function.function_pointer = extern_symbol_address;
 

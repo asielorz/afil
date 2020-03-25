@@ -66,6 +66,7 @@ namespace complete
 			{id_for(box<Args>)...},
 			callc::c_function_caller(fn),
 			fn,
+			"",
 			true
 		};
 	}
@@ -405,6 +406,22 @@ namespace complete
 			return program.extern_functions[id.index].is_callable_at_compile_time;
 		else
 			return program.functions[id.index].is_callable_at_compile_time;
+	}
+
+	auto ABI_name(Program & program, FunctionId id) noexcept -> std::string &
+	{
+		if (id.is_extern)
+			return program.extern_functions[id.index].ABI_name;
+		else
+			return program.functions[id.index].ABI_name;
+	}
+
+	auto ABI_name(Program const & program, FunctionId id) noexcept -> std::string_view
+	{
+		if (id.is_extern)
+			return program.extern_functions[id.index].ABI_name;
+		else
+			return program.functions[id.index].ABI_name;
 	}
 
 	auto type_for_overload_set(Program & program, OverloadSet overload_set) noexcept -> TypeId

@@ -68,6 +68,14 @@ namespace instantiation
 		return StackGuard<ScopeStack>(scope_stack);
 	}
 
+	auto bind_function_name(std::string_view name, FunctionId function_id, complete::Program & program, ScopeStack & scope_stack) -> void
+	{
+		top(scope_stack).functions.push_back({std::string(name), function_id});
+		std::string & function_ABI_name = ABI_name(program, function_id);
+		if (function_ABI_name.empty())
+			function_ABI_name = name;
+	}
+
 	auto does_name_collide(ScopeStackView scope_stack, std::string_view name) noexcept -> bool
 	{
 		auto const visitor = overload(
@@ -1077,7 +1085,8 @@ namespace instantiation
 						return make_syntax_error(incomplete_statement.variable_name, "Function name collides with another name.");
 
 					FunctionId const function_id = add_function(*program, function);
-					top(scope_stack).functions.push_back({ incomplete_statement.variable_name, function_id });
+					bind_function_name(incomplete_statement.variable_name, function_id, *program, scope_stack);
+					function.ABI_name = incomplete_statement.variable_name;
 
 					try_call_void(instantiate_function_body(incomplete_function, template_parameters, scope_stack, program, out(function)));
 					program->functions[function_id.index] = std::move(function);
@@ -1129,7 +1138,7 @@ namespace instantiation
 					complete::OverloadSetView const overload_set = overload_set_for_type(*program, var_type);
 
 					for (FunctionId const function_id : overload_set.function_ids)
-						top(scope_stack).functions.push_back({ incomplete_statement.variable_name, function_id });
+						bind_function_name(incomplete_statement.variable_name, function_id, *program, scope_stack);
 
 					for (FunctionTemplateId const template_id : overload_set.function_template_ids)
 						top(scope_stack).function_templates.push_back({ incomplete_statement.variable_name, template_id });
@@ -1344,6 +1353,7 @@ namespace instantiation
 				{
 					complete::ExternFunction extern_function;
 					extern_function.function_pointer = incomplete_extern_function.function_pointer;
+					extern_function.ABI_name = incomplete_extern_function.ABI_name;
 
 					complete::Function function;
 					try_call_void(instantiate_function_prototype(incomplete_extern_function.prototype, template_parameters, scope_stack, program, out(function)));
@@ -1375,7 +1385,7 @@ namespace instantiation
 					if (does_function_name_collide(scope_stack, incomplete_extern_function.name)) 
 						return make_syntax_error(incomplete_extern_function.name, "Extern function name collides with another name.");
 
-					top(scope_stack).functions.push_back({std::string(incomplete_extern_function.name), function_id});
+					bind_function_name(incomplete_extern_function.name, function_id, *program, scope_stack);
 				}
 
 				return std::nullopt;

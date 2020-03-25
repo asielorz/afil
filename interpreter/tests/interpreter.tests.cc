@@ -2143,6 +2143,7 @@ TEST_CASE("Fibonacci deleteme")
 	std::ofstream file("test_output.c");
 	file << c_transpiler::transpile_to_c(program);
 	std::cout << "**************************************************************************************\n";
+
 	system("pause");
 }
 

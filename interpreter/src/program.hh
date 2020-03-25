@@ -53,6 +53,7 @@ namespace complete
 		int parameter_size = 0;	     // Size in bytes needed for parameters.
 		TypeId return_type;
 		std::vector<Statement> statements;
+		std::string ABI_name;
 		bool is_callable_at_compile_time;
 	};
 
@@ -64,6 +65,7 @@ namespace complete
 		std::vector<TypeId> parameter_types;
 		callc::CFunctionCaller caller;
 		void const * function_pointer;
+		std::string ABI_name;
 		bool is_callable_at_compile_time;
 	};
 
@@ -126,6 +128,7 @@ namespace complete
 		std::vector<ResolvedTemplateParameter> scope_template_parameters;
 		instantiation::ScopeStack scope_stack;
 		std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
+		std::string ABI_name;
 	};
 
 	struct MemberVariable : Variable
@@ -200,6 +203,8 @@ namespace complete
 	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>;
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool;
+	auto ABI_name(Program & program, FunctionId id) noexcept -> std::string &;
+	auto ABI_name(Program const & program, FunctionId id) noexcept -> std::string_view;
 
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, PartialSyntaxError>;
 	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, PartialSyntaxError>;
