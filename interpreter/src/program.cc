@@ -435,6 +435,26 @@ namespace complete
 			return program.functions[id.index].ABI_name;
 	}
 
+	auto ABI_name(Program & program, FunctionTemplateId id) noexcept -> std::string &
+	{
+		return program.function_templates[id.index].ABI_name;
+	}
+
+	auto ABI_name(Program const & program, FunctionTemplateId id) noexcept -> std::string_view
+	{
+		return program.function_templates[id.index].ABI_name;
+	}
+
+	auto ABI_name(Program & program, StructTemplateId id) noexcept -> std::string &
+	{
+		return program.struct_templates[id.index].ABI_name;
+	}
+
+	auto ABI_name(Program const & program, StructTemplateId id) noexcept -> std::string_view
+	{
+		return program.struct_templates[id.index].ABI_name;
+	}
+
 	auto type_for_overload_set(Program & program, OverloadSet overload_set) noexcept -> TypeId
 	{
 		TypeId new_type_id;
@@ -472,6 +492,8 @@ namespace complete
 
 		try_call_decl(Function instantiated_function,
 			instantiation::instantiate_function_template(function_template.incomplete_function, all_template_parameters, scope_stack, out(program)));
+
+		instantiated_function.ABI_name = function_template.ABI_name;
 		FunctionId const instantiated_function_id = add_function(program, std::move(instantiated_function));
 
 		auto parameters_to_insert = std::vector<TypeId>(parameters.begin(), parameters.end());
@@ -517,6 +539,7 @@ namespace complete
 		}
 
 		new_type.extra_data = Type::Struct{static_cast<int>(program.structs.size())};
+		new_type.ABI_name = struct_template.ABI_name;
 		program.structs.push_back(std::move(new_struct));
 
 		Type::TemplateInstantiation template_instantiation;

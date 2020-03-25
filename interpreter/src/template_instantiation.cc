@@ -76,10 +76,26 @@ namespace instantiation
 			function_ABI_name = name;
 	}
 
+	auto bind_function_template_name(std::string_view name, FunctionTemplateId function_template_id, complete::Program & program, ScopeStack & scope_stack) -> void
+	{
+		top(scope_stack).function_templates.push_back({std::string(name), function_template_id});
+		std::string & function_ABI_name = ABI_name(program, function_template_id);
+		if (function_ABI_name.empty())
+			function_ABI_name = name;
+	}
+
 	auto bind_type_name(std::string_view name, complete::TypeId type_id, complete::Program & program, ScopeStack & scope_stack)
 	{
 		top(scope_stack).types.push_back({std::string(name), type_id});
 		std::string & type_ABI_name = ABI_name(program, type_id);
+		if (type_ABI_name.empty())
+			type_ABI_name = name;
+	}
+
+	auto bind_struct_template_name(std::string_view name, complete::StructTemplateId template_id, complete::Program & program, ScopeStack & scope_stack)
+	{
+		top(scope_stack).struct_templates.push_back({std::string(name), template_id});
+		std::string & type_ABI_name = ABI_name(program, template_id);
 		if (type_ABI_name.empty())
 			type_ABI_name = name;
 	}
@@ -1149,7 +1165,7 @@ namespace instantiation
 						bind_function_name(incomplete_statement.variable_name, function_id, *program, scope_stack);
 
 					for (FunctionTemplateId const template_id : overload_set.function_template_ids)
-						top(scope_stack).function_templates.push_back({ incomplete_statement.variable_name, template_id });
+						bind_function_template_name(incomplete_statement.variable_name, template_id, *program, scope_stack);
 
 					return std::nullopt;
 				}
@@ -1351,7 +1367,7 @@ namespace instantiation
 				new_template.scope_template_parameters = template_parameters;
 				new_template.scope_stack = scope_stack;
 				auto const id = add_struct_template(*program, std::move(new_template));
-				top(scope_stack).struct_templates.push_back({std::string(incomplete_statement.declared_struct_template.name), id});
+				bind_struct_template_name(incomplete_statement.declared_struct_template.name, id, *program, scope_stack);
 
 				return std::nullopt;
 			},
