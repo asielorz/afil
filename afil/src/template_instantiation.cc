@@ -742,6 +742,50 @@ namespace instantiation
 				complete_expression.type = type_for_overload_set(*program, std::move(overload_set));
 				return std::move(complete_expression);
 			},
+			[&](incomplete::expression::ExternFunction const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
+			{
+				incomplete::ExternFunction const & incomplete_extern_function = incomplete_expression.function;
+
+				complete::ExternFunction extern_function;
+				extern_function.function_pointer = load_symbol(incomplete_extern_function.ABI_name);
+				if (!extern_function.function_pointer)
+					return make_syntax_error(incomplete_extern_function.ABI_name_source, join("Cannot find extern symbol \"", incomplete_extern_function.ABI_name, "\"."));
+				extern_function.ABI_name = incomplete_extern_function.ABI_name;
+
+				complete::Function function;
+				try_call_void(instantiate_function_prototype(incomplete_extern_function.prototype, template_parameters, scope_stack, program, out(function)));
+				extern_function.parameter_size = function.stack_frame_size;
+				extern_function.parameter_alignment = function.stack_frame_alignment;
+				extern_function.return_type = function.return_type;
+
+				extern_function.parameter_types.reserve(function.parameter_count);
+				for (int i = 0; i < function.parameter_count; ++i)
+					extern_function.parameter_types.push_back(function.variables[i].type);
+
+				if (function.parameter_count > 4)
+					mark_as_to_do("Extern functions with more than 4 parameters");
+
+				callc::TypeDescriptor parameter_type_descriptors[4];
+				for (int i = 0; i < function.parameter_count; ++i)
+					parameter_type_descriptors[i] = type_descriptor_for(extern_function.parameter_types[i], *program);
+
+				callc::TypeDescriptor const return_type_descriptor = type_descriptor_for(extern_function.return_type, *program);
+
+				extern_function.caller = callc::c_function_caller({ parameter_type_descriptors, extern_function.parameter_types.size() }, return_type_descriptor);
+				extern_function.is_callable_at_compile_time = false;
+
+				FunctionId function_id;
+				function_id.is_extern = true;
+				function_id.index = static_cast<int>(program->extern_functions.size());
+				program->extern_functions.push_back(std::move(extern_function));
+
+				complete::OverloadSet overload_set;
+				overload_set.function_ids.push_back(function_id);
+
+				complete::expression::Constant complete_expression;
+				complete_expression.type = type_for_overload_set(*program, std::move(overload_set));
+				return std::move(complete_expression);
+			},
 			[&](incomplete::expression::FunctionCall const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				std::vector<complete::Expression> parameters;
@@ -1387,51 +1431,6 @@ namespace instantiation
 				new_template.scope_stack = scope_stack;
 				auto const id = add_struct_template(*program, std::move(new_template));
 				bind_struct_template_name(incomplete_statement.declared_struct_template.name, id, *program, scope_stack);
-
-				return std::nullopt;
-			},
-			[&](incomplete::statement::ImportBlock const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
-			{
-				for (incomplete::ExternFunction const & incomplete_extern_function : incomplete_statement.imported_functions)
-				{
-					complete::ExternFunction extern_function;
-					extern_function.function_pointer = load_symbol(incomplete_extern_function.ABI_name);
-					if (!extern_function.function_pointer)
-						return make_syntax_error(incomplete_extern_function.ABI_name_source, join("Cannot find extern symbol \"", incomplete_extern_function.ABI_name, "\"."));
-					extern_function.ABI_name = incomplete_extern_function.ABI_name;
-
-					complete::Function function;
-					try_call_void(instantiate_function_prototype(incomplete_extern_function.prototype, template_parameters, scope_stack, program, out(function)));
-					extern_function.parameter_size = function.stack_frame_size;
-					extern_function.parameter_alignment = function.stack_frame_alignment;
-					extern_function.return_type = function.return_type;
-
-					extern_function.parameter_types.reserve(function.parameter_count);
-					for (int i = 0; i < function.parameter_count; ++i)
-						extern_function.parameter_types.push_back(function.variables[i].type);
-
-					if (function.parameter_count > 4)
-						mark_as_to_do("Extern functions with more than 4 parameters");
-
-					callc::TypeDescriptor parameter_type_descriptors[4];
-					for (int i = 0; i < function.parameter_count; ++i)
-						parameter_type_descriptors[i] = type_descriptor_for(extern_function.parameter_types[i], *program);
-
-					callc::TypeDescriptor const return_type_descriptor = type_descriptor_for(extern_function.return_type, *program);
-
-					extern_function.caller = callc::c_function_caller({parameter_type_descriptors, extern_function.parameter_types.size()}, return_type_descriptor);
-					extern_function.is_callable_at_compile_time = false;
-
-					FunctionId function_id;
-					function_id.is_extern = true;
-					function_id.index = static_cast<int>(program->extern_functions.size());
-					program->extern_functions.push_back(std::move(extern_function));
-
-					if (does_function_name_collide(scope_stack, incomplete_extern_function.name)) 
-						return make_syntax_error(incomplete_extern_function.name, "Extern function name collides with another name.");
-
-					bind_function_name(incomplete_extern_function.name, function_id, *program, scope_stack);
-				}
 
 				return std::nullopt;
 			}

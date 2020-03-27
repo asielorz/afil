@@ -65,11 +65,6 @@ namespace incomplete
 		struct Break {};
 		struct Continue {};
 
-		struct ImportBlock
-		{
-			std::vector<ExternFunction> imported_functions;
-		};
-
 		struct StructDeclaration
 		{
 			Struct declared_struct;
@@ -84,8 +79,7 @@ namespace incomplete
 			VariableDeclaration, LetDeclaration, ExpressionStatement,
 			If, StatementBlock, While, For,
 			Return, Break, Continue,
-			StructDeclaration, StructTemplateDeclaration,
-			ImportBlock
+			StructDeclaration, StructTemplateDeclaration
 		>;
 
 	} // namespace statement

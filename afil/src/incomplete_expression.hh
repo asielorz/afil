@@ -60,6 +60,11 @@ namespace incomplete
 			incomplete::FunctionTemplate function_template;
 		};
 
+		struct ExternFunction
+		{
+			incomplete::ExternFunction function;
+		};
+
 		struct FunctionCall
 		{
 			std::vector<Expression> parameters;
@@ -116,7 +121,7 @@ namespace incomplete
 			Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<uninit_t>,
 			Dereference, Addressof, Subscript,
 			Identifier, MemberVariable,
-			Function, FunctionTemplate,	
+			Function, FunctionTemplate,	ExternFunction,
 			FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 			If, StatementBlock,
 			Constructor, DesignatedInitializerConstructor,

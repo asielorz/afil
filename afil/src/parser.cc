@@ -554,6 +554,30 @@ namespace parser
 		return incomplete::expression::FunctionTemplate{std::move(function)};
 	}
 
+	auto parse_extern_function_expression(span<lex::Token const> tokens, size_t & index, incomplete::FunctionPrototype function_prototype) noexcept
+		-> expected<incomplete::expression::Variant, PartialSyntaxError>
+	{
+		if (!function_prototype.return_type.has_value()) 
+			return make_syntax_error(tokens[index], "Cannot omit return type of imported extern function.");
+
+		index++;
+		if (tokens[index].type != TokenType::open_parenthesis)
+			return make_syntax_error(tokens[index], "Expected '(' after extern_symbol.");
+		index++;
+		std::string_view const extern_symbol_name = tokens[index].source;
+		index++;
+		if (tokens[index].type != TokenType::close_parenthesis)
+			return make_syntax_error(tokens[index], "Expected ')' after extern_symbol name.");
+		index++;
+
+		incomplete::ExternFunction extern_function;
+		extern_function.ABI_name = parse_string_literal(extern_symbol_name);
+		extern_function.ABI_name_source = extern_symbol_name;
+		extern_function.prototype = std::move(function_prototype);
+
+		return incomplete::expression::ExternFunction{std::move(extern_function)};
+	}
+
 	auto parse_function_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
 		// Skip fn token.
@@ -566,6 +590,10 @@ namespace parser
 
 		incomplete::Function function;
 		try_call_void(parse_function_prototype(tokens, index, type_names, out(function)));
+
+		if (tokens[index].source == "extern_symbol")
+			return parse_extern_function_expression(tokens, index, std::move(function));
+
 		try_call_void(parse_function_body(tokens, index, type_names, out(function)));
 
 		return incomplete::expression::Function{std::move(function)};
@@ -1179,63 +1207,6 @@ namespace parser
 		return std::move(statement);
 	}
 
-	auto parse_import_block(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
-		-> expected<incomplete::statement::ImportBlock, PartialSyntaxError>
-	{
-		// Skip import keyword.
-		index++;
-
-		if (tokens[index].type != TokenType::open_brace) return make_syntax_error(tokens[index], "Expected { after import keyword.");
-		index++;
-
-		incomplete::statement::ImportBlock import_block;
-
-		while (tokens[index].type != TokenType::close_brace)
-		{
-			if (tokens[index].source != "let") return make_syntax_error(tokens[index], "Expected function declaration in import block.");
-			index++;
-			if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after let.");
-			std::string_view const function_name = tokens[index].source;
-			index++;
-
-			if (tokens[index].source != "=") return make_syntax_error(tokens[index], "Expected '=' after function name.");
-			index++;
-
-			if (tokens[index].source != "fn") return make_syntax_error(tokens[index], "Expected function declaration after '=' in import block.");
-			index++;
-
-			incomplete::FunctionPrototype function_prototype;
-			try_call_void(parse_function_prototype(tokens, index, type_names, out(function_prototype)));
-
-			if (tokens[index].source != "extern_symbol"sv) return make_syntax_error(tokens[index], "Expected keyword \"extern_symbol\" after function prototype.");
-			if (!function_prototype.return_type.has_value()) return make_syntax_error(tokens[index], "Cannot omit return type of imported extern function.");
-
-			index++;
-			if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after extern_symbol.");
-			index++;
-			std::string_view const extern_symbol_name = tokens[index].source;
-			index++;
-			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after extern_symbol name.");
-			index++;
-
-			incomplete::ExternFunction extern_function;
-			extern_function.name = function_name;
-			extern_function.ABI_name = parse_string_literal(extern_symbol_name);
-			extern_function.ABI_name_source = extern_symbol_name;
-			extern_function.prototype = std::move(function_prototype);
-
-			import_block.imported_functions.push_back(std::move(extern_function));
-			
-			if (tokens[index].type != TokenType::semicolon) return make_syntax_error(tokens[index], "Missing ';' after function declaration.");
-			index++;
-		}
-
-		// Skip '}'
-		index++;
-
-		return import_block;
-	}
-
 	auto parse_statement_variant(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
 		-> expected<incomplete::statement::Variant, PartialSyntaxError>
 	{
@@ -1260,8 +1231,6 @@ namespace parser
 			result = parse_break_or_continue_statement<incomplete::statement::Continue>(tokens, index, type_names);
 		else if (tokens[index].source == "struct")
 			return parse_struct_declaration(tokens, index, type_names);
-		else if (tokens[index].source == "import")
-			return parse_import_block(tokens, index, type_names);
 		else
 		{
 			try_call_decl(auto parsed_type, parse_type_name(tokens, index, type_names));

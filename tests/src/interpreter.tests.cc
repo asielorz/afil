@@ -1647,14 +1647,11 @@ TEST_CASE("Declaring a function inside a template")
 TEST_CASE("import allows to import C functions from DLLs")
 {
 	auto const src = R"(
-		import
-		{
-			let putchar = fn(char c) -> int 
-				extern_symbol("putchar");
+		let putchar = fn(char c) -> int 
+			extern_symbol("putchar");
 
-			let abs = fn(int x) -> int 
-				extern_symbol("abs");
-		}
+		let abs = fn(int x) -> int 
+			extern_symbol("abs");
 
 		let print_string = fn(char[] s, int n)
 		{
@@ -2146,7 +2143,6 @@ TEST_CASE("Fibonacci deleteme")
 
 	system("pause");
 }
-
 
 //TEST_CASE("Functions that take types as parameters")
 //{
