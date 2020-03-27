@@ -7,6 +7,7 @@
 #include "interpreter.hh"
 #include "constexpr.hh"
 #include "utils/algorithm.hh"
+#include "utils/load_dll.hh"
 #include "utils/out.hh"
 #include "utils/overload.hh"
 #include "utils/string.hh"
@@ -121,6 +122,24 @@ namespace instantiation
 
 		auto const lookup = lookup_name(scope_stack, name);
 		return std::visit(visitor, lookup);
+	}
+
+	auto load_symbol(std::string_view symbol_name) noexcept -> void const *
+	{
+		TODO("DLLs as parameters.");
+		constexpr std::string_view const loaded_dlls[] = {
+			"ucrtbase"
+		};
+		
+		for (std::string_view const lib : loaded_dlls)
+		{
+			DLL dll = load_library(lib);
+			auto const symbol = find_symbol(dll, symbol_name);
+			if (symbol)
+				return symbol;
+		}
+
+		return nullptr;
 	}
 
 	auto resolve_dependent_type(
@@ -1376,7 +1395,9 @@ namespace instantiation
 				for (incomplete::ExternFunction const & incomplete_extern_function : incomplete_statement.imported_functions)
 				{
 					complete::ExternFunction extern_function;
-					extern_function.function_pointer = incomplete_extern_function.function_pointer;
+					extern_function.function_pointer = load_symbol(incomplete_extern_function.ABI_name);
+					if (!extern_function.function_pointer)
+						return make_syntax_error(incomplete_extern_function.ABI_name_source, join("Cannot find extern symbol \"", incomplete_extern_function.ABI_name, "\"."));
 					extern_function.ABI_name = incomplete_extern_function.ABI_name;
 
 					complete::Function function;

@@ -4,7 +4,6 @@
 #include "syntax_error.hh"
 #include "lexer.hh"
 #include "utils/algorithm.hh"
-#include "utils/load_dll.hh"
 #include "utils/out.hh"
 #include "utils/overload.hh"
 #include "utils/span.hh"
@@ -1186,14 +1185,8 @@ namespace parser
 		// Skip import keyword.
 		index++;
 
-		if (tokens[index].type != TokenType::literal_string) return make_syntax_error(tokens[index], "Expected string literal with library name after import.");
-		std::string const library_name = parse_string_literal(tokens[index].source);
+		if (tokens[index].type != TokenType::open_brace) return make_syntax_error(tokens[index], "Expected { after import keyword.");
 		index++;
-
-		if (tokens[index].type != TokenType::open_brace) return make_syntax_error(tokens[index], "Expected { after library name.");
-		index++;
-
-		DLL const library = load_library(library_name);
 
 		incomplete::statement::ImportBlock import_block;
 
@@ -1225,15 +1218,11 @@ namespace parser
 			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after extern_symbol name.");
 			index++;
 
-			auto const module_handle = load_library(library_name);
-			void const * const extern_symbol_address = find_symbol(module_handle, parse_string_literal(extern_symbol_name));
-			if (extern_symbol_address == nullptr) return make_syntax_error(tokens[index], "Extern symbol not found.");
-
 			incomplete::ExternFunction extern_function;
 			extern_function.name = function_name;
-			extern_function.ABI_name = extern_symbol_name;
+			extern_function.ABI_name = parse_string_literal(extern_symbol_name);
+			extern_function.ABI_name_source = extern_symbol_name;
 			extern_function.prototype = std::move(function_prototype);
-			extern_function.function_pointer = extern_symbol_address;
 
 			import_block.imported_functions.push_back(std::move(extern_function));
 			

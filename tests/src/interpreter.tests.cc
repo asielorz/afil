@@ -1647,7 +1647,7 @@ TEST_CASE("Declaring a function inside a template")
 TEST_CASE("import allows to import C functions from DLLs")
 {
 	auto const src = R"(
-		import "ucrtbase"
+		import
 		{
 			let putchar = fn(char c) -> int 
 				extern_symbol("putchar");
