@@ -2162,8 +2162,6 @@ TEST_CASE("Fibonacci deleteme")
 
 /*****************************************************************
 Backlog
-- good errors (very tied to modules)
-- separation of the program in modules
 - contracts
 - concepts
 - semantic analysis on templates based on concepts (depends on concepts)

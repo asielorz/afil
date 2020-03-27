@@ -1,7 +1,1 @@
-.vs/
-interpreter/bin/
-interpreter/obj/
-test_dll/bin/
-test_dll/obj/
-*.vcxproj.filters
-*.vcxproj.user
+build*/

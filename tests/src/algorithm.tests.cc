@@ -14,5 +14,5 @@ TEST_CASE("filter_in_place removes all elements that do not satisfy an algorithm
 	erase_if(indices, is_even);
 	REQUIRE(indices.size() == 500);
 	for (size_t i : indices)
-		REQUIRE(!is_even(i));
+		REQUIRE(!is_even(i));	 
 }
