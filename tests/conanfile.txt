@@ -1,8 +1,4 @@
 [requires]
-catch2/2.11.3
+Catch2/2.11.1@catchorg/stable
 
 [options]
-
-#[imports]
-#bin, *.dll -> ./bin # Copies all dll files from the package "bin" folder to my project "bin" folder
-#lib, *.dylib* -> ./bin # Copies all dylib files from the package "lib" folder to my project "bin" folder

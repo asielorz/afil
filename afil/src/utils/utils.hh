@@ -1,6 +1,7 @@
 #pragma once
 
 auto align(int address, int alignment) noexcept -> int;
+auto add_size_aligned(int prev_size, int size_to_add, int alignment) noexcept -> int;
 
 template <typename T>
 constexpr auto align(T * address, size_t alignment) noexcept -> T *

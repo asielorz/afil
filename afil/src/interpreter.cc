@@ -87,14 +87,44 @@ namespace interpreter
 			int const prev_ebp = stack.base_pointer;
 			int const prev_esp = stack.top_pointer;
 
+			// Allocarte memory for temporaries passed by reference.
+			int size_of_temporaries_passed_by_reference = 0;
+			int alignment_of_temporaries_passed_by_reference = 1;
+			for (size_t i = 0; i < parameters.size(); ++i)
+			{
+				complete::TypeId const param_type = expression_type_id(parameters[i], program);
+				if (!param_type.is_reference && func.variables[i].type.is_reference)
+				{
+					complete::Type const & param_type_data = type_with_id(program, param_type);
+					size_of_temporaries_passed_by_reference = add_size_aligned(size_of_temporaries_passed_by_reference, param_type_data.size, param_type_data.alignment);
+					alignment_of_temporaries_passed_by_reference = std::max(alignment_of_temporaries_passed_by_reference, param_type_data.alignment);
+				}
+			}
+			int const temporaries_start = alloc(stack, size_of_temporaries_passed_by_reference, alignment_of_temporaries_passed_by_reference);
+
 			// Allocate memory for the parameters.
 			int const parameters_start = alloc(stack, parameter_size, func.stack_frame_alignment);
 
 			// Evaluate the expressions that yield the parameters of the function.
-			for (int i = 0, next_parameter_address = parameters_start; i < parameters.size(); ++i)
+			for (
+				int i = 0, next_parameter_address = parameters_start, next_temporary_address = temporaries_start;
+				i < parameters.size(); 
+				++i
+			)
 			{
-				eval_expression(parameters[i], stack, program, next_parameter_address);
-				next_parameter_address += expression_type_size(parameters[i], program);
+				complete::TypeId const param_type = expression_type_id(parameters[i], program);
+				if (!param_type.is_reference && func.variables[i].type.is_reference)
+				{
+					eval_expression(parameters[i], stack, program, next_temporary_address);
+					write(stack, next_parameter_address, pointer_at_address(stack, next_temporary_address));
+					next_temporary_address += expression_type_size(parameters[i], program);
+					next_parameter_address += sizeof(void *);
+				}
+				else
+				{
+					eval_expression(parameters[i], stack, program, next_parameter_address);
+					next_parameter_address += expression_type_size(parameters[i], program);
+				}
 			}
 
 			// Move the stack pointers.

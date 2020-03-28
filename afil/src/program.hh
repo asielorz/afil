@@ -246,4 +246,3 @@ namespace complete
 	auto overload_set_for_type(Program const & program, TypeId overload_set_type) noexcept -> OverloadSetView;
 
 } // namespace complete
-

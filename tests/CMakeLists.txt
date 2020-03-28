@@ -18,7 +18,7 @@ target_include_directories(afil_lib
 target_link_libraries(afil_tests
 	PRIVATE
 		afil_lib
-		CONAN_PKG::catch2
+		CONAN_PKG::Catch2
 )
 
 target_compile_definitions(afil_tests

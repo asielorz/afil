@@ -554,7 +554,7 @@ namespace complete
 		return new_type_id;
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>
+	auto insert_conversion_node_impl(Expression tree, TypeId from, TypeId to, Program const & program, bool allow_address_of_temporary) noexcept -> expected<Expression, PartialSyntaxError>
 	{
 		if (from.index == to.index)
 		{
@@ -565,16 +565,19 @@ namespace complete
 			if (from.is_reference && !to.is_reference)
 			{
 				expression::Dereference deref_node;
-				deref_node.expression = std::make_unique<Expression>(std::move(tree));
+				deref_node.expression = allocate(std::move(tree));
 				deref_node.return_type = to;
 				return std::move(deref_node);
 			}
 			else
 			{
-				if (to.is_mutable) 
+				if (to.is_mutable)
 					return make_syntax_error("Can't bind a temporary to a mutable reference.");
 
-				mark_as_to_do("Address of temporaries");
+				if (allow_address_of_temporary)
+					return std::move(tree);
+				else 
+					return make_syntax_error("Cannot take address of temporary.");
 			}
 		}
 		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
@@ -582,6 +585,11 @@ namespace complete
 			return std::move(tree);
 		}
 		return make_syntax_error("Conversion between types does not exist.");
+	}
+
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>
+	{
+		return insert_conversion_node_impl(std::move(tree), from, to, program, false);
 	}
 
 	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>
@@ -819,7 +827,11 @@ namespace complete
 
 		// If any conversion is needed in order to call the function, perform the conversion.
 		auto const target_parameter_types = parameter_types_of(program, function_id);
-		try_call_void(insert_conversions(parameters, parameter_types, target_parameter_types, program));
+		for (size_t i = 0; i < target_parameter_types.size(); ++i)
+		{
+			if (parameter_types[i] != target_parameter_types[i])
+				try_call(assign_to(parameters[i]), insert_conversion_node_impl(std::move(parameters[i]), parameter_types[i], target_parameter_types[i], program, true));
+		}
 
 		return function_id;
 	}

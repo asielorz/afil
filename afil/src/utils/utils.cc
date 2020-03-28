@@ -7,3 +7,8 @@ auto align(int address, int alignment) noexcept -> int
 		address += alignment - excedent;
 	return address;
 }
+
+auto add_size_aligned(int prev_size, int size_to_add, int alignment) noexcept -> int
+{
+	return align(prev_size, alignment) + size_to_add;
+}
