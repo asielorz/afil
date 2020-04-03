@@ -2152,6 +2152,33 @@ TEST_CASE("compiles can define names for using them inside its body")
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
+TEST_CASE("compiles can have any number of expressions, separated by semicolons. All must be true for the compiles expression to be true")
+{
+	auto const src1 = R"(
+		let main = fn() -> int
+		{
+			if (compiles(int i, int j){i + j; i - j; i < j})
+				return 3 + 4;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src1) == 7);
+
+	auto const src2 = R"(
+		let main = fn() -> int
+		{
+			if (compiles(int i, int j){i + j; i - j; i[j]}) // Last one i[j] does not compile
+				return 3 + 4;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src2) == 0);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(

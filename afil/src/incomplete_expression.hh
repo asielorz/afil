@@ -126,7 +126,7 @@ namespace incomplete
 			};
 
 			std::vector<FakeVariable> variables;
-			value_ptr<Expression> body;
+			std::vector<Expression> body;
 		};
 
 		using Variant = std::variant<

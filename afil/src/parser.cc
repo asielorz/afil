@@ -716,14 +716,25 @@ namespace parser
 			return make_syntax_error(tokens[index].source, "Expected '{' after \"compiles\" keyword.");
 		index++;
 
-		try_call_decl(incomplete::Expression body, parse_expression(tokens, index, type_names));
+		while (true)
+		{
+			try_call(compiles_expr.body.push_back, parse_expression(tokens, index, type_names));
 
-		// Expect { after expression.
-		if (tokens[index].type != TokenType::close_brace)
-			return make_syntax_error(tokens[index].source, "Expected '}' after body of compiles expression.");
-		index++;
+			if (tokens[index].type == TokenType::semicolon)
+			{
+				index++;
+			}
+			else if (tokens[index].type == TokenType::close_brace)
+			{
+				index++;
+				break;
+			}
+			else
+			{
+				return make_syntax_error(tokens[index].source, "Expected '}' or ';' after expression in body of compiles expression.");
+			}
+		}
 
-		compiles_expr.body = allocate(std::move(body));
 		return std::move(compiles_expr);
 	}
 

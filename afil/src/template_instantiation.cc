@@ -1098,8 +1098,17 @@ namespace instantiation
 					add_variable_to_scope(fake_scope, fake_var.name, var_type, 0, *program);
 				}
 				auto const guard = push_block_scope(scope_stack, fake_scope);
-				auto const body = instantiate_expression(*incomplete_expression.body, template_parameters, scope_stack, program, current_scope_return_type);
-				return complete::expression::Literal<bool>{body.has_value()};
+
+				bool all_body_expressions_compile = true;
+				for (incomplete::Expression const & expression_to_test : incomplete_expression.body)
+				{
+					if (!instantiate_expression(expression_to_test, template_parameters, scope_stack, program, current_scope_return_type))
+					{
+						all_body_expressions_compile = false;
+						break;
+					}
+				}
+				return complete::expression::Literal<bool>{all_body_expressions_compile};
 			}
 		);
 
