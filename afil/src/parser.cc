@@ -718,7 +718,28 @@ namespace parser
 
 		while (true)
 		{
-			try_call(compiles_expr.body.push_back, parse_expression(tokens, index, type_names));
+			incomplete::ExpressionToTest expr_to_test;
+
+			if (tokens[index].type == TokenType::open_brace)
+			{
+				index++;
+				try_call(assign_to(expr_to_test.expression), parse_expression(tokens, index, type_names));
+
+				if (tokens[index].type != TokenType::close_brace)
+					return make_syntax_error(tokens[index].source, "Expected '}' after expression in body of compiles expression.");
+				index++;
+
+				if (tokens[index].type != TokenType::arrow)
+					return make_syntax_error(tokens[index].source, "Expected \"->\" after '}' in body of compiles expression.");
+				index++;
+
+				try_call(assign_to(expr_to_test.expected_type), parse_type_name(tokens, index, type_names));
+			}
+			else
+			{
+				try_call(assign_to(expr_to_test.expression), parse_expression(tokens, index, type_names));
+			}
+			compiles_expr.body.push_back(std::move(expr_to_test));
 
 			if (tokens[index].type == TokenType::semicolon)
 			{

@@ -448,6 +448,28 @@ namespace instantiation
 		return {type.size, is_float};
 	}
 
+	auto test_if_expression_compiles(
+		incomplete::ExpressionToTest const & expression_to_test,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program,
+		optional_out<complete::TypeId> current_scope_return_type
+	) -> bool
+	{
+		auto expr = instantiate_expression(expression_to_test.expression, template_parameters, scope_stack, program, current_scope_return_type);
+		if (!expr)
+			return false;
+
+		if (!expression_to_test.expected_type)
+			return true;
+
+		auto expected_return_type = resolve_dependent_type(*expression_to_test.expected_type, template_parameters, scope_stack, program);
+		if (!expected_return_type)
+			return false;
+
+		return is_convertible(expression_type_id(*expr, *program), *expected_return_type, *program);
+	}
+
 	auto instantiate_statement(
 		incomplete::Statement const & incomplete_statement_,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -1100,9 +1122,9 @@ namespace instantiation
 				auto const guard = push_block_scope(scope_stack, fake_scope);
 
 				bool all_body_expressions_compile = true;
-				for (incomplete::Expression const & expression_to_test : incomplete_expression.body)
+				for (incomplete::ExpressionToTest const & expression_to_test : incomplete_expression.body)
 				{
-					if (!instantiate_expression(expression_to_test, template_parameters, scope_stack, program, current_scope_return_type))
+					if (!test_if_expression_compiles(expression_to_test, template_parameters, scope_stack, program, current_scope_return_type))
 					{
 						all_body_expressions_compile = false;
 						break;

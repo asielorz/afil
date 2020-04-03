@@ -2179,6 +2179,45 @@ TEST_CASE("compiles can have any number of expressions, separated by semicolons.
 	REQUIRE(tests::parse_and_run(src2) == 0);
 }
 
+TEST_CASE("A compiles expression may specify what the return type of the return type of a expression must be")
+{
+	auto const src1 = R"(
+		let main = fn() -> int
+		{
+			bool condition = compiles(int i, int j)
+			{
+				{3 + 4} -> int;
+				{3 < 4} -> bool
+			};
+
+			if (condition)
+				return 3 + 4;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src1) == 7);
+
+	auto const src2 = R"(
+		let main = fn() -> int
+		{
+			bool condition = compiles(int i, int j)
+			{
+				{3 + 4} -> float; // Wrong
+				{3 < 4} -> bool
+			};
+
+			if (condition)
+				return 3 + 4;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src2) == 0);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(
