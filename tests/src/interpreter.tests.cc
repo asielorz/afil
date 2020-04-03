@@ -2186,8 +2186,8 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 		{
 			bool condition = compiles(int i, int j)
 			{
-				{3 + 4} -> int;
-				{3 < 4} -> bool
+				{i + j} -> int;
+				{i < j} -> bool
 			};
 
 			if (condition)
@@ -2204,8 +2204,8 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 		{
 			bool condition = compiles(int i, int j)
 			{
-				{3 + 4} -> float; // Wrong
-				{3 < 4} -> bool
+				{i + j} -> float; // Wrong
+				{i < j} -> bool
 			};
 
 			if (condition)
@@ -2218,17 +2218,29 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 	REQUIRE(tests::parse_and_run(src2) == 0);
 }
 
-//TEST_CASE("Functions that take types as parameters")
-//{
-//	auto const src = R"(
-//		let main = fn() -> int
-//		{
-//			return alignment(int);
-//		};
-//	)"sv;
-//
-//	REQUIRE(tests::parse_and_run(src) == 4);
-//}
+TEST_CASE("Functions that take types as parameters")
+{
+	auto const src = R"(
+		let is_ordered = fn(type t) -> bool
+		{
+			return compiles(t i, t j)
+			{
+				{i == j} -> bool;
+				{3 <=> 4} -> int
+			};
+		};
+
+		let main = fn() -> int
+		{
+			if (is_ordered(int))
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
 
 /*****************************************************************
 Backlog
