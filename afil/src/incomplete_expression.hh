@@ -119,6 +119,13 @@ namespace incomplete
 
 		struct Compiles
 		{
+			struct FakeVariable
+			{
+				incomplete::TypeId type;
+				std::string_view name;
+			};
+
+			std::vector<FakeVariable> variables;
 			value_ptr<Expression> body;
 		};
 

@@ -2137,6 +2137,21 @@ TEST_CASE("compiles returns false when given an ill formed expression")
 	REQUIRE(tests::parse_and_run(src) == 0);
 }
 
+TEST_CASE("compiles can define names for using them inside its body")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			if (compiles(int i, int j){i + j})
+				return 3 + 4;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(

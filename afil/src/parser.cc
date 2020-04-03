@@ -675,6 +675,42 @@ namespace parser
 		// Skip compiles token.
 		index++;
 
+		incomplete::expression::Compiles compiles_expr;
+
+		// Variable list.
+		if (tokens[index].type == TokenType::open_parenthesis)
+		{
+			// Skip open parenthesis.
+			index++;
+
+			while (true)
+			{
+				try_call_decl(auto type, parse_type_name(tokens, index, type_names));
+				if (!type.has_value())
+					return make_syntax_error(tokens[index].source, "Expected type in parameter list of compiles expression.");
+
+				if (tokens[index].type != TokenType::identifier || is_keyword(tokens[index].source))
+					return make_syntax_error(tokens[index].source, "Expected name after type in parameter list of compiles expression.");
+
+				compiles_expr.variables.push_back({std::move(*type), tokens[index].source});
+				index++;
+
+				if (tokens[index].type == TokenType::comma)
+				{
+					index++;
+				}
+				else if (tokens[index].type == TokenType::close_parenthesis)
+				{
+					index++;
+					break;
+				}
+				else
+				{
+					return make_syntax_error(tokens[index].source, "Expected ')' or ',' after variable name in parameter list of compiles expression.");
+				}
+			}
+		}
+
 		// Expect { after compiles.
 		if (tokens[index].type != TokenType::open_brace)
 			return make_syntax_error(tokens[index].source, "Expected '{' after \"compiles\" keyword.");
@@ -687,7 +723,6 @@ namespace parser
 			return make_syntax_error(tokens[index].source, "Expected '}' after body of compiles expression.");
 		index++;
 
-		incomplete::expression::Compiles compiles_expr;
 		compiles_expr.body = allocate(std::move(body));
 		return std::move(compiles_expr);
 	}

@@ -1091,6 +1091,13 @@ namespace instantiation
 			},
 			[&](incomplete::expression::Compiles const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
+				complete::Scope fake_scope;
+				for (incomplete::expression::Compiles::FakeVariable const & fake_var : incomplete_expression.variables)
+				{
+					try_call_decl(complete::TypeId const var_type, resolve_dependent_type(fake_var.type, template_parameters, scope_stack, program));
+					add_variable_to_scope(fake_scope, fake_var.name, var_type, 0, *program);
+				}
+				auto const guard = push_block_scope(scope_stack, fake_scope);
 				auto const body = instantiate_expression(*incomplete_expression.body, template_parameters, scope_stack, program, current_scope_return_type);
 				return complete::expression::Literal<bool>{body.has_value()};
 			}
