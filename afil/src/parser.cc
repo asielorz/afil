@@ -669,6 +669,29 @@ namespace parser
 		return node;
 	}
 
+	auto parse_compiles_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept
+		-> expected<incomplete::expression::Compiles, PartialSyntaxError>
+	{
+		// Skip compiles token.
+		index++;
+
+		// Expect { after compiles.
+		if (tokens[index].type != TokenType::open_brace)
+			return make_syntax_error(tokens[index].source, "Expected '{' after \"compiles\" keyword.");
+		index++;
+
+		try_call_decl(incomplete::Expression body, parse_expression(tokens, index, type_names));
+
+		// Expect { after expression.
+		if (tokens[index].type != TokenType::close_brace)
+			return make_syntax_error(tokens[index].source, "Expected '}' after body of compiles expression.");
+		index++;
+
+		incomplete::expression::Compiles compiles_expr;
+		compiles_expr.body = allocate(std::move(body));
+		return std::move(compiles_expr);
+	}
+
 	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
 		Operator const op = parse_operator(tokens[index].source);
@@ -727,6 +750,8 @@ namespace parser
 			id_node.name = name;
 			return std::move(id_node);
 		}
+		else if (tokens[index].source == "compiles")
+			return parse_compiles_expression(tokens, index, type_names);
 		else if (tokens[index].source == "data")
 		{
 			index++;

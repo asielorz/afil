@@ -117,6 +117,11 @@ namespace incomplete
 			value_ptr<Expression> operand;
 		};
 
+		struct Compiles
+		{
+			value_ptr<Expression> body;
+		};
+
 		using Variant = std::variant<
 			Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<uninit_t>,
 			Dereference, Addressof, Subscript,
@@ -125,7 +130,7 @@ namespace incomplete
 			FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 			If, StatementBlock,
 			Constructor, DesignatedInitializerConstructor,
-			DataCall, SizeCall
+			DataCall, SizeCall, Compiles
 		>;
 
 	} // namespace expression

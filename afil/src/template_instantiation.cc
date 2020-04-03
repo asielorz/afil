@@ -19,7 +19,7 @@
 
 using namespace std::literals;
 
-auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> expected<void, PartialSyntaxError>
+[[nodiscard]] auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> expected<void, PartialSyntaxError>
 {
 	if (!is_constant_expression(expression, program, constant_base_index)) return make_syntax_error("Cannot evaluate expression at compile time.");
 
@@ -33,12 +33,18 @@ auto evaluate_constant_expression(complete::Expression const & expression, compl
 	return success;
 }
 
+template <typename T>
+auto evaluate_constant_expression_as(complete::Expression const & expression, complete::Program const & program, int constant_base_index) noexcept -> expected<T, PartialSyntaxError>
+{
+	T result;
+	try_call_void(evaluate_constant_expression(expression, program, constant_base_index, &result));
+	return result;
+}
+
 auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> expected<int, PartialSyntaxError>
 {
 	try_call(assign_to(expression), insert_conversion_node(std::move(expression), complete::TypeId::int_, program));
-	int result;
-	try_call_void(evaluate_constant_expression(expression, program, constant_base_index, &result));
-	return result;
+	return evaluate_constant_expression_as<int>(expression, program, constant_base_index);
 }
 
 namespace instantiation
@@ -887,21 +893,33 @@ namespace instantiation
 				try_call_decl(complete::Expression condition, instantiate_expression(*incomplete_expression.condition, template_parameters, scope_stack, program, current_scope_return_type));
 				try_call(assign_to(condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
 
-				try_call_decl(complete::Expression then_case, instantiate_expression(*incomplete_expression.then_case, template_parameters, scope_stack, program, current_scope_return_type));
-				try_call_decl(complete::Expression else_case, instantiate_expression(*incomplete_expression.else_case, template_parameters, scope_stack, program, current_scope_return_type));
+				if (is_constant_expression(condition, *program, next_block_scope_offset(scope_stack)))
+				{
+					try_call_decl(bool const condition_value, evaluate_constant_expression_as<bool>(condition, *program, next_block_scope_offset(scope_stack)));
 
-				complete::TypeId const then_type = expression_type_id(then_case, *program);
-				complete::TypeId const else_type = expression_type_id(else_case, *program);
-				complete::TypeId const return_type = common_type(then_type, else_type, *program);
+					if (condition_value)
+						return instantiate_expression(*incomplete_expression.then_case, template_parameters, scope_stack, program, current_scope_return_type);
+					else
+						return instantiate_expression(*incomplete_expression.else_case, template_parameters, scope_stack, program, current_scope_return_type);
+				}
+				else
+				{
+					try_call_decl(complete::Expression then_case, instantiate_expression(*incomplete_expression.then_case, template_parameters, scope_stack, program, current_scope_return_type));
+					try_call_decl(complete::Expression else_case, instantiate_expression(*incomplete_expression.else_case, template_parameters, scope_stack, program, current_scope_return_type));
 
-				try_call(assign_to(then_case), insert_conversion_node(std::move(then_case), then_type, return_type, *program));
-				try_call(assign_to(else_case), insert_conversion_node(std::move(else_case), else_type, return_type, *program));
+					complete::TypeId const then_type = expression_type_id(then_case, *program);
+					complete::TypeId const else_type = expression_type_id(else_case, *program);
+					complete::TypeId const return_type = common_type(then_type, else_type, *program);
 
-				complete::expression::If complete_expression;
-				complete_expression.condition = allocate(std::move(condition));
-				complete_expression.then_case = allocate(std::move(then_case));
-				complete_expression.else_case = allocate(std::move(else_case));
-				return std::move(complete_expression);
+					try_call(assign_to(then_case), insert_conversion_node(std::move(then_case), then_type, return_type, *program));
+					try_call(assign_to(else_case), insert_conversion_node(std::move(else_case), else_type, return_type, *program));
+
+					complete::expression::If complete_expression;
+					complete_expression.condition = allocate(std::move(condition));
+					complete_expression.then_case = allocate(std::move(then_case));
+					complete_expression.else_case = allocate(std::move(else_case));
+					return std::move(complete_expression);
+				}
 			},
 			[&](incomplete::expression::StatementBlock const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
@@ -1070,6 +1088,11 @@ namespace instantiation
 
 				complete_expression.value = array_size(operand_type);
 				return std::move(complete_expression);
+			},
+			[&](incomplete::expression::Compiles const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
+			{
+				auto const body = instantiate_expression(*incomplete_expression.body, template_parameters, scope_stack, program, current_scope_return_type);
+				return complete::expression::Literal<bool>{body.has_value()};
 			}
 		);
 
@@ -1122,7 +1145,7 @@ namespace instantiation
 					constant.name = incomplete_statement.variable_name;
 
 					try_call(assign_to(expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
-					evaluate_constant_expression(std::move(expression), *program, next_block_scope_offset(scope_stack), constant.value.data());
+					try_call_void(evaluate_constant_expression(expression, *program, next_block_scope_offset(scope_stack), constant.value.data()));
 
 					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) 
 						return make_syntax_error(incomplete_statement.variable_name, "Constant name collides with another name.");
@@ -1240,7 +1263,7 @@ namespace instantiation
 					constant.name = incomplete_statement.variable_name;
 
 					try_call(assign_to(expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
-					evaluate_constant_expression(std::move(expression), *program, next_block_scope_offset(scope_stack), constant.value.data());
+					try_call_void(evaluate_constant_expression(expression, *program, next_block_scope_offset(scope_stack), constant.value.data()));
 
 					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) 
 						return make_syntax_error(incomplete_statement.variable_name, "Constant name collides with another name.");
@@ -1274,23 +1297,56 @@ namespace instantiation
 			},
 			[&](incomplete::statement::If const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
-				complete::statement::If complete_statement;
 				try_call_decl(complete::Expression condition, instantiate_expression(incomplete_statement.condition, template_parameters, scope_stack, program, current_scope_return_type));
-				try_call(assign_to(complete_statement.condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
+				try_call(assign_to(condition), insert_conversion_node(std::move(condition), complete::TypeId::bool_, *program));
 
-				try_call_decl(auto then_case, instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
-				if (!then_case.has_value())
-					return make_syntax_error(incomplete_statement.then_case->source, "Noop statement not allowed as then case of if statement.");
-				complete_statement.then_case = allocate(std::move(*then_case));
-				if (incomplete_statement.else_case != nullptr)
+				if (is_constant_expression(condition, *program, next_block_scope_offset(scope_stack)))
 				{
-					try_call_decl(auto else_case, instantiate_statement(*incomplete_statement.else_case, template_parameters, scope_stack, program, current_scope_return_type));
-					if (!else_case.has_value()) 
-						return make_syntax_error(incomplete_statement.else_case->source, "Noop statement not allowed as else case of if statement.");
-					complete_statement.else_case = allocate(std::move(*else_case));
-				}
+					try_call_decl(bool const condition_value, evaluate_constant_expression_as<bool>(condition, *program, next_block_scope_offset(scope_stack)));
 
-				return std::move(complete_statement);
+					if (condition_value)
+					{
+						try_call_decl(auto then_case, instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
+						if (!then_case.has_value())
+							return make_syntax_error(incomplete_statement.then_case->source, "Noop statement not allowed as then case of if statement.");
+
+						return std::move(then_case);
+					}
+					else
+					{
+						if (incomplete_statement.else_case != nullptr)
+						{
+							try_call_decl(auto else_case, instantiate_statement(*incomplete_statement.else_case, template_parameters, scope_stack, program, current_scope_return_type));
+							if (!else_case.has_value())
+								return make_syntax_error(incomplete_statement.else_case->source, "Noop statement not allowed as else case of if statement.");
+
+							return std::move(else_case);
+						}
+						else
+						{
+							return std::nullopt;
+						}
+					}
+				}
+				else
+				{
+					complete::statement::If complete_statement;
+					complete_statement.condition = std::move(condition);
+
+					try_call_decl(auto then_case, instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
+					if (!then_case.has_value())
+						return make_syntax_error(incomplete_statement.then_case->source, "Noop statement not allowed as then case of if statement.");
+					complete_statement.then_case = allocate(std::move(*then_case));
+					if (incomplete_statement.else_case != nullptr)
+					{
+						try_call_decl(auto else_case, instantiate_statement(*incomplete_statement.else_case, template_parameters, scope_stack, program, current_scope_return_type));
+						if (!else_case.has_value())
+							return make_syntax_error(incomplete_statement.else_case->source, "Noop statement not allowed as else case of if statement.");
+						complete_statement.else_case = allocate(std::move(*else_case));
+					}
+
+					return std::move(complete_statement);
+				}
 			},
 			[&](incomplete::statement::StatementBlock const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{

@@ -2106,7 +2106,37 @@ TEST_CASE("Passing a temporary by constant reference")
 
 	REQUIRE(tests::parse_and_run(src) == 9);
 }
- 
+
+TEST_CASE("compiles is a built in function that checks if ")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			if (compiles{3 + 4})
+				return 3 + 4;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
+TEST_CASE("compiles returns false when given an ill formed expression")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			if (compiles{*3})
+				return *3;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 0);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(
