@@ -2,8 +2,9 @@
 
 #include "function_id.hh"
 #include "utils/utils.hh"
-#include <vector>
+#include <algorithm>
 #include <string>
+#include <vector>
 
 namespace complete
 {
