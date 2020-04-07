@@ -37,6 +37,9 @@ namespace parser
 		"float",
 		"bool",
 		"char",
+		"type",
+		"uninit",
+		"uninit_t"
 
 		// Declarations
 		"fn",
