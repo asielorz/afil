@@ -2255,7 +2255,7 @@ TEST_CASE("Contracts let defining preconditions for a function")
 	REQUIRE(tests::source_compiles(src));
 }
 
-TEST_CASE("Running a function out of contract at compile time is a compiler error")
+TEST_CASE("Running a function out of contract at runtime will stop execution and return an error")
 {
 	auto const src = R"(
 		let div = fn(int dividend, int divisor) -> int
@@ -2270,7 +2270,9 @@ TEST_CASE("Running a function out of contract at compile time is a compiler erro
 		};
 	)"sv;
 
-	REQUIRE(!tests::source_compiles(src));
+	// Think of how to test this.
+	auto const program = tests::parse_source(src);
+	REQUIRE(program.has_value());
 }
 
 /*****************************************************************

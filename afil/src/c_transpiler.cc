@@ -449,9 +449,6 @@ namespace c_transpiler
 				},
 				[&](expression::Assignment const & assign_node)
 				{
-#if 0
-					mark_as_to_do();
-#else
 					if (can_be_written_inline(*assign_node.source))
 					{
 						c_source += indent(indentation);
@@ -475,7 +472,6 @@ namespace c_transpiler
 						c_source += temp_var_name;
 						c_source += ";\n";
 					}
-#endif
 				},
 				[&](expression::If const & if_node)
 				{
@@ -541,7 +537,6 @@ namespace c_transpiler
 				},
 				[&](expression::Constructor const & ctor_node)
 				{
-#if 1
 					Type const & constructed_type = type_with_id(program, ctor_node.constructed_type);
 					if (is_struct(constructed_type))
 					{
@@ -573,61 +568,6 @@ namespace c_transpiler
 					{
 						declare_unreachable();
 					}
-#else
-					Type const & constructed_type = type_with_id(program, ctor_node.constructed_type);
-
-					if (is_struct(constructed_type))
-					{
-						c_source += type_name(ctor_node.constructed_type, program);
-						c_source += '{';
-
-						size_t const size = ctor_node.parameters.size();
-						for (size_t i = 0; i < size - 1; ++i)
-						{
-							transpile_expression(ctor_node.parameters[i], program, c_source);
-							c_source += ", ";
-						}
-						transpile_expression(ctor_node.parameters.back(), program, c_source);
-
-						c_source += '}';
-					}
-					else if (is_array(constructed_type))
-					{
-						c_source += '{';
-
-						if (ctor_node.parameters.size() == 1)
-						{
-							size_t const size = array_size(constructed_type);
-							std::string parameter_source;
-							transpile_expression(ctor_node.parameters[0], program, parameter_source);
-
-							for (size_t i = 0; i < size - 1; ++i)
-							{
-								c_source += parameter_source;
-								c_source += ", ";
-							}
-							c_source += parameter_source;
-						}
-						else
-						{
-							size_t const size = array_size(constructed_type);
-							assert(size == ctor_node.parameters.size());
-
-							for (size_t i = 0; i < size - 1; ++i)
-							{
-								transpile_expression(ctor_node.parameters[i], program, c_source);
-								c_source += ", ";
-							}
-							transpile_expression(ctor_node.parameters.back(), program, c_source);
-						}
-
-						c_source += '}';
-					}
-					else
-					{
-						declare_unreachable();
-					}
-#endif
 				}
 			);
 			std::visit(visitor, expr.as_variant());
@@ -882,6 +822,23 @@ namespace c_transpiler
 		c_source += "{\n";
 
 		write_scope_locals({function.variables.data() + function.parameter_count, function.variables.size() - function.parameter_count}, program, 1, c_source);
+
+		// Write preconditions.
+		for (complete::Expression const & precondition : function.preconditions)
+		{
+			if (can_be_written_inline(precondition))
+			{
+				c_source += "\tassert(";
+				transpile_expression_inline(precondition, program, c_source);
+				c_source += ");\n";
+			}
+			else
+			{
+				c_source += "\tint precondition_met;";
+				write_expression_as_statement_in_its_own_scope_and_dont_close_the_scope(precondition, program, "precondition_met", 1, c_source);
+				c_source += "\tassert(precondition_met);";
+			}
+		}
 
 		for (complete::Statement const & statement : function.statements)
 			transpile_statement(statement, program, 1, "return ", c_source);

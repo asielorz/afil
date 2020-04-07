@@ -131,6 +131,22 @@ namespace interpreter
 			stack.base_pointer = parameters_start;
 			stack.top_pointer = parameters_start + func.stack_frame_size;
 
+#if 0
+			// Run the preconditions
+			for (auto const & precondition : func.preconditions)
+			{
+				int const precondition_return_address = eval_expression(precondition, stack, program);
+				bool const precondition_ok = read<bool>(stack, precondition_return_address);
+				if (!precondition_ok)
+				{
+					abort();
+
+					break;
+				}
+			}
+			stack.top_pointer = parameters_start + func.stack_frame_size;
+#endif
+
 			// Run the function.
 			for (auto const & statement : func.statements)
 			{
