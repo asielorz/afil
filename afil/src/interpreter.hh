@@ -29,14 +29,13 @@ namespace interpreter
 	auto alloc_stack(ProgramStack & stack, int stack_size_in_bytes) noexcept -> void;
 	auto pointer_at_address(ProgramStack & stack, int address) noexcept -> char *;
 
-	namespace control_flow
+	enum struct ControlFlow
 	{
-		struct Nothing {};
-		struct Return {};
-		struct Break {};
-		struct Continue {};
-		using Variant = std::variant<Nothing, Return, Break, Continue>;
-	}
+		Nothing,
+		Return,
+		Break,
+		Continue
+	};
 
 	// TODO: argc, argv. Decide a good stack size.
 	auto run(complete::Program const & program, int stack_size = 2048) noexcept -> int;
@@ -44,7 +43,7 @@ namespace interpreter
 	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
 	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program) noexcept -> int;
 	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
-	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> control_flow::Variant;
+	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> ControlFlow;
 
 } // namespace interpreter
 

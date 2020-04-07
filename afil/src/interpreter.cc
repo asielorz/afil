@@ -73,7 +73,7 @@ namespace interpreter
 	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
 	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program) noexcept -> int;
 	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
-	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> control_flow::Variant;
+	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> ControlFlow;
 
 	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void
 	{
@@ -135,7 +135,7 @@ namespace interpreter
 			for (auto const & statement : func.statements)
 			{
 				auto const cf = run_statement(statement, stack, program, return_address);
-				if (auto const ret = try_get<control_flow::Return>(cf))
+				if (cf == ControlFlow::Return)
 					break;
 			}
 
@@ -328,7 +328,7 @@ namespace interpreter
 				for (auto const & statement : block_node.statements)
 				{
 					auto const cf = run_statement(statement, stack, program, return_address);
-					if (auto const ret = try_get<control_flow::Return>(cf))
+					if (cf == ControlFlow::Return)
 						break;
 				}
 			},
@@ -370,11 +370,11 @@ namespace interpreter
 	}
 
 	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept
-		-> control_flow::Variant
+		-> ControlFlow
 	{
 		using namespace complete;
 
-		auto const visitor = overload_default_ret(control_flow::Variant(),
+		auto const visitor = overload_default_ret(ControlFlow::Nothing,
 			[&](statement::VariableDeclaration const & node)
 			{
 				int const address = stack.base_pointer + node.variable_offset;
@@ -387,9 +387,9 @@ namespace interpreter
 			[&](statement::Return const & return_node)
 			{
 				eval_expression(return_node.returned_expression, stack, program, return_address);
-				return control_flow::Return{};
+				return ControlFlow::Return;
 			},
-			[&](statement::If const & if_node) -> control_flow::Variant
+			[&](statement::If const & if_node)
 			{
 				int const result_addr = eval_expression(if_node.condition, stack, program);
 				bool const condition = read<bool>(stack, result_addr);
@@ -399,9 +399,9 @@ namespace interpreter
 				if (branch)
 					return run_statement(*branch, stack, program, return_address);
 				else
-					return control_flow::Nothing();
+					return ControlFlow::Nothing;
 			},
-			[&](statement::StatementBlock const & block_node) -> control_flow::Variant
+			[&](statement::StatementBlock const & block_node)
 			{
 				StackGuard const stack_guard(stack);
 				stack.top_pointer += block_node.scope.stack_frame_size;
@@ -410,13 +410,13 @@ namespace interpreter
 				for (auto const & statement : block_node.statements)
 				{
 					auto const cf = run_statement(statement, stack, program, return_address);
-					if (has_type<control_flow::Return>(cf) || has_type<control_flow::Break>(cf) || has_type<control_flow::Continue>(cf))
+					if (cf == ControlFlow::Return || cf == ControlFlow::Break || cf == ControlFlow::Continue)
 						return cf;
 				}
 
-				return control_flow::Nothing();
+				return ControlFlow::Nothing;
 			},
-			[&](statement::While const & while_node) -> control_flow::Variant
+			[&](statement::While const & while_node)
 			{
 				for (;;)
 				{
@@ -427,18 +427,18 @@ namespace interpreter
 					if (condition)
 					{
 						auto const cf = run_statement(*while_node.body, stack, program, return_address);
-						if (has_type<control_flow::Return>(cf))
+						if (cf == ControlFlow::Return)
 							return cf;
-						if (has_type<control_flow::Break>(cf))
-							return control_flow::Nothing();
+						if (cf == ControlFlow::Break)
+							return ControlFlow::Nothing;
 					}
 					else
 					{
-						return control_flow::Nothing();
+						return ControlFlow::Nothing;
 					}
 				}
 			},
-			[&](statement::For const & for_node) -> control_flow::Variant
+			[&](statement::For const & for_node)
 			{
 				// Allocate stack frame for the scope.
 				StackGuard const stack_guard(stack);
@@ -458,27 +458,27 @@ namespace interpreter
 					{
 						// Run body.
 						auto const cf = run_statement(*for_node.body, stack, program, return_address);
-						if (has_type<control_flow::Return>(cf))
+						if (cf == ControlFlow::Return)
 							return cf;
-						if (has_type<control_flow::Break>(cf))
-							return control_flow::Nothing();
+						if (cf == ControlFlow::Break)
+							return ControlFlow::Nothing;
 
 						// Run end expression.
 						eval_expression(for_node.end_expression, stack, program, stack.top_pointer);
 					}
 					else
 					{
-						return control_flow::Nothing();
+						return ControlFlow::Nothing;
 					}
 				}
 			},
-			[&](statement::Break const &) -> control_flow::Variant
+			[&](statement::Break const &)
 			{
-				return control_flow::Break();
+				return ControlFlow::Break;
 			},
-			[&](statement::Continue const &) -> control_flow::Variant
+			[&](statement::Continue const &)
 			{
-				return control_flow::Continue();
+				return ControlFlow::Continue;
 			}
 		);
 		return std::visit(visitor, tree.as_variant());
