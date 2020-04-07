@@ -53,6 +53,7 @@ namespace complete
 		int parameter_count = 0;     // From the variables, how many are arguments. The rest are locals.
 		int parameter_size = 0;	     // Size in bytes needed for parameters.
 		TypeId return_type;
+		std::vector<Expression> preconditions;
 		std::vector<Statement> statements;
 		std::string ABI_name;
 		bool is_callable_at_compile_time;

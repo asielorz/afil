@@ -514,6 +514,13 @@ namespace instantiation
 	{
 		scope_stack.push_back({ &*function, ScopeType::function, 0 });
 
+		function->preconditions.reserve(incomplete_function.preconditions.size());
+		for (incomplete::Expression const & precondition : incomplete_function.preconditions)
+		{
+			try_call_decl(auto complete_precondition, instantiate_expression(precondition, template_parameters, scope_stack, program, out(function->return_type)));
+			try_call(function->preconditions.push_back, insert_conversion_node(std::move(complete_precondition), complete::TypeId::bool_, *program));
+		}
+
 		function->statements.reserve(incomplete_function.statements.size());
 		for (incomplete::Statement const & substatment : incomplete_function.statements)
 		{

@@ -108,8 +108,9 @@ namespace complete
 
 	auto can_be_run_in_a_constant_expression(Function const & function, Program const & program) noexcept -> bool
 	{
-		return std::all_of(function.statements,
-			[&](Statement const & stmt) { return can_be_run_in_a_constant_expression(stmt, program, 0); });
+		return 
+			std::all_of(function.preconditions, [&](Expression const & expr) { return is_constant_expression(expr, program, 0); }) &&
+			std::all_of(function.statements, [&](Statement const & stmt) { return can_be_run_in_a_constant_expression(stmt, program, 0); });
 	}
 
 } // namespace complete

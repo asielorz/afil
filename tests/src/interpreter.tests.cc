@@ -2282,6 +2282,7 @@ Backlog
 - destructor and copy operations
 - reflection
 - namespaces
+- rework extern functions so that built in operators and such are intrinsics, not extern functions.
 - currying (maybe, maybe at library level?)
 - some minimalistic standard library
 *****************************************************************/
