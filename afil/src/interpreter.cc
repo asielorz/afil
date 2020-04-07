@@ -87,7 +87,7 @@ namespace interpreter
 			int const prev_ebp = stack.base_pointer;
 			int const prev_esp = stack.top_pointer;
 
-			// Allocarte memory for temporaries passed by reference.
+			// Allocate memory for temporaries passed by reference.
 			int size_of_temporaries_passed_by_reference = 0;
 			int alignment_of_temporaries_passed_by_reference = 1;
 			for (size_t i = 0; i < parameters.size(); ++i)
