@@ -75,6 +75,7 @@ namespace incomplete
 	};
 	struct Function : FunctionPrototype
 	{
+		std::vector<Expression> preconditions;
 		std::vector<Statement> statements;
 	};
 	struct FunctionTemplate : Function 

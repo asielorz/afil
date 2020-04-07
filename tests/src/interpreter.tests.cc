@@ -2218,28 +2218,59 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 	REQUIRE(tests::parse_and_run(src2) == 0);
 }
 
-TEST_CASE("Functions that take types as parameters")
+//TEST_CASE("Functions that take types as parameters")
+//{
+//	auto const src = R"(
+//		let is_ordered = fn(type t) -> bool
+//		{
+//			return compiles(t i, t j)
+//			{
+//				{i == j} -> bool;
+//				{3 <=> 4} -> int
+//			};
+//		};
+//
+//		let main = fn() -> int
+//		{
+//			if (is_ordered(int))
+//				return 1;
+//			else
+//				return 0;
+//		};
+//	)"sv;
+//
+//	REQUIRE(tests::parse_and_run(src) == 1);
+//}
+
+TEST_CASE("Contracts let defining preconditions for a function")
 {
 	auto const src = R"(
-		let is_ordered = fn(type t) -> bool
+		let div = fn(int dividend, int divisor) -> int
+			assert{divisor != 0;}
 		{
-			return compiles(t i, t j)
-			{
-				{i == j} -> bool;
-				{3 <=> 4} -> int
-			};
+			return dividend / divisor;
+		};
+	)"sv;
+
+	REQUIRE(tests::source_compiles(src));
+}
+
+TEST_CASE("Running a function out of contract at compile time is a compiler error")
+{
+	auto const src = R"(
+		let div = fn(int dividend, int divisor) -> int
+			assert{divisor != 0;}
+		{
+			return dividend / divisor;
 		};
 
 		let main = fn() -> int
 		{
-			if (is_ordered(int))
-				return 1;
-			else
-				return 0;
+			return div(5, 0);
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src) == 1);
+	REQUIRE(!tests::source_compiles(src));
 }
 
 /*****************************************************************

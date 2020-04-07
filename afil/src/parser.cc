@@ -521,6 +521,31 @@ namespace parser
 		return success;
 	}
 
+	[[nodiscard]] auto parse_function_contract(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> expected<void, PartialSyntaxError>
+	{
+		if (tokens[index].source == "assert")
+		{
+			index++;
+
+			if (tokens[index].type != TokenType::open_brace)
+				return make_syntax_error(tokens[index].source, "Expected '{' after \"assert\" keyword.");
+			index++;
+
+			while (tokens[index].type != TokenType::close_brace)
+			{
+				try_call(function->preconditions.push_back, parse_expression(tokens, index, type_names));
+				
+				if (tokens[index].type != TokenType::semicolon)
+					return make_syntax_error(tokens[index].source, "Expected ';' after expression in assert block.");
+				index++;
+			}
+
+			index++;
+		}
+
+		return success;
+	}
+
 	[[nodiscard]] auto parse_function_body(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> expected<void, PartialSyntaxError>
 	{
 		// Body of the function is enclosed by braces.
@@ -550,6 +575,7 @@ namespace parser
 			type_names.push_back({param.name, TypeName::Type::template_parameter});
 		
 		try_call_void(parse_function_prototype(tokens, index, type_names, out(function)));
+		try_call_void(parse_function_contract(tokens, index, type_names, out(function)));
 		try_call_void(parse_function_body(tokens, index, type_names, out(function)));
 
 		type_names.resize(type_name_stack_size);
@@ -597,6 +623,7 @@ namespace parser
 		if (tokens[index].source == "extern_symbol")
 			return parse_extern_function_expression(tokens, index, std::move(function));
 
+		try_call_void(parse_function_contract(tokens, index, type_names, out(function)));
 		try_call_void(parse_function_body(tokens, index, type_names, out(function)));
 
 		return incomplete::expression::Function{std::move(function)};
