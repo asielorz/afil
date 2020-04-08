@@ -31,7 +31,7 @@ struct expected
 	}
 
 	constexpr bool has_value() const noexcept { return value_or_error.index() == 0; }
-	constexpr operator bool() const noexcept { return has_value(); }
+	constexpr explicit operator bool() const noexcept { return has_value(); }
 
 	constexpr T & operator * () & noexcept { return value(); }
 	constexpr T && operator * () && noexcept { return std::move(value()); }
@@ -66,7 +66,7 @@ struct expected<void, ErrorT>
 	constexpr expected(Error<ErrorT> err) noexcept : maybe_error(std::move(err.value)) {}
 
 	constexpr bool has_value() const noexcept { return !maybe_error.has_value(); }
-	constexpr operator bool() const noexcept { return has_value(); }
+	constexpr explicit operator bool() const noexcept { return has_value(); }
 
 	constexpr ErrorT & error() & noexcept { return *maybe_error; }
 	constexpr ErrorT && error() && noexcept { return std::move(*maybe_error); }

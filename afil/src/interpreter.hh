@@ -1,5 +1,7 @@
 #pragma once
 
+#include "function_id.hh"
+#include "utils/expected.hh"
 #include "utils/span.hh"
 #include <string_view>
 #include <variant>
@@ -37,13 +39,23 @@ namespace interpreter
 		Continue
 	};
 
-	// TODO: argc, argv. Decide a good stack size.
-	auto run(complete::Program const & program, int stack_size = 2048) noexcept -> int;
+	struct UnmetPrecondition
+	{
+		FunctionId function;
+		int precondition;
+	};
 
-	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
-	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program) noexcept -> int;
-	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
-	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> ControlFlow;
+	// TODO: argc, argv. Decide a good stack size.
+	auto run(complete::Program const & program, int stack_size = 2048) noexcept -> expected<int, UnmetPrecondition>;
+
+	[[nodiscard]] auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept
+		-> expected<void, UnmetPrecondition>;
+	[[nodiscard]] auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program) noexcept
+		-> expected<int, UnmetPrecondition>;
+	[[nodiscard]] auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program, int return_address) noexcept
+		-> expected<void, UnmetPrecondition>;
+	[[nodiscard]] auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept 
+		-> expected<ControlFlow, UnmetPrecondition>;
 
 } // namespace interpreter
 

@@ -26,7 +26,9 @@ using namespace std::literals;
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 256);
 
-	interpreter::eval_expression(expression, stack, program);
+	auto const eval_result = interpreter::eval_expression(expression, stack, program);
+	if (!eval_result.has_value())
+		return make_syntax_error("Precondition not met");
 
 	memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
 
@@ -252,7 +254,7 @@ namespace instantiation
 					resolve_function_template_parameter_type(*array.value_type, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 
 				try_call_decl(complete::Expression size_expr, instantiate_expression(*array.size, resolved_template_parameters, scope_stack, program, nullptr));
-				array_type.size = evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack));
+				try_call(assign_to(array_type.size), evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack)));
 				return complete::FunctionTemplateParameterType{std::move(array_type), false, false};
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
@@ -1707,8 +1709,15 @@ namespace instantiation
 			auto analysis_result = semantic_analysis(incomplete_modules[i].statements, out(program), scope_stack);
 			if (!analysis_result)
 			{
-				incomplete::Module::File const & file = file_that_contains(incomplete_modules[i], analysis_result.error().error_in_source);
-				return Error(complete_syntax_error(std::move(analysis_result.error()), file.source, file.filename));
+				if (analysis_result.error().error_in_source.empty())
+				{
+					return Error(complete_syntax_error(std::move(analysis_result.error()), "", "<source>"));
+				}
+				else
+				{
+					incomplete::Module::File const & file = file_that_contains(incomplete_modules[i], analysis_result.error().error_in_source);
+					return Error(complete_syntax_error(std::move(analysis_result.error()), file.source, file.filename));
+				}
 			}
 		}
 

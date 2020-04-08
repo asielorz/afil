@@ -12,6 +12,11 @@ using namespace std::literals;
 
 namespace tests
 {
+	auto error_string(interpreter::UnmetPrecondition) -> std::string
+	{
+		return "Unmet precondition";
+	}
+
 	template <typename T, typename Error>
 	auto assert_get(expected<T, Error> e) -> T
 	{
@@ -44,7 +49,7 @@ namespace tests
 	auto parse_and_run(std::string_view src) -> int
 	{
 		complete::Program const program = assert_get(parse_source(src));
-		return interpreter::run(program);
+		return assert_get(interpreter::run(program));
 	}
 
 	auto source_compiles(std::string_view src) noexcept -> bool
@@ -2037,7 +2042,7 @@ TEST_CASE("A program may be composed of several modules")
 	auto const parse_order = tests::assert_get(parser::parse_modules(modules));
 	complete::Program const program = tests::assert_get(instantiation::semantic_analysis(modules, parse_order));
 
-	REQUIRE(interpreter::run(program) == 8);
+	REQUIRE(tests::assert_get(interpreter::run(program)) == 8);
 }
 
 TEST_CASE("A module cannot access symbols from a module it does not depend on")
@@ -2273,11 +2278,33 @@ TEST_CASE("Running a function out of contract at runtime will stop execution and
 	// Think of how to test this.
 	auto const program = tests::parse_source(src);
 	REQUIRE(program.has_value());
+	auto const run_result = interpreter::run(*program);
+	REQUIRE(!run_result.has_value());
+}
+
+TEST_CASE("Running a function out of contract at compile time is a compiler error")
+{
+	auto const src = R"(
+		let div = fn(int dividend, int divisor) -> int
+			assert{divisor != 0;}
+		{
+			return dividend / divisor;
+		};
+
+		let main = fn() -> int
+		{
+			int result = div(5, 0); // Result is a compile time constant
+			return result;
+		};
+	)"sv;
+
+	// Think of how to test this.
+	auto const program = tests::parse_source(src);
+	REQUIRE(!program.has_value());
 }
 
 /*****************************************************************
 Backlog
-- contracts
 - concepts
 - semantic analysis on templates based on concepts (depends on concepts)
 - synthesizing arithmetic operators

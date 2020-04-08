@@ -70,12 +70,7 @@ namespace interpreter
 		return address;
 	}
 
-	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
-	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program) noexcept -> int;
-	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void;
-	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> ControlFlow;
-
-	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void
+	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> expected<void, UnmetPrecondition>
 	{
 		if (!function_id.is_extern)
 		{
@@ -115,14 +110,14 @@ namespace interpreter
 				complete::TypeId const param_type = expression_type_id(parameters[i], program);
 				if (!param_type.is_reference && func.variables[i].type.is_reference)
 				{
-					eval_expression(parameters[i], stack, program, next_temporary_address);
+					try_call_void(eval_expression(parameters[i], stack, program, next_temporary_address));
 					write(stack, next_parameter_address, pointer_at_address(stack, next_temporary_address));
 					next_temporary_address += expression_type_size(parameters[i], program);
 					next_parameter_address += sizeof(void *);
 				}
 				else
 				{
-					eval_expression(parameters[i], stack, program, next_parameter_address);
+					try_call_void(eval_expression(parameters[i], stack, program, next_parameter_address));
 					next_parameter_address += expression_type_size(parameters[i], program);
 				}
 			}
@@ -131,26 +126,21 @@ namespace interpreter
 			stack.base_pointer = parameters_start;
 			stack.top_pointer = parameters_start + func.stack_frame_size;
 
-#if 0
 			// Run the preconditions
-			for (auto const & precondition : func.preconditions)
+			int const precondition_count = static_cast<int>(func.preconditions.size());
+			for (int i = 0; i < precondition_count; ++i)
 			{
-				int const precondition_return_address = eval_expression(precondition, stack, program);
+				try_call_decl(int const precondition_return_address, eval_expression(func.preconditions[i], stack, program));
 				bool const precondition_ok = read<bool>(stack, precondition_return_address);
 				if (!precondition_ok)
-				{
-					abort();
-
-					break;
-				}
+					return Error(UnmetPrecondition{function_id, i});
 			}
 			stack.top_pointer = parameters_start + func.stack_frame_size;
-#endif
 
 			// Run the function.
 			for (auto const & statement : func.statements)
 			{
-				auto const cf = run_statement(statement, stack, program, return_address);
+				try_call_decl(auto const cf, run_statement(statement, stack, program, return_address));
 				if (cf == ControlFlow::Return)
 					break;
 			}
@@ -170,13 +160,15 @@ namespace interpreter
 			// Evaluate the expressions that yield the parameters of the function.
 			for (int i = 0, next_parameter_address = parameters_start; i < parameters.size(); ++i)
 			{
-				eval_expression(parameters[i], stack, program, next_parameter_address);
+				try_call_void(eval_expression(parameters[i], stack, program, next_parameter_address));
 				next_parameter_address += expression_type_size(parameters[i], program);
 			}
 
 			func.caller(func.function_pointer, pointer_at_address(stack, parameters_start), pointer_at_address(stack, return_address));
 			free_up_to(stack, prev_stack_top);
 		}
+
+		return success;
 	}
 
 	auto eval_variable_node(complete::TypeId variable_type, int address, ProgramStack & stack, int return_address) noexcept -> void
@@ -192,18 +184,18 @@ namespace interpreter
 		}
 	}
 
-	auto eval_expression(complete::Expression const & tree, ProgramStack & stack, complete::Program const & program) noexcept -> int
+	auto eval_expression(complete::Expression const & tree, ProgramStack & stack, complete::Program const & program) noexcept -> expected<int, UnmetPrecondition>
 	{
 		int const address = alloc(stack, expression_type_size(tree, program));
-		eval_expression(tree, stack, program, address);
+		try_call_void(eval_expression(tree, stack, program, address));
 		return address;
 	}
 
-	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> void
+	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> expected<void, UnmetPrecondition>
 	{
 		using namespace complete;
 
-		auto const visitor = overload(
+		auto const visitor = overload_default_ret(expected<void, UnmetPrecondition>(success),
 			[&](expression::Literal<int> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<float> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<bool> literal) { write(stack, return_address, literal.value); },
@@ -222,10 +214,10 @@ namespace interpreter
 				int const address = var_node.variable_offset;
 				eval_variable_node(var_node.variable_type, address, stack, return_address);
 			},
-			[&](expression::MemberVariable const & var_node)
+			[&](expression::MemberVariable const & var_node) -> expected<void, UnmetPrecondition>
 			{
 				// If the owner is an lvalue, return a reference to the member.
-				int const owner_address = eval_expression(*var_node.owner, stack, program);
+				try_call_decl(int const owner_address, eval_expression(*var_node.owner, stack, program));
 				if (expression_type_id(*var_node.owner, program).is_reference)
 				{
 					char * const owner_ptr = read<char *>(stack, owner_address);
@@ -237,24 +229,26 @@ namespace interpreter
 					int const variable_size = type_size(program, var_node.variable_type);
 					memcpy(pointer_at_address(stack, return_address), pointer_at_address(stack, owner_address + var_node.variable_offset), variable_size);
 				}
+				return success;
 			},
 			[&](expression::Constant const & constant_node)
 			{
 				//write(stack, return_address, constant_node.value.data(), static_cast<int>(constant_node.value.size()));
 				write(stack, return_address, constant_node.value.data());
 			},
-			[&](expression::Dereference const & deref_node)
+			[&](expression::Dereference const & deref_node) -> expected<void, UnmetPrecondition>
 			{
 				StackGuard const g(stack);
-				int const pointer_address = eval_expression(*deref_node.expression, stack, program);
+				try_call_decl(int const pointer_address, eval_expression(*deref_node.expression, stack, program));
 				auto const pointer = read<void const *>(stack, pointer_address);
 				memcpy(pointer_at_address(stack, return_address), pointer, type_size(program, deref_node.return_type));
+				return success;
 			},
 			[&](expression::ReinterpretCast const & addressof_node)
 			{
-				eval_expression(*addressof_node.operand, stack, program, return_address);
+				return eval_expression(*addressof_node.operand, stack, program, return_address);
 			},
-			[&](expression::Subscript const & subscript_node)
+			[&](expression::Subscript const & subscript_node) -> expected<void, UnmetPrecondition>
 			{
 				TypeId const array_type_id = expression_type_id(*subscript_node.array, program);
 				Type const & array_type = type_with_id(program, array_type_id);
@@ -263,8 +257,8 @@ namespace interpreter
 				
 				if (array_type_id.is_reference || is_array_pointer(array_type))
 				{
-					int const array_address = eval_expression(*subscript_node.array, stack, program);
-					int const index_address = eval_expression(*subscript_node.index, stack, program);
+					try_call_decl(int const array_address, eval_expression(*subscript_node.array, stack, program));
+					try_call_decl(int const index_address, eval_expression(*subscript_node.index, stack, program));
 					char const * const array = read<char const *>(stack, array_address);
 					int const index = read<int>(stack, index_address);
 					int const value_type_size = type_size(program, remove_reference(subscript_node.return_type));
@@ -272,28 +266,25 @@ namespace interpreter
 				}
 				else // array rvalue
 				{
-					int const array_address = eval_expression(*subscript_node.array, stack, program);
-					int const index_address = eval_expression(*subscript_node.index, stack, program);
+					try_call_decl(int const array_address, eval_expression(*subscript_node.array, stack, program));
+					try_call_decl(int const index_address, eval_expression(*subscript_node.index, stack, program));
 					char const * const array = pointer_at_address(stack, array_address);
 					int const index = read<int>(stack, index_address);
 					int const value_type_size = type_size(program, remove_reference(subscript_node.return_type));
 					memcpy(pointer_at_address(stack, return_address), array + index * value_type_size, value_type_size);
 				}
+				return success;
 			},
-				//[&](expression::OverloadSet const &) // Not sure if I like this. Maybe evaluating a function node should just be an error or a noop?
-				//{
-				//	write(stack, return_address, 0);
-				//},
 			[&](expression::FunctionCall const & func_call_node)
 			{
-				call_function(func_call_node.function_id, func_call_node.parameters, stack, program, return_address);
+				return call_function(func_call_node.function_id, func_call_node.parameters, stack, program, return_address);
 			},
-			[&](expression::RelationalOperatorCall const & op_node)
+			[&](expression::RelationalOperatorCall const & op_node) -> expected<void, UnmetPrecondition>
 			{
 				if (op_node.op == Operator::not_equal)
 				{
 					// Call operator ==.
-					call_function(op_node.function_id, op_node.parameters, stack, program, return_address);
+					try_call_void(call_function(op_node.function_id, op_node.parameters, stack, program, return_address));
 					// Negate the result.
 					write(stack, return_address, !read<bool>(stack, return_address));
 				}
@@ -301,7 +292,7 @@ namespace interpreter
 				{
 					int const prev_stack_top = stack.top_pointer;
 					int const temp_storage = alloc(stack, sizeof(int), alignof(int));
-					call_function(op_node.function_id, op_node.parameters, stack, program, temp_storage);
+					try_call_void(call_function(op_node.function_id, op_node.parameters, stack, program, temp_storage));
 
 					int const three_way_result = read_word(stack, temp_storage);
 					bool boolean_result;
@@ -318,24 +309,27 @@ namespace interpreter
 					write(stack, return_address, boolean_result);
 					free_up_to(stack, prev_stack_top);
 				}
+				return success;
 			},
-			[&](expression::Assignment const & assign_node)
+			[&](expression::Assignment const & assign_node) -> expected<void, UnmetPrecondition>
 			{
-				const int dest_address = eval_expression(*assign_node.destination, stack, program);
-				const int source_address = eval_expression(*assign_node.source, stack, program);
+				try_call_decl(const int dest_address, eval_expression(*assign_node.destination, stack, program));
+				try_call_decl(const int source_address, eval_expression(*assign_node.source, stack, program));
 				memcpy(read<void *>(stack, dest_address), pointer_at_address(stack, source_address), expression_type_size(*assign_node.source, program));
 				free_up_to(stack, dest_address);
+				return success;
 			},
-			[&](expression::If const & if_node)
+			[&](expression::If const & if_node) -> expected<void, UnmetPrecondition>
 			{
-				int const result_addr = eval_expression(*if_node.condition, stack, program);
+				try_call_decl(int const result_addr, eval_expression(*if_node.condition, stack, program));
 				bool const condition = read<bool>(stack, result_addr);
 				free_up_to(stack, result_addr);
 
 				Expression const & branch = condition ? *if_node.then_case : *if_node.else_case;
-				eval_expression(branch, stack, program, return_address);
+				try_call_void(eval_expression(branch, stack, program, return_address));
+				return success;
 			},
-			[&](expression::StatementBlock const & block_node)
+			[&](expression::StatementBlock const & block_node) -> expected<void, UnmetPrecondition>
 			{
 				StackGuard const stack_guard(stack);
 				stack.top_pointer += block_node.scope.stack_frame_size;
@@ -343,12 +337,13 @@ namespace interpreter
 				// Run the function.
 				for (auto const & statement : block_node.statements)
 				{
-					auto const cf = run_statement(statement, stack, program, return_address);
+					try_call_decl(auto const cf, run_statement(statement, stack, program, return_address));
 					if (cf == ControlFlow::Return)
 						break;
 				}
+				return success;
 			},
-			[&](expression::Constructor const & ctor_node)
+			[&](expression::Constructor const & ctor_node) -> expected<void, UnmetPrecondition>
 			{
 				Type const & constructed_type = type_with_id(program, ctor_node.constructed_type);
 
@@ -356,7 +351,7 @@ namespace interpreter
 				{
 					Struct const & struct_data = *struct_for_type(program, constructed_type);
 					for (size_t i = 0; i < struct_data.member_variables.size(); ++i)
-						eval_expression(ctor_node.parameters[i], stack, program, return_address + struct_data.member_variables[i].offset);
+						try_call_void(eval_expression(ctor_node.parameters[i], stack, program, return_address + struct_data.member_variables[i].offset));
 				}
 				else if (is_array(constructed_type))
 				{
@@ -367,47 +362,50 @@ namespace interpreter
 					if (ctor_node.parameters.size() == 1)
 					{
 						for (int i = 0; i < array.size; ++i)
-							eval_expression(ctor_node.parameters[0], stack, program, return_address + value_type_size * i);
+							try_call_void(eval_expression(ctor_node.parameters[0], stack, program, return_address + value_type_size * i));
 					}
 					// Regular constructor
 					else
 					{
 						for (int i = 0; i < array.size; ++i)
-							eval_expression(ctor_node.parameters[i], stack, program, return_address + value_type_size * i);
+							try_call_void(eval_expression(ctor_node.parameters[i], stack, program, return_address + value_type_size * i));
 					}
 				}
 				else
 				{
 					declare_unreachable();
 				}
+				return success;
 			}
 		);
-		std::visit(visitor, expr.as_variant());
+		return std::visit(visitor, expr.as_variant());
 	}
 
 	auto run_statement(complete::Statement const & tree, ProgramStack & stack, complete::Program const & program, int return_address) noexcept
-		-> ControlFlow
+		-> expected<ControlFlow, UnmetPrecondition>
 	{
 		using namespace complete;
 
-		auto const visitor = overload_default_ret(ControlFlow::Nothing,
-			[&](statement::VariableDeclaration const & node)
+		auto const visitor = overload(
+			[&](statement::VariableDeclaration const & node) -> expected<ControlFlow, UnmetPrecondition>
 			{
 				int const address = stack.base_pointer + node.variable_offset;
-				eval_expression(node.assigned_expression, stack, program, address);
+				try_call_void(eval_expression(node.assigned_expression, stack, program, address));
+				return ControlFlow::Nothing;
 			},
-			[&](statement::ExpressionStatement const & expr_node)
+			[&](statement::ExpressionStatement const & expr_node) -> expected<ControlFlow, UnmetPrecondition>
 			{
-				eval_expression(expr_node.expression, stack, program, stack.top_pointer);
+				try_call_void(eval_expression(expr_node.expression, stack, program, stack.top_pointer));
+				return ControlFlow::Nothing;
 			},
-			[&](statement::Return const & return_node)
+			[&](statement::Return const & return_node) -> expected<ControlFlow, UnmetPrecondition>
 			{
-				eval_expression(return_node.returned_expression, stack, program, return_address);
+				try_call_void(eval_expression(return_node.returned_expression, stack, program, return_address));
 				return ControlFlow::Return;
 			},
-			[&](statement::If const & if_node)
+			[&](statement::If const & if_node) -> expected<ControlFlow, UnmetPrecondition>
 			{
-				int const result_addr = eval_expression(if_node.condition, stack, program);
+				try_call_decl(int const result_addr, eval_expression(if_node.condition, stack, program));
 				bool const condition = read<bool>(stack, result_addr);
 				free_up_to(stack, result_addr);
 
@@ -417,7 +415,7 @@ namespace interpreter
 				else
 					return ControlFlow::Nothing;
 			},
-			[&](statement::StatementBlock const & block_node)
+			[&](statement::StatementBlock const & block_node) -> expected<ControlFlow, UnmetPrecondition>
 			{
 				StackGuard const stack_guard(stack);
 				stack.top_pointer += block_node.scope.stack_frame_size;
@@ -425,24 +423,24 @@ namespace interpreter
 				// Run the statements.
 				for (auto const & statement : block_node.statements)
 				{
-					auto const cf = run_statement(statement, stack, program, return_address);
+					try_call_decl(auto const cf, run_statement(statement, stack, program, return_address));
 					if (cf == ControlFlow::Return || cf == ControlFlow::Break || cf == ControlFlow::Continue)
 						return cf;
 				}
 
 				return ControlFlow::Nothing;
 			},
-			[&](statement::While const & while_node)
+			[&](statement::While const & while_node) -> expected<ControlFlow, UnmetPrecondition>
 			{
 				for (;;)
 				{
-					int const result_addr = eval_expression(while_node.condition, stack, program);
+					try_call_decl(int const result_addr, eval_expression(while_node.condition, stack, program));
 					bool const condition = read<bool>(stack, result_addr);
 					free_up_to(stack, result_addr);
 
 					if (condition)
 					{
-						auto const cf = run_statement(*while_node.body, stack, program, return_address);
+						try_call_decl(auto const cf, run_statement(*while_node.body, stack, program, return_address));
 						if (cf == ControlFlow::Return)
 							return cf;
 						if (cf == ControlFlow::Break)
@@ -454,33 +452,33 @@ namespace interpreter
 					}
 				}
 			},
-			[&](statement::For const & for_node)
+			[&](statement::For const & for_node) -> expected<ControlFlow, UnmetPrecondition>
 			{
 				// Allocate stack frame for the scope.
 				StackGuard const stack_guard(stack);
 				stack.top_pointer += for_node.scope.stack_frame_size;
 
 				// Run init statement.
-				run_statement(*for_node.init_statement, stack, program, return_address);
+				try_call_void(run_statement(*for_node.init_statement, stack, program, return_address));
 
 				for (;;)
 				{
 					// Check condition.
-					int const result_addr = eval_expression(for_node.condition, stack, program);
+					try_call_decl(int const result_addr, eval_expression(for_node.condition, stack, program));
 					bool const condition = read<bool>(stack, result_addr);
 					free_up_to(stack, result_addr);
 
 					if (condition)
 					{
 						// Run body.
-						auto const cf = run_statement(*for_node.body, stack, program, return_address);
+						try_call_decl(auto const cf, run_statement(*for_node.body, stack, program, return_address));
 						if (cf == ControlFlow::Return)
 							return cf;
 						if (cf == ControlFlow::Break)
 							return ControlFlow::Nothing;
 
 						// Run end expression.
-						eval_expression(for_node.end_expression, stack, program, stack.top_pointer);
+						try_call_void(eval_expression(for_node.end_expression, stack, program, stack.top_pointer));
 					}
 					else
 					{
@@ -488,11 +486,11 @@ namespace interpreter
 					}
 				}
 			},
-			[&](statement::Break const &)
+			[&](statement::Break const &) -> expected<ControlFlow, UnmetPrecondition>
 			{
 				return ControlFlow::Break;
 			},
-			[&](statement::Continue const &)
+			[&](statement::Continue const &) -> expected<ControlFlow, UnmetPrecondition>
 			{
 				return ControlFlow::Continue;
 			}
@@ -500,7 +498,7 @@ namespace interpreter
 		return std::visit(visitor, tree.as_variant());
 	}
 
-	auto run(complete::Program const & program, int stack_size) noexcept -> int
+	auto run(complete::Program const & program, int stack_size) noexcept -> expected<int, UnmetPrecondition>
 	{
 		assert(program.main_function != invalid_function_id);
 
@@ -510,11 +508,11 @@ namespace interpreter
 		// Initialization of globals.
 		alloc(stack, program.global_scope.stack_frame_size);
 		for (auto const & statement : program.global_initialization_statements)
-			run_statement(statement, stack, program, 0);
+			try_call_void(run_statement(statement, stack, program, 0));
 
 		// Run main.
 		int const return_address = alloc(stack, sizeof(int), alignof(int));
-		call_function(program.main_function, {}, stack, program, return_address);
+		try_call_void(call_function(program.main_function, {}, stack, program, return_address));
 		return read<int>(stack, return_address);
 	}
 
