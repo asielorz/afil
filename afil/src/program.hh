@@ -71,6 +71,13 @@ namespace complete
 		bool is_callable_at_compile_time;
 	};
 
+	struct IntrinsicFunction
+	{
+		TypeId return_type;
+		std::vector<TypeId> parameter_types;
+		std::string_view name;
+	};
+
 	struct MemcmpRanges
 	{
 		using is_transparent = std::true_type;

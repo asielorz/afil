@@ -812,7 +812,7 @@ namespace instantiation
 				extern_function.is_callable_at_compile_time = false;
 
 				FunctionId function_id;
-				function_id.is_extern = true;
+				function_id.type = FunctionId::Type::imported;
 				function_id.index = static_cast<int>(program->extern_functions.size());
 				program->extern_functions.push_back(std::move(extern_function));
 

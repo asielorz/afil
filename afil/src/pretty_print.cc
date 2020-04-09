@@ -357,7 +357,7 @@ auto pretty_print(complete::Function const & function, complete::Program const &
 	scope_stack.push_back(&program.global_scope);
 	scope_stack.push_back(&function);
 
-	std::string str = std::string(function_name(FunctionId{false, static_cast<unsigned>(&function - program.functions.data())}, program));
+	std::string str = std::string(function_name(FunctionId(FunctionId::Type::program, static_cast<unsigned>(&function - program.functions.data())), program));
 	str += '(';
 	for (int i = 0; i < function.parameter_count; ++i)
 		str += join(type_name(function.variables[i].type, program), ' ', function.variables[i].name, (i == function.parameter_count - 1) ? "" : ", ");

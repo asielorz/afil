@@ -1,14 +1,20 @@
 #pragma once
 
+
 struct FunctionId
 {
-	unsigned is_extern : 1;
-	unsigned index : 31;
+	enum struct Type : unsigned { program, imported, instrinsic };
+
+	FunctionId() noexcept = default;
+	constexpr FunctionId(Type type_, unsigned index_) noexcept : type(type_), index(index_) {}
+
+	Type type : 2;
+	unsigned index : 30;
 
 };
-constexpr FunctionId invalid_function_id = { 1, (1u << 31u) - 1u };
+constexpr FunctionId invalid_function_id = {FunctionId::Type::instrinsic, (1u << 30u) - 1u};
 
-constexpr auto operator == (FunctionId a, FunctionId b) noexcept -> bool { return a.is_extern == b.is_extern && a.index == b.index; }
+constexpr auto operator == (FunctionId a, FunctionId b) noexcept -> bool { return a.type == b.type && a.index == b.index; }
 constexpr auto operator != (FunctionId a, FunctionId b) noexcept -> bool { return !(a == b); }
 
 struct FunctionTemplateId { unsigned index; };

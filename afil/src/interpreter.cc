@@ -72,7 +72,240 @@ namespace interpreter
 
 	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, complete::Program const & program, int return_address) noexcept -> expected<void, UnmetPrecondition>
 	{
-		if (!function_id.is_extern)
+		if (function_id.type == FunctionId::Type::instrinsic)
+		{
+			int const stack_top = stack.top_pointer;
+
+			switch (function_id.index)
+			{
+				case 0: // int + int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) + read<int>(stack, b_address));
+					break;
+				}
+				case 1: // int - int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) - read<int>(stack, b_address));
+					break;
+				}
+				case 2: // int * int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) * read<int>(stack, b_address));
+					break;
+				}
+				case 3: // int / int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) / read<int>(stack, b_address));
+					break;
+				}
+				case 4: // int % int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) % read<int>(stack, b_address));
+					break;
+				}
+				case 5: // int == int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) == read<int>(stack, b_address));
+					break;
+				}
+				case 6: // int <=> int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) - read<int>(stack, b_address));
+					break;
+				}
+				case 7: // -int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					write(stack, return_address, -read<int>(stack, a_address));
+					break;
+				}
+				case 8: // int & int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) & read<int>(stack, b_address));
+					break;
+				}
+				case 9: // int | int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) | read<int>(stack, b_address));
+					break;
+				}
+				case 10: // int ^ int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) ^ read<int>(stack, b_address));
+					break;
+				}
+				case 11: // ~int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					write(stack, return_address, ~read<int>(stack, a_address));
+					break;
+				}
+				case 12: // int >> int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) >> read<int>(stack, b_address));
+					break;
+				}
+				case 13: // int << int
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<int>(stack, a_address) << read<int>(stack, b_address));
+					break;
+				}
+
+				case 14: // float + float
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<float>(stack, a_address) + read<float>(stack, b_address));
+					break;
+				}
+				case 15: // float - float
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<float>(stack, a_address) - read<float>(stack, b_address));
+					break;
+				}
+				case 16: // float * float
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<float>(stack, a_address) * read<float>(stack, b_address));
+					break;
+				}
+				case 17: // float / float
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<float>(stack, a_address) / read<float>(stack, b_address));
+					break;
+				}
+				case 18: // float == float
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<float>(stack, a_address) == read<float>(stack, b_address));
+					break;
+				}
+				case 19: // float <=> float
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<float>(stack, a_address) - read<float>(stack, b_address));
+					break;
+				}
+				case 20: // -float
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					write(stack, return_address, -read<float>(stack, a_address));
+					break;
+				}
+
+				case 21: // char + char
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<unsigned char>(stack, a_address) + read<unsigned char>(stack, b_address));
+					break;
+				}
+				case 22: // char - char
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<unsigned char>(stack, a_address) - read<unsigned char>(stack, b_address));
+					break;
+				}
+				case 23: // char * char
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<unsigned char>(stack, a_address) * read<unsigned char>(stack, b_address));
+					break;
+				}
+				case 24: // char / char
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<unsigned char>(stack, a_address) / read<unsigned char>(stack, b_address));
+					break;
+				}
+				case 25: // char == char
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<unsigned char>(stack, a_address) == read<unsigned char>(stack, b_address));
+					break;
+				}
+				case 26: // char <=> char
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, int(read<unsigned char>(stack, a_address)) - int(read<unsigned char>(stack, b_address)));
+					break;
+				}
+				
+				case 27: // bool and bool
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<bool>(stack, a_address) && read<bool>(stack, b_address));
+					break;
+				}
+				case 28: // bool or bool
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<bool>(stack, a_address) || read<bool>(stack, b_address));
+					break;
+				}
+				case 29: // bool xor bool
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<bool>(stack, a_address) != read<bool>(stack, b_address));
+					break;
+				}
+				case 30: // not bool
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					write(stack, return_address, !read<bool>(stack, a_address));
+					break;
+				}
+				case 31: // bool == bool
+				{
+					try_call_decl(int const a_address, eval_expression(parameters[0], stack, program));
+					try_call_decl(int const b_address, eval_expression(parameters[1], stack, program));
+					write(stack, return_address, read<bool>(stack, a_address) == read<bool>(stack, b_address));
+					break;
+				}
+			}
+
+			free_up_to(stack, stack_top);
+		}
+		else if (function_id.type == FunctionId::Type::program)
 		{
 			complete::Function const & func = program.functions[function_id.index];
 

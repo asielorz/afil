@@ -57,60 +57,58 @@ namespace complete
 	}
 
 	template <typename R, typename ... Args>
-	auto extern_function_descriptor(auto (*fn)(Args...) noexcept -> R) noexcept -> ExternFunction
+	auto intrinsic_function_descriptor_helper(std::string_view name, auto (*)(Args...) -> R) noexcept -> IntrinsicFunction
 	{
-		return ExternFunction{
-			static_cast<int>(sizeof(std::tuple<Args...>)),
-			static_cast<int>(alignof(std::tuple<Args...>)),
+		return IntrinsicFunction{
 			id_for(box<R>),
 			{id_for(box<Args>)...},
-			callc::c_function_caller(fn),
-			fn,
-			"",
-			true
+			name
 		};
 	}
 
-	auto default_extern_functions() noexcept -> std::vector<std::pair<std::string_view, ExternFunction>>
+	template <typename F>
+	auto intrinsic_function_descriptor(std::string_view name) noexcept -> IntrinsicFunction
 	{
-		return {
-			{"+"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a + b; })},
-			{"-"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
-			{"*"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a * b; })},
-			{"/"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a / b; })},
-			{"%"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a % b; })},
-			{"=="sv,	extern_function_descriptor(+[](int a, int b) noexcept -> bool { return a == b; })},
-			{"<=>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a - b; })},
-			{"-"sv,		extern_function_descriptor(+[](int a) noexcept -> int { return -a; })},
-			{"&"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a & b; })},
-			{"|"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a | b; })},
-			{"^"sv,		extern_function_descriptor(+[](int a, int b) noexcept -> int { return a ^ b; })},
-			{"~"sv,		extern_function_descriptor(+[](int a) noexcept -> int { return ~a; })},
-			{">>"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a >> b; })},
-			{"<<"sv,	extern_function_descriptor(+[](int a, int b) noexcept -> int { return a << b; })},
-
-			{"+"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a + b; })},
-			{"-"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
-			{"*"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a * b; })},
-			{"/"sv,		extern_function_descriptor(+[](float a, float b) noexcept -> float { return a / b; })},
-			{"=="sv,	extern_function_descriptor(+[](float a, float b) noexcept -> bool { return a == b; })},
-			{"<=>"sv,	extern_function_descriptor(+[](float a, float b) noexcept -> float { return a - b; })},
-			{"-"sv,		extern_function_descriptor(+[](float a) noexcept -> float { return -a; })},
-
-			{"+"sv,		extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> unsigned char { return a + b; })},
-			{"-"sv,		extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> unsigned char { return a - b; })},
-			{"*"sv,		extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> unsigned char { return a * b; })},
-			{"/"sv,		extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> unsigned char { return a / b; })},
-			{"=="sv,	extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> bool { return a == b; })},
-			{"<=>"sv,	extern_function_descriptor(+[](unsigned char a, unsigned char b) noexcept -> int { return int(a) - int(b); })},
-
-			{"and"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a && b; })},
-			{"or"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a || b; })},
-			{"xor"sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a != b; })},
-			{"not"sv,	extern_function_descriptor(+[](bool a) noexcept -> bool { return !a; })},
-			{"=="sv,	extern_function_descriptor(+[](bool a, bool b) noexcept -> bool { return a == b; })},
-		};
+		return intrinsic_function_descriptor_helper(name, static_cast<F *>(nullptr));
 	}
+
+	const IntrinsicFunction intrinsic_functions[] = {
+		intrinsic_function_descriptor<int(int, int)>("+"sv),
+		intrinsic_function_descriptor<int(int, int)>("-"sv),
+		intrinsic_function_descriptor<int(int, int)>("*"sv),
+		intrinsic_function_descriptor<int(int, int)>("/"sv),
+		intrinsic_function_descriptor<int(int, int)>("%"sv),
+		intrinsic_function_descriptor<bool(int, int)>("=="sv),
+		intrinsic_function_descriptor<int(int, int)>("<=>"sv),
+		intrinsic_function_descriptor<int(int)>("-"sv),
+		intrinsic_function_descriptor<int(int, int)>("&"sv),
+		intrinsic_function_descriptor<int(int, int)>("|"sv),
+		intrinsic_function_descriptor<int(int, int)>("^"sv),
+		intrinsic_function_descriptor<int(int)>("~"sv),
+		intrinsic_function_descriptor<int(int, int)>(">>"sv),
+		intrinsic_function_descriptor<int(int, int)>("<<"sv),
+
+		intrinsic_function_descriptor<float(float, float)>("+"sv),
+		intrinsic_function_descriptor<float(float, float)>("-"sv),
+		intrinsic_function_descriptor<float(float, float)>("*"sv),
+		intrinsic_function_descriptor<float(float, float)>("/"sv),
+		intrinsic_function_descriptor<bool(float, float)>("=="sv),
+		intrinsic_function_descriptor<float(float, float)>("<=>"sv),
+		intrinsic_function_descriptor<float(float)>("-"sv),
+
+		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("+"sv),
+		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("-"sv),
+		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("*"sv),
+		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("/"sv),
+		intrinsic_function_descriptor<bool(unsigned char, unsigned char)>("=="sv),
+		intrinsic_function_descriptor<int(unsigned char, unsigned char)>("<=>"sv),
+
+		intrinsic_function_descriptor<bool(bool, bool)>("and"sv),
+		intrinsic_function_descriptor<bool(bool, bool)>("or"sv),
+		intrinsic_function_descriptor<bool(bool, bool)>("xor"sv),
+		intrinsic_function_descriptor<bool(bool)>("not"sv),
+		intrinsic_function_descriptor<bool(bool, bool)>("=="sv),
+	};
 
 	Program::Program()
 	{
@@ -128,15 +126,13 @@ namespace complete
 
 		//*******************************************************************
 
-		auto const extern_functions_to_add = default_extern_functions();
+		size_t const intrinsic_function_count = std::size(intrinsic_functions);
+		global_scope.functions.reserve(intrinsic_function_count);
 
-		extern_functions.reserve(extern_functions_to_add.size());
-		global_scope.functions.reserve(extern_functions_to_add.size());
-
-		for (auto const fn : extern_functions_to_add)
+		for (size_t i = 0; i < intrinsic_function_count; ++i)
 		{
-			global_scope.functions.push_back({std::string(fn.first), {true, static_cast<unsigned>(extern_functions.size())}});
-			extern_functions.push_back(fn.second);
+			auto const & fn = intrinsic_functions[i];
+			global_scope.functions.push_back({std::string(fn.name), {FunctionId::Type::instrinsic, static_cast<unsigned>(i)}});
 		}
 	}
 
@@ -375,7 +371,7 @@ namespace complete
 
 	auto add_function(Program & program, Function new_function) noexcept -> FunctionId
 	{
-		FunctionId const function_id = FunctionId{0, static_cast<unsigned>(program.functions.size())};
+		FunctionId const function_id = FunctionId{FunctionId::Type::program, static_cast<unsigned>(program.functions.size())};
 		program.functions.push_back(std::move(new_function));
 		return function_id;
 	}
@@ -389,7 +385,11 @@ namespace complete
 
 	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
 	{
-		if (id.is_extern)
+		if (id.type == FunctionId::Type::instrinsic)
+		{
+			return intrinsic_functions[id.index].parameter_types;
+		}
+		else if (id.type == FunctionId::Type::imported)
 		{
 			return program.extern_functions[id.index].parameter_types;
 		}
@@ -405,7 +405,9 @@ namespace complete
 
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId
 	{
-		if (id.is_extern)
+		if (id.type == FunctionId::Type::instrinsic)
+			return intrinsic_functions[id.index].return_type;
+		else if (id.type == FunctionId::Type::imported)
 			return program.extern_functions[id.index].return_type;
 		else
 			return program.functions[id.index].return_type;
@@ -413,7 +415,9 @@ namespace complete
 
 	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool
 	{
-		if (id.is_extern)
+		if (id.type == FunctionId::Type::instrinsic)
+			return true;
+		else if (id.type == FunctionId::Type::imported)
 			return program.extern_functions[id.index].is_callable_at_compile_time;
 		else
 			return program.functions[id.index].is_callable_at_compile_time;
@@ -421,7 +425,8 @@ namespace complete
 
 	auto ABI_name(Program & program, FunctionId id) noexcept -> std::string &
 	{
-		if (id.is_extern)
+		assert(id.type != FunctionId::Type::instrinsic);
+		if (id.type == FunctionId::Type::imported)
 			return program.extern_functions[id.index].ABI_name;
 		else
 			return program.functions[id.index].ABI_name;
@@ -429,7 +434,8 @@ namespace complete
 
 	auto ABI_name(Program const & program, FunctionId id) noexcept -> std::string_view
 	{
-		if (id.is_extern)
+		assert(id.type != FunctionId::Type::instrinsic);
+		if (id.type == FunctionId::Type::imported)
 			return program.extern_functions[id.index].ABI_name;
 		else
 			return program.functions[id.index].ABI_name;

@@ -114,7 +114,7 @@ namespace c_transpiler
 		if (!function_ABI_name.empty())
 			return mangle(function_ABI_name, function_id, program);
 
-		if (function_id.is_extern)
+		if (function_id.type == FunctionId::Type::imported)
 			return mangle(join("extern_function_", function_id.index), function_id, program);
 		else
 			return mangle(join("function_", function_id.index), function_id, program);
@@ -122,7 +122,7 @@ namespace c_transpiler
 
 	auto write_function_call(FunctionId function_id, span<std::string const> parameters, complete::Program const & program, std::string & c_source)
 	{
-		if (function_id.is_extern && function_id.index < std::size(built_in_operator_table))
+		if (function_id.type == FunctionId::Type::instrinsic)
 		{
 			c_source += '(';
 			if (parameters.size() == 1)
@@ -872,7 +872,7 @@ namespace c_transpiler
 		// Write prototypes of all functions.
 		for (complete::Function const & function : program.functions)
 		{
-			auto const id = FunctionId{false, unsigned(&function - program.functions.data())};
+			auto const id = FunctionId(FunctionId::Type::program, unsigned(&function - program.functions.data()));
 			if (id != program.main_function)
 			{
 				write_function_prototype(function, id, program, c_source);
@@ -885,7 +885,7 @@ namespace c_transpiler
 		// Write all functions.
 		for (complete::Function const & function : program.functions)
 		{
-			auto const id = FunctionId{false, unsigned(&function - program.functions.data())};
+			auto const id = FunctionId(FunctionId::Type::program, unsigned(&function - program.functions.data()));
 
 			write_function(function, id, program, c_source);
 		}
