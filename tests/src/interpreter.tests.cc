@@ -2273,7 +2273,6 @@ TEST_CASE("Running a function out of contract at compile time is a compiler erro
 		};
 	)"sv;
 
-	// Think of how to test this.
 	auto const program = tests::parse_source(src);
 	REQUIRE(!program.has_value());
 }

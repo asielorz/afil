@@ -68,7 +68,6 @@ namespace complete
 		callc::CFunctionCaller caller;
 		void const * function_pointer;
 		std::string ABI_name;
-		bool is_callable_at_compile_time;
 	};
 
 	struct IntrinsicFunction

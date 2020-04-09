@@ -808,8 +808,7 @@ namespace instantiation
 
 				callc::TypeDescriptor const return_type_descriptor = type_descriptor_for(extern_function.return_type, *program);
 
-				extern_function.caller = callc::c_function_caller({ parameter_type_descriptors, extern_function.parameter_types.size() }, return_type_descriptor);
-				extern_function.is_callable_at_compile_time = false;
+				extern_function.caller = callc::c_function_caller({parameter_type_descriptors, extern_function.parameter_types.size()}, return_type_descriptor);
 
 				FunctionId function_id;
 				function_id.type = FunctionId::Type::imported;

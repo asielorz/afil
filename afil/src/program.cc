@@ -418,7 +418,7 @@ namespace complete
 		if (id.type == FunctionId::Type::instrinsic)
 			return true;
 		else if (id.type == FunctionId::Type::imported)
-			return program.extern_functions[id.index].is_callable_at_compile_time;
+			return false;
 		else
 			return program.functions[id.index].is_callable_at_compile_time;
 	}
