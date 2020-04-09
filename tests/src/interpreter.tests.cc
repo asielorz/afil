@@ -2223,30 +2223,6 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 	REQUIRE(tests::parse_and_run(src2) == 0);
 }
 
-//TEST_CASE("Functions that take types as parameters")
-//{
-//	auto const src = R"(
-//		let is_ordered = fn(type t) -> bool
-//		{
-//			return compiles(t i, t j)
-//			{
-//				{i == j} -> bool;
-//				{3 <=> 4} -> int
-//			};
-//		};
-//
-//		let main = fn() -> int
-//		{
-//			if (is_ordered(int))
-//				return 1;
-//			else
-//				return 0;
-//		};
-//	)"sv;
-//
-//	REQUIRE(tests::parse_and_run(src) == 1);
-//}
-
 TEST_CASE("Contracts let defining preconditions for a function")
 {
 	auto const src = R"(
@@ -2275,7 +2251,6 @@ TEST_CASE("Running a function out of contract at runtime will stop execution and
 		};
 	)"sv;
 
-	// Think of how to test this.
 	auto const program = tests::parse_source(src);
 	REQUIRE(program.has_value());
 	auto const run_result = interpreter::run(*program);
@@ -2303,6 +2278,30 @@ TEST_CASE("Running a function out of contract at compile time is a compiler erro
 	REQUIRE(!program.has_value());
 }
 
+//TEST_CASE("Functions that take types as parameters")
+//{
+//	auto const src = R"(
+//		let is_ordered = fn(type t) -> bool
+//		{
+//			return compiles(t i, t j)
+//			{
+//				{i == j} -> bool;
+//				{3 <=> 4} -> int
+//			};
+//		};
+//
+//		let main = fn() -> int
+//		{
+//			if (is_ordered(int))
+//				return 1;
+//			else
+//				return 0;
+//		};
+//	)"sv;
+//
+//	REQUIRE(tests::parse_and_run(src) == 1);
+//}
+
 /*****************************************************************
 Backlog
 - concepts
@@ -2312,6 +2311,7 @@ Backlog
 - reflection
 - namespaces
 - rework extern functions so that built in operators and such are intrinsics, not extern functions.
+- closures and lambda captures
 - currying (maybe, maybe at library level?)
 - some minimalistic standard library
 *****************************************************************/
