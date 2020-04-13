@@ -6,6 +6,7 @@
 #include "afil.hh"
 #include "program.hh"
 #include "pretty_print.hh"
+#include "utils/warning_macro.hh"
 #include <iostream>
 
 using namespace std::literals;
@@ -232,8 +233,8 @@ TEST_CASE("Block expression")
 		let main = fn () -> int
 		{
 			return {
-				int i = 3;
-				int j = 4;
+				let i = 3;
+				let j = 4;
 				return i * i + j * j;
 			};
 		};
@@ -248,8 +249,8 @@ TEST_CASE("Block expressions with multiple return paths")
 		let main = fn () -> int
 		{
 			return {
-				int i = 3;
-				int j = 4;
+				let i = 3;
+				let j = 4;
 				if (i > j)
 					return i * i - j * j;
 				else
@@ -268,12 +269,12 @@ TEST_CASE("Accessing a variable from outside the block")
 		{
 			if (i > j)
 			{
-				int difference = i - j;
+				let difference = i - j;
 				return difference;
 			}
 			else
 			{
-				int difference = j - i;
+				let difference = j - i;
 				return difference;
 			}
 		};		
@@ -294,12 +295,12 @@ TEST_CASE("Ensure that variables inside the block do not share an address with t
 		{
 			if (i > j)
 			{
-				int difference = i - j;
+				let difference = i - j;
 				return difference + i + j;
 			}
 			else
 			{
-				int difference = j - i;
+				let difference = j - i;
 				return difference + i + j;
 			}
 		};		
@@ -318,7 +319,7 @@ TEST_CASE("integer assignment")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int mut i = 5;
+			let mut i = 5;
 			i = 6;
 			return i;
 		};
@@ -332,8 +333,8 @@ TEST_CASE("while loop")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int mut i = 1;
-			int mut sum = 0;
+			let mut i = 1;
+			let mut sum = 0;
 			while (i < 10)
 			{
 				sum = sum + i;
@@ -351,8 +352,8 @@ TEST_CASE("for loop")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int mut sum = 0;
-			for (int mut i = 1; i < 10; i = i + 1)
+			let mut sum = 0;
+			for (let mut i = 1; i < 10; i = i + 1)
 				sum = sum + i;
 
 			return sum;
@@ -367,8 +368,8 @@ TEST_CASE("break")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int mut sum = 0;
-			for (int mut i = 1; i < 10; i = i + 1)
+			let mut sum = 0;
+			for (let mut i = 1; i < 10; i = i + 1)
 			{
 				sum = sum + i;
 				if (i == 6)
@@ -387,8 +388,8 @@ TEST_CASE("continue")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int mut sum = 0;
-			for (int mut i = 1; i < 10; i = i + 1)
+			let mut sum = 0;
+			for (let mut i = 1; i < 10; i = i + 1)
 			{
 				// Ignore multiples of 3.
 				if (i % 3 == 0)
@@ -413,7 +414,7 @@ TEST_CASE("function that takes a reference")
 
 		let main = fn () -> int
 		{
-			int mut i = 5;
+			let mut i = 5;
 			assign(i, 6);
 			return i;
 		};
@@ -427,8 +428,8 @@ TEST_CASE("Reference types in the stack")
 	auto const src = R"(
 		let main = fn () -> int
 		{
-			int mut i = 5;
-			int mut & ri = i;
+			let mut i = 5;
+			let mut & ri = i;
 			ri = 6;		// Mutate through the reference
 			return i;	// Return the original value
 		};
@@ -444,8 +445,8 @@ TEST_CASE("Returning references")
 	
 		let main = fn () -> int
 		{
-			int mut i = 0;
-			int mut & ri = id(i);
+			let mut i = 0;
+			let mut & ri = id(i);
 			ri = 0 - 7;
 			return i;
 		};
@@ -539,6 +540,7 @@ TEST_CASE("A struct can be constructed by giving values to each member")
 		let main = fn() -> int
 		{
 			let v = vec2(3.5, 2.22);
+			return 0;
 		};
 	)"sv;
 
@@ -757,8 +759,8 @@ TEST_CASE("Pointers")
 	auto const src = R"(
 		let main = fn() -> int
 		{
-			int mut i = 5;
-			int mut * pi = &i;
+			let mut i = 5;
+			let pi = &i;
 			*pi = 6;
 			return i;
 		};
@@ -772,8 +774,8 @@ TEST_CASE("Conversion from immutable pointer to mutable pointer")
 	auto const src = R"(
 		let main = fn() -> int
 		{
-			int mut i = 5;
-			int * pi = &i;
+			let mut i = 5;
+			let pi = &i;
 			return *pi;
 		};
 	)"sv;
@@ -808,7 +810,7 @@ TEST_CASE("A template parameter may be a reference or mutable")
 
 		let main = fn() -> int
 		{
-			int mut i = 5;
+			let mut i = 5;
 			assign(i, -225);
 			return i;
 		};
@@ -853,7 +855,7 @@ TEST_CASE("A structure may contain a variable of a template type")
 		
 		let main = fn() -> int
 		{
-			aabb box;
+			let box = aabb();
 			return box.min.y;
 		};
 	)"sv;
@@ -867,15 +869,15 @@ TEST_CASE("Statement block in the default value of a member variable")
 		struct test
 		{
 			int x = {
-				int i = 3;
-				int j = 4;
+				let i = 3;
+				let j = 4;
 				return i * i + j * j;
 			};
 		}
 		
 		let main = fn() -> int
 		{
-			test t;
+			let t = test();
 			return t.x;
 		};
 	)"sv;
@@ -1003,7 +1005,7 @@ TEST_CASE("Function template refactor: variable declaration statement of a non d
 	auto const src = R"(
 		let difference = fn<T>(T a, T b) 
 		{ 
-			bool less = a < b;
+			let less = a < b;
 			if (less)
 				return b - a;
 			else
@@ -1024,7 +1026,7 @@ TEST_CASE("Function template refactor: variable declaration statement of a non d
 	auto const src = R"(
 		let difference = fn<T>(T a, T b) 
 		{ 
-			bool less = a < b;
+			let less = a < b;
 			if (less)
 				return b - a;
 			else
@@ -1045,7 +1047,7 @@ TEST_CASE("Function template refactor: variable declaration of dependent type")
 	auto const src = R"(
 		let midpoint = fn<T>(T a, T b) 
 		{ 
-			T m = (a + b) / 2;
+			let m = (a + b) / 2;
 			return m;
 		};
 
@@ -1068,7 +1070,7 @@ TEST_CASE("Function template refactor: synthesizing default constructor for vari
 	auto const src = R"(
 		let return_default = fn<T>(T ignored) 
 		{ 
-			T default_constructed;
+			let default_constructed = T();
 			return default_constructed;
 		};
 
@@ -1123,7 +1125,7 @@ TEST_CASE("Structs are assignable by default")
 
 		let main = fn() -> int
 		{
-			Foo mut f = Foo(5);
+			let mut f = Foo(5);
 			f = Foo(6);
 			return f.x;
 		};
@@ -1181,32 +1183,13 @@ TEST_CASE("Member default initializer for struct templates")
 	REQUIRE(tests::parse_and_run(src) == -7);
 }
 
-TEST_CASE("Default construct struct template without let = syntax")
-{
-	auto const src = R"(
-		struct<T, U> test_pair
-		{
-			T first = -4;
-			U second = -3;
-		}
-
-		let main = fn() -> int
-		{
-			test_pair<int, int> p;
-			return p.first + p.second;
-		};
-	)"sv;
-
-	REQUIRE(tests::parse_and_run(src) == -7);
-}
-
 TEST_CASE("For loops in dependent contexts")
 {
 	auto const src = R"(
 		let some_sum = fn<T>(T first, T last, T step)
 		{
-			T mut sum = first;
-			for (T mut i = first + step; i < last; i = i + step)
+			let mut sum = first;
+			for (let mut i = first + step; i < last; i = i + step)
 				sum = sum + i;
 			return sum;
 		};
@@ -1253,8 +1236,8 @@ TEST_CASE("Statement block expressions in dependent contexts")
 		let add = fn<T>(T a, T b)
 		{
 			return {
-				T needless_copy_1 = a;
-				T needless_copy_2 = b;
+				let needless_copy_1 = a;
+				let needless_copy_2 = b;
 				return needless_copy_1 + needless_copy_2;
 			};
 		};
@@ -1278,7 +1261,7 @@ TEST_CASE("Recursive dependent types")
 
 		let main = fn() -> int
 		{
-			int x = 25;
+			let x = 25;
 			return dereference(&x);
 		};
 	)"sv;
@@ -1310,7 +1293,7 @@ TEST_CASE("Default constructed array")
 
 		let main = fn() -> int
 		{
-			ivec2[4] a;
+			let a = ivec2[4]();
 			return 0;
 		};
 	)"sv;
@@ -1379,7 +1362,7 @@ TEST_CASE("Can overload based on mutability")
 			let v = ivec4(1, 3, 5, 7);
 			let mut mv = ivec4();
 
-			for (int mut i = 0; i < 4; i = i + 1)
+			for (let mut i = 0; i < 4; i = i + 1)
 				mv[i] = v[i];
 
 			return mv[3] - mv[1];
@@ -1422,7 +1405,7 @@ TEST_CASE("Can overload based on mutability independent of order")
 			let v = ivec4(1, 3, 5, 7);
 			let mut mv = ivec4();
 
-			for (int mut i = 0; i < 4; i = i + 1)
+			for (let mut i = 0; i < 4; i = i + 1)
 				mv[i] = v[i];
 
 			return mv[3] - mv[1];
@@ -1514,7 +1497,7 @@ TEST_CASE("Array pointer type")
 		let main = fn() -> int
 		{
 			let a = int[4](1, 2, 3, 4);
-			int[] pa = data(a);
+			let pa = data(a);
 			return pa[2];
 		};
 	)"sv;
@@ -1533,7 +1516,7 @@ TEST_CASE("Function template that takes array pointer")
 		let main = fn() -> int
 		{
 			let a = int[4](1, 2, 3, 4);
-			int[] pa = data(a);
+			let pa = data(a);
 			return subscript(pa, 2);
 		};
 	)"sv;
@@ -1572,8 +1555,8 @@ TEST_CASE("size function for arrays")
 		let main = fn() -> int
 		{
 			let a = int[5](1, 2, 3, 4, 5);
-			int mut sum = 0;
-			for (int mut i = 0; i < size(a); i = i + 1)
+			let mut sum = 0;
+			for (let mut i = 0; i < size(a); i = i + 1)
 				sum = sum + a[i];
 			return sum;
 		};
@@ -1624,7 +1607,7 @@ TEST_CASE("Declaring a function inside a template")
 		let is_sorted = fn<T>(T[] array, int n)
 		{
 			let compare = fn(T a, T b) { return a < b; };
-			for (int mut i = 1; i < n; i = i + 1)
+			for (let mut i = 1; i < n; i = i + 1)
 				if (compare(array[i], array[i - 1]))
 					return false;
 
@@ -1636,7 +1619,7 @@ TEST_CASE("Declaring a function inside a template")
 			let sorted_array = int[6](1, 2, 3, 3, 3, 4);
 			let array_not_sorted = int[6](1, 4, 3, 3, 3, 4);
 
-			int mut ret = 0;
+			let mut ret = 0;
 			if (is_sorted(data(sorted_array), size(sorted_array)))
 				ret = ret + 1;
 			if (not is_sorted(data(array_not_sorted), size(array_not_sorted)))
@@ -1660,7 +1643,7 @@ TEST_CASE("import allows to import C functions from DLLs")
 
 		let print_string = fn(char[] s, int n)
 		{
-			for (int mut i = 0; i < n; i = i + 1)
+			for (let mut i = 0; i < n; i = i + 1)
 				putchar(s[i]);
 		};
 
@@ -1694,7 +1677,7 @@ TEST_CASE("Variables with values known at compile time are constants and can be 
 	auto const src = R"(
 		let main = fn() -> int
 		{
-			int s = 5;
+			let s = 5;
 			let array = int[s](0);
 			return size(array);
 		};
@@ -1703,13 +1686,13 @@ TEST_CASE("Variables with values known at compile time are constants and can be 
 	REQUIRE(tests::parse_and_run(src) == 5);
 } 
 
-TEST_CASE("Contant variable of pointer type")
+TEST_CASE("Constant variable of pointer type")
 {
 	auto const src = R"(
 		let main = fn() -> int
 		{
-			int s = 5;
-			int * ps = &s;
+			let s = 5;
+			let ps = &s;
 			let array = int[*ps](0);
 			return size(array);
 		};
@@ -1723,8 +1706,8 @@ TEST_CASE("Statement blocks in constant expressions")
 	auto const src = R"(
 		let main = fn() -> int
 		{
-			int s = {
-				int mut i = 3;
+			let s = {
+				let mut i = 3;
 				i = i * 2;
 				return i;
 			};
@@ -1741,8 +1724,8 @@ TEST_CASE("Function call in constant expression")
 	auto const src = R"(
 		let int_sqrt = fn(int mut number) -> int
 		{
-			int mut result = 0;
- 			int mut result_squared = 1;
+			let mut result = 0;
+ 			let mut result_squared = 1;
 			while (number >= result_squared)
 			{
 				number = number - result_squared;
@@ -1754,7 +1737,7 @@ TEST_CASE("Function call in constant expression")
 
 		let main = fn() -> int
 		{
-			int s = int_sqrt(25);
+			let s = int_sqrt(25);
 			let array = int[s](0);
 			return size(array);
 		};
@@ -1854,7 +1837,7 @@ TEST_CASE("There is no operator + for booleans")
 	auto const src = R"(
 		let main = fn() -> int
 		{
-			bool b = true + false;
+			let b = true + false;
 			return 5;
 		};
 	)"sv;
@@ -1977,18 +1960,19 @@ TEST_CASE("Deduction of array size")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
-TEST_CASE("uninit allows for not initializing an object")
-{
-	auto const src = R"(
-		let main = fn() -> int
-		{
-			int mut a = uninit;
-			return a;
-		};
-	)"sv;
-
-	tests::parse_and_run(src);
-}
+TODO("Uninit with let statements")
+//TEST_CASE("uninit allows for not initializing an object")
+//{
+//	auto const src = R"(
+//		let main = fn() -> int
+//		{
+//			let mut a = uninit;
+//			return a;
+//		};
+//	)"sv;
+//
+//	tests::parse_and_run(src);
+//}
 
 TEST_CASE("Order of declarations doesn't matter")
 {
@@ -2189,7 +2173,7 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 	auto const src1 = R"(
 		let main = fn() -> int
 		{
-			bool condition = compiles(int i, int j)
+			let condition = compiles(int i, int j)
 			{
 				{i + j} -> int;
 				{i < j} -> bool
@@ -2207,7 +2191,7 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 	auto const src2 = R"(
 		let main = fn() -> int
 		{
-			bool condition = compiles(int i, int j)
+			let condition = compiles(int i, int j)
 			{
 				{i + j} -> float; // Wrong
 				{i < j} -> bool
@@ -2268,7 +2252,7 @@ TEST_CASE("Running a function out of contract at compile time is a compiler erro
 
 		let main = fn() -> int
 		{
-			int result = div(5, 0); // Result is a compile time constant
+			let result = div(5, 0); // Result is a compile time constant
 			return result;
 		};
 	)"sv;

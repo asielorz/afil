@@ -9,13 +9,6 @@ namespace incomplete
 
 	namespace statement
 	{
-		struct VariableDeclaration
-		{
-			std::string variable_name;
-			std::optional<Expression> assigned_expression;
-			incomplete::TypeId type;
-		};
-
 		struct LetDeclaration
 		{
 			std::string variable_name;
@@ -82,7 +75,7 @@ namespace incomplete
 		};
 
 		using Variant = std::variant<
-			VariableDeclaration, LetDeclaration, ExpressionStatement,
+			LetDeclaration, ExpressionStatement,
 			If, StatementBlock, While, For,
 			Return, Break, Continue,
 			StructDeclaration, StructTemplateDeclaration, TypeAliasDeclaration

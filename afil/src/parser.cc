@@ -1177,7 +1177,7 @@ namespace parser
 
 		// Parse init statement. Must be an expression or a declaration.
 		try_call_decl(incomplete::Statement init_statement, parse_statement(tokens, index, type_names));
-		if (!(has_type<incomplete::statement::VariableDeclaration>(init_statement.variant) || 
+		if (!(has_type<incomplete::statement::LetDeclaration>(init_statement.variant) || 
 			  has_type<incomplete::statement::ExpressionStatement>(init_statement.variant)))
 			return make_syntax_error(tokens[index], "init-statement of a for statement must be a variable declaration or an expression.");
 		for_statement.init_statement = allocate(std::move(init_statement));
@@ -1325,32 +1325,6 @@ namespace parser
 		return std::move(type_alias_statement);
 	}
 
-	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept 
-		-> expected<incomplete::statement::VariableDeclaration, PartialSyntaxError>
-	{
-		incomplete::statement::VariableDeclaration statement;
-		
-		// The second token of the statement is the variable name.
-		if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after type name.");
-		if (is_keyword(tokens[index].source)) return make_syntax_error(tokens[index], "Cannot use a keyword as variable name.");
-		std::string_view const var_name = tokens[index].source;
-		index++;
-
-		statement.variable_name = var_name;
-		statement.type = std::move(type);
-
-		if (tokens[index].type == TokenType::semicolon)
-			return std::move(statement);
-
-		// The third token is a '='.
-		if (tokens[index].source != "=") return make_syntax_error(tokens[index], "Expected '=' or ';' after variable name in declaration.");
-		index++;
-
-		// The rest is the expression assigned to the variable.
-		try_call(assign_to(statement.assigned_expression), parse_expression(tokens, index, type_names));
-		return std::move(statement);
-	}
-
 	auto parse_expression_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
 		-> expected<incomplete::statement::ExpressionStatement, PartialSyntaxError>
 	{
@@ -1386,13 +1360,7 @@ namespace parser
 		else if (tokens[index].source == "type")
 			try_call(assign_to(result), parse_type_alias(tokens, index, type_names))
 		else
-		{
-			try_call_decl(auto parsed_type, parse_type_name(tokens, index, type_names));
-			if (parsed_type.has_value())
-				try_call(assign_to(result), parse_variable_declaration_statement(tokens, index, type_names, std::move(*parsed_type)))
-			else
-				try_call(assign_to(result), parse_expression_statement(tokens, index, type_names));
-		}
+			try_call(assign_to(result), parse_expression_statement(tokens, index, type_names));
 
 		// A statement must end with a semicolon.
 		if (tokens[index].type != TokenType::semicolon) return make_syntax_error(tokens[index], "Expected ';' after statement.");
