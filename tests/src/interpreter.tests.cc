@@ -2277,29 +2277,29 @@ TEST_CASE("Running a function out of contract at compile time is a compiler erro
 	REQUIRE(!program.has_value());
 }
 
-//TEST_CASE("Functions that take types as parameters")
-//{
-//	auto const src = R"(
-//		let is_ordered = fn(type t) -> bool
-//		{
-//			return compiles(t i, t j)
-//			{
-//				{i == j} -> bool;
-//				{3 <=> 4} -> int
-//			};
-//		};
-//
-//		let main = fn() -> int
-//		{
-//			if (is_ordered(int))
-//				return 1;
-//			else
-//				return 0;
-//		};
-//	)"sv;
-//
-//	REQUIRE(tests::parse_and_run(src) == 1);
-//}
+TEST_CASE("Functions that take types as parameters")
+{
+	auto const src = R"(
+		let is_ordered = fn(type t) -> bool
+		{
+			return compiles(@t i, @t j)
+			{
+				{i == j} -> bool;
+				{3 <=> 4} -> int
+			};
+		};
+
+		let main = fn() -> int
+		{
+			if (is_ordered(int))
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
 
 /*****************************************************************
 Backlog

@@ -192,6 +192,7 @@ namespace c_transpiler
 			[&](expression::Literal<bool>) { return true; },
 			[&](expression::Literal<uninit_t>) { return false; },
 			[&](expression::StringLiteral) { return true; },
+			[&](expression::Literal<TypeId>) { return true; },
 			[&](expression::LocalVariable const &) { return true; },
 			[&](expression::GlobalVariable const &) { return true; },
 			[&](expression::MemberVariable const & var_node) { return can_be_written_inline(*var_node.owner); },
@@ -234,6 +235,10 @@ namespace c_transpiler
 			[&](expression::StringLiteral literal) 
 			{
 				c_source += join('"', literal.value, '"'); 
+			},
+			[&](expression::Literal<TypeId> literal)
+			{
+				c_source += type_name(literal.value, program);
 			},
 			[&](expression::LocalVariable const & var_node)
 			{
@@ -359,11 +364,12 @@ namespace c_transpiler
 		else
 		{
 			auto const visitor = overload(
-				[&](expression::Literal<int>)	{ declare_unreachable(); },
-				[&](expression::Literal<float>) { declare_unreachable(); },
-				[&](expression::Literal<bool>)	{ declare_unreachable(); },
+				[&](expression::Literal<int>)	 { declare_unreachable(); },
+				[&](expression::Literal<float>)  { declare_unreachable(); },
+				[&](expression::Literal<bool>)	 { declare_unreachable(); },
 				[&](expression::Literal<uninit_t>) {},
-				[&](expression::StringLiteral)	{ declare_unreachable(); },
+				[&](expression::Literal<TypeId>) { declare_unreachable(); },
+				[&](expression::StringLiteral)	 { declare_unreachable(); },
 				[&](expression::LocalVariable const &)	{ declare_unreachable(); },
 				[&](expression::GlobalVariable const &) { declare_unreachable(); },
 				[&](expression::MemberVariable const & var_node)

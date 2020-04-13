@@ -49,6 +49,12 @@ auto evaluate_array_size_expression(complete::Expression expression, complete::P
 	return evaluate_constant_expression_as<int>(expression, program, constant_base_index);
 }
 
+auto evaluate_type_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> expected<complete::TypeId, PartialSyntaxError>
+{
+	try_call(assign_to(expression), insert_conversion_node(std::move(expression), complete::TypeId::type, program));
+	return evaluate_constant_expression_as<complete::TypeId>(expression, program, constant_base_index);
+}
+
 namespace instantiation
 {
 	auto top(ScopeStack & scope_stack) noexcept -> complete::Scope & { return *scope_stack.back().scope; }
@@ -165,6 +171,11 @@ namespace instantiation
 					return make_syntax_error(join("Type not found: ", base_case.name));
 				return type;
 			},
+			[&](incomplete::TypeId::TypeExpression const & expr) -> expected<complete::TypeId, PartialSyntaxError>
+			{
+				try_call_decl(complete::Expression type_expr, instantiate_expression(*expr.expression, template_parameters, scope_stack, program, nullptr));
+				return evaluate_type_expression(std::move(type_expr), *program, next_block_scope_offset(scope_stack));
+			},
 			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::TypeId, PartialSyntaxError>
 			{
 				try_call_decl(complete::TypeId const pointee, resolve_dependent_type(*pointer.pointee, template_parameters, scope_stack, program));
@@ -239,6 +250,12 @@ namespace instantiation
 				}
 
 				declare_unreachable();
+			},
+			[&](incomplete::TypeId::TypeExpression const & expr) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
+			{
+				try_call_decl(complete::Expression type_expr, instantiate_expression(*expr.expression, resolved_template_parameters, scope_stack, program, nullptr));
+				try_call_decl(complete::TypeId const type, evaluate_type_expression(std::move(type_expr), *program, next_block_scope_offset(scope_stack)));
+				return complete::FunctionTemplateParameterType{complete::FunctionTemplateParameterType::BaseCase{type}, false, false};
 			},
 			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
@@ -965,6 +982,11 @@ namespace instantiation
 				}
 			
 				return std::move(complete_expression);
+			},
+			[&](incomplete::expression::Literal<incomplete::TypeId> const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
+			{
+				try_call_decl(complete::TypeId const type_id, resolve_dependent_type(incomplete_expression.value, template_parameters, scope_stack, program));
+				return complete::expression::Literal<complete::TypeId>{type_id};
 			},
 			[&](incomplete::expression::Constructor const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{

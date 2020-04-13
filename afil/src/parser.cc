@@ -319,40 +319,59 @@ namespace parser
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<std::optional<incomplete::TypeId>, PartialSyntaxError>
 	{
 		using namespace incomplete;
-		std::string_view const name_to_look_up = tokens[index].source;
-		auto const it = std::find_if(type_names.rbegin(), type_names.rend(), [name_to_look_up](TypeName const & type_name) { return type_name.name == name_to_look_up; });
-		if (it == type_names.rend())
-			return std::nullopt;
-
-		index++;
-
-		int const found_index = static_cast<int>(&*it - type_names.data());
-
-		switch (it->type)
+		if (tokens[index].type == TokenType::arroba)
 		{
-			case TypeName::Type::type:
-			case TypeName::Type::template_parameter:
-			{
-				TypeId::BaseCase base_case;
-				base_case.name = name_to_look_up;
-				TypeId type;
-				type.is_mutable = false;
-				type.is_reference = false;
-				type.value = base_case;
+			// Skip @ token.
+			index++;
 
-				return parse_mutable_pointer_array_and_reference(tokens, index, type_names, std::move(type));
-			}
-			case TypeName::Type::struct_template:
-			{
-				TypeId::TemplateInstantiation template_instantiation;
-				template_instantiation.template_name = name_to_look_up;
-				try_call(assign_to(template_instantiation.parameters), parse_template_instantiation_parameter_list(tokens, index, type_names));
-				TypeId type;
-				type.is_mutable = false;
-				type.is_reference = false;
-				type.value = std::move(template_instantiation);
+			TypeId::TypeExpression type_expr;
+			try_call(assign_to(type_expr.expression), parse_expression(tokens, index, type_names));
+			TypeId type;
+			type.is_mutable = false;
+			type.is_reference = false;
+			type.value = std::move(type_expr);
+			return parse_mutable_pointer_array_and_reference(tokens, index, type_names, std::move(type));
+		}
+		else
+		{
+			if (tokens[index].type != TokenType::identifier)
+				return std::nullopt;
 
-				return parse_mutable_pointer_array_and_reference(tokens, index, type_names, std::move(type));
+			std::string_view const name_to_look_up = tokens[index].source;
+			auto const it = std::find_if(type_names.rbegin(), type_names.rend(), [name_to_look_up](TypeName const & type_name) { return type_name.name == name_to_look_up; });
+			if (it == type_names.rend())
+				return std::nullopt;
+
+			index++;
+
+			int const found_index = static_cast<int>(&*it - type_names.data());
+
+			switch (it->type)
+			{
+				case TypeName::Type::type:
+				case TypeName::Type::template_parameter:
+				{
+					TypeId::BaseCase base_case;
+					base_case.name = name_to_look_up;
+					TypeId type;
+					type.is_mutable = false;
+					type.is_reference = false;
+					type.value = base_case;
+
+					return parse_mutable_pointer_array_and_reference(tokens, index, type_names, std::move(type));
+				}
+				case TypeName::Type::struct_template:
+				{
+					TypeId::TemplateInstantiation template_instantiation;
+					template_instantiation.template_name = name_to_look_up;
+					try_call(assign_to(template_instantiation.parameters), parse_template_instantiation_parameter_list(tokens, index, type_names));
+					TypeId type;
+					type.is_mutable = false;
+					type.is_reference = false;
+					type.value = std::move(template_instantiation);
+
+					return parse_mutable_pointer_array_and_reference(tokens, index, type_names, std::move(type));
+				}
 			}
 		}
 
@@ -877,19 +896,26 @@ namespace parser
 			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (type.has_value())
 			{
-				if (tokens[index + 1].type == TokenType::period)
+				if (tokens[index].type == TokenType::open_parenthesis)
 				{
-					incomplete::expression::DesignatedInitializerConstructor ctor_node;
-					ctor_node.constructed_type = std::move(*type);
-					try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
-					return std::move(ctor_node);
+					if (tokens[index + 1].type == TokenType::period)
+					{
+						incomplete::expression::DesignatedInitializerConstructor ctor_node;
+						ctor_node.constructed_type = std::move(*type);
+						try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
+						return std::move(ctor_node);
+					}
+					else
+					{
+						incomplete::expression::Constructor ctor_node;
+						ctor_node.constructed_type = std::move(*type);
+						try_call(assign_to(ctor_node.parameters), parse_comma_separated_expression_list(tokens, index, type_names));
+						return std::move(ctor_node);
+					}
 				}
 				else
 				{
-					incomplete::expression::Constructor ctor_node;
-					ctor_node.constructed_type = std::move(*type);
-					try_call(assign_to(ctor_node.parameters), parse_comma_separated_expression_list(tokens, index, type_names));
-					return std::move(ctor_node);
+					return incomplete::expression::Literal<incomplete::TypeId>(std::move(*type));
 				}
 			}
 			else
@@ -1092,13 +1118,15 @@ namespace parser
 		// Skip the if
 		index++;
 
-		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after if.");
+		if (tokens[index].type != TokenType::open_parenthesis)
+			return make_syntax_error(tokens[index], "Expected '(' after if.");
 		index++;
 
 		incomplete::statement::If statement;
 		try_call(assign_to(statement.condition), parse_expression(tokens, index, type_names));
 
-		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after condition in if statement.");
+		if (tokens[index].type != TokenType::close_parenthesis) 
+			return make_syntax_error(tokens[index], "Expected ')' after condition in if statement.");
 		index++;
 
 		try_call(assign_to(statement.then_case), parse_statement(tokens, index, type_names));

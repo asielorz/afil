@@ -18,6 +18,10 @@ namespace incomplete
 		{
 			std::string name;
 		};
+		struct TypeExpression
+		{
+			value_ptr<Expression> expression;
+		};
 		struct Pointer
 		{
 			value_ptr<TypeId> pointee;
@@ -38,7 +42,7 @@ namespace incomplete
 		};
 		struct Deduce{};
 
-		std::variant<BaseCase, Pointer, Array, ArrayPointer, TemplateInstantiation, Deduce> value;
+		std::variant<BaseCase, TypeExpression, Pointer, Array, ArrayPointer, TemplateInstantiation, Deduce> value;
 		bool is_mutable : 1;
 		bool is_reference : 1;
 
