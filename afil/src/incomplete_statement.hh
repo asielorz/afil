@@ -75,11 +75,17 @@ namespace incomplete
 			StructTemplate declared_struct_template;
 		};
 
+		struct TypeAliasDeclaration
+		{
+			std::string_view name;
+			incomplete::TypeId type;
+		};
+
 		using Variant = std::variant<
 			VariableDeclaration, LetDeclaration, ExpressionStatement,
 			If, StatementBlock, While, For,
 			Return, Break, Continue,
-			StructDeclaration, StructTemplateDeclaration
+			StructDeclaration, StructTemplateDeclaration, TypeAliasDeclaration
 		>;
 
 	} // namespace statement

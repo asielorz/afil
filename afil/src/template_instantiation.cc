@@ -1535,6 +1535,16 @@ namespace instantiation
 				bind_struct_template_name(incomplete_statement.declared_struct_template.name, id, *program, scope_stack);
 
 				return std::nullopt;
+			},
+			[&](incomplete::statement::TypeAliasDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
+			{
+				if (does_name_collide(scope_stack, incomplete_statement.name))
+					return make_syntax_error(incomplete_statement.name, "Type alias name collides with another name.");
+
+				try_call_decl(complete::TypeId type, resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program));
+				bind_type_name(incomplete_statement.name, type, *program, scope_stack);
+
+				return std::nullopt;
 			}
 		);
 

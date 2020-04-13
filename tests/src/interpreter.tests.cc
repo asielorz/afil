@@ -2277,6 +2277,20 @@ TEST_CASE("Running a function out of contract at compile time is a compiler erro
 	REQUIRE(!program.has_value());
 }
 
+TEST_CASE("Type aliases")
+{
+	auto const src = R"(
+		type also_int = int;
+		
+		let main = fn() -> also_int
+		{
+			return 5;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(

@@ -1295,6 +1295,36 @@ namespace parser
 		return incomplete::statement::StructDeclaration{std::move(declared_struct)};
 	}
 
+	auto parse_type_alias(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept
+		-> expected<incomplete::statement::TypeAliasDeclaration, PartialSyntaxError>
+	{
+		// Skip type token.
+		index++;
+
+		if (tokens[index].type != TokenType::identifier)
+			return make_syntax_error(tokens[index].source, "Expected identifier after \"type\" keyword.");
+
+		std::string_view const alias_name = tokens[index].source;
+		if (is_keyword(alias_name))
+			return make_syntax_error(tokens[index].source, "Canot use a keyword as type alias name.");
+		index++;
+		
+		if (tokens[index].source != "=")
+			return make_syntax_error(tokens[index].source, "Expected '=' after type alias name.");
+		index++;
+
+		try_call_decl(auto type, parse_type_name(tokens, index, type_names));
+		if (!type.has_value())
+			return make_syntax_error(tokens[index].source, "Expected type after '=' in type alias declaration.");
+
+		type_names.push_back({alias_name, TypeName::Type::type});
+
+		incomplete::statement::TypeAliasDeclaration type_alias_statement;
+		type_alias_statement.name = alias_name;
+		type_alias_statement.type = std::move(*type);
+		return std::move(type_alias_statement);
+	}
+
 	auto parse_variable_declaration_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept 
 		-> expected<incomplete::statement::VariableDeclaration, PartialSyntaxError>
 	{
@@ -1353,6 +1383,8 @@ namespace parser
 			result = parse_break_or_continue_statement<incomplete::statement::Continue>(tokens, index, type_names);
 		else if (tokens[index].source == "struct")
 			return parse_struct_declaration(tokens, index, type_names);
+		else if (tokens[index].source == "type")
+			try_call(assign_to(result), parse_type_alias(tokens, index, type_names))
 		else
 		{
 			try_call_decl(auto parsed_type, parse_type_name(tokens, index, type_names));
