@@ -22,6 +22,17 @@ using namespace std::literals;
 namespace parser
 {
 
+	constexpr std::string_view type_keywords[] = {
+		// Built in types
+		"void",
+		"int",
+		"float",
+		"bool",
+		"char",
+		"type",
+		"uninit_t"
+	};
+
 	constexpr std::string_view keywords[] = {
 		// Control flow
 		"if",
@@ -32,14 +43,7 @@ namespace parser
 		"continue",
 
 		// Built in types
-		"void",
-		"int",
-		"float",
-		"bool",
-		"char",
-		"type",
 		"uninit",
-		"uninit_t"
 
 		// Declarations
 		"fn",
@@ -55,19 +59,6 @@ namespace parser
 		"xor",
 	};
 
-	auto built_in_type_names() noexcept -> std::vector<TypeName>
-	{
-		return {
-			{"void",		TypeName::Type::type},
-			{"int",			TypeName::Type::type},
-			{"float",		TypeName::Type::type},
-			{"bool",		TypeName::Type::type},
-			{"char",		TypeName::Type::type},
-			{"type",		TypeName::Type::type},
-			{"uninit_t",	TypeName::Type::type}
-		};
-	}
-
 	template <typename C>
 	auto is_name_locally_taken(std::string_view name_to_test, C const & registered_names) noexcept -> bool
 	{
@@ -77,11 +68,23 @@ namespace parser
 		return false;
 	}
 
-	auto is_keyword(std::string_view name) noexcept -> bool
+	auto is_non_type_keyword(std::string_view name) noexcept -> bool
+	{
+		return std::find(keywords, name) != std::end(keywords);
+
+	}
+
+	auto is_type_keyword(std::string_view name) noexcept -> bool
 	{
 		// TODO: Binary search
-		return std::find(keywords, std::end(keywords), name) != std::end(keywords);
+		return std::find(type_keywords, name) != std::end(type_keywords);
 	}
+
+	auto is_keyword(std::string_view name) noexcept -> bool
+	{
+		return is_type_keyword(name) || is_non_type_keyword(name);
+	}
+
 
 	auto parse_operator(std::string_view token_source) noexcept -> Operator
 	{
@@ -300,8 +303,7 @@ namespace parser
 		while (true)
 		{
 			try_call_decl(auto type, parse_type_name(tokens, index));
-			if (!type.has_value()) return make_syntax_error(tokens[index], "Expected type in template instantiation parameter list.");
-			template_parameters.push_back(std::move(*type));
+			template_parameters.push_back(std::move(type));
 
 			if (tokens[index].source == ">")
 				break;
@@ -319,7 +321,7 @@ namespace parser
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index) noexcept -> expected<incomplete::TypeId, PartialSyntaxError>
 	{
 		using namespace incomplete;
-		if (tokens[index].type != TokenType::identifier || is_keyword(tokens[index].source))
+		if (tokens[index].type != TokenType::identifier || is_non_type_keyword(tokens[index].source))
 			return make_syntax_error(tokens[index].source, "Expected type name.");
 
 		std::string_view const type_name = tokens[index].source;
@@ -348,8 +350,6 @@ namespace parser
 
 			return parse_mutable_pointer_array_and_reference(tokens, index, std::move(type));
 		}
-
-		declare_unreachable();
 	}
 
 	auto parse_template_parameter_list(span<lex::Token const> tokens, size_t & index) noexcept -> expected<std::vector<incomplete::TemplateParameter>, PartialSyntaxError>
@@ -484,8 +484,7 @@ namespace parser
 		{
 			incomplete::FunctionParameter var;
 			try_call_decl(auto type, parse_type_name(tokens, index));
-			if (!type.has_value()) return make_syntax_error(tokens[index], "Parameter type not found.");
-			var.type = std::move(*type);
+			var.type = std::move(type);
 
 			if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after function parameter type.");
 			if (is_keyword(tokens[index].source)) return make_syntax_error(tokens[index], "Cannot use a keyword as function parameter name.");
@@ -563,15 +562,9 @@ namespace parser
 		incomplete::FunctionTemplate function;
 		try_call(assign_to(function.template_parameters), parse_template_parameter_list(tokens, index));
 
-		size_t const type_name_stack_size = type_names.size();
-		for (incomplete::TemplateParameter const & param : function.template_parameters)
-			type_names.push_back({param.name, TypeName::Type::template_parameter});
-		
 		try_call_void(parse_function_prototype(tokens, index, out(function)));
 		try_call_void(parse_function_contract(tokens, index, out(function)));
 		try_call_void(parse_function_body(tokens, index, out(function)));
-
-		type_names.resize(type_name_stack_size);
 
 		return incomplete::expression::FunctionTemplate{std::move(function)};
 	}
@@ -675,12 +668,10 @@ namespace parser
 		incomplete::expression::StatementBlock node;
 
 		// Parse all statements in the function.
-		size_t const stack_size = type_names.size();
 		while (tokens[index].type != TokenType::close_brace)
 		{
 			try_call(node.statements.push_back, parse_statement(tokens, index));
 		}
-		type_names.resize(stack_size);
 
 		// Ensure that all branches return.
 		if (!all_branches_return(node.statements.back().variant)) return make_syntax_error(tokens[index], "Not all branches of statement block expression return.");
@@ -709,13 +700,11 @@ namespace parser
 			while (true)
 			{
 				try_call_decl(auto type, parse_type_name(tokens, index));
-				if (!type.has_value())
-					return make_syntax_error(tokens[index].source, "Expected type in parameter list of compiles expression.");
 
 				if (tokens[index].type != TokenType::identifier || is_keyword(tokens[index].source))
 					return make_syntax_error(tokens[index].source, "Expected name after type in parameter list of compiles expression.");
 
-				compiles_expr.variables.push_back({std::move(*type), tokens[index].source});
+				compiles_expr.variables.push_back({std::move(type), tokens[index].source});
 				index++;
 
 				if (tokens[index].type == TokenType::comma)
@@ -868,29 +857,28 @@ namespace parser
 		{
 			// It can be either a constructor call or the naming of a variable/function
 			try_call_decl(auto type, parse_type_name(tokens, index));
-			if (type.has_value())
+			if (auto const b = try_get<incomplete::TypeId::BaseCase>(type.value))
+			{
+				incomplete::expression::Identifier id_node;
+				id_node.name = tokens[index - 1].source;
+				return id_node;
+			}
+			else
 			{
 				if (tokens[index + 1].type == TokenType::period)
 				{
 					incomplete::expression::DesignatedInitializerConstructor ctor_node;
-					ctor_node.constructed_type = std::move(*type);
+					ctor_node.constructed_type = std::move(type);
 					try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index));
 					return std::move(ctor_node);
 				}
 				else
 				{
 					incomplete::expression::Constructor ctor_node;
-					ctor_node.constructed_type = std::move(*type);
+					ctor_node.constructed_type = std::move(type);
 					try_call(assign_to(ctor_node.parameters), parse_comma_separated_expression_list(tokens, index));
 					return std::move(ctor_node);
 				}
-			}
-			else
-			{
-				incomplete::expression::Identifier id_node;
-				id_node.name = tokens[index].source;
-				index++;
-				return id_node;
 			}
 		}
 		else if (is_unary_operator(tokens[index]))
@@ -1114,14 +1102,11 @@ namespace parser
 
 		incomplete::statement::StatementBlock statement_block;
 
-		size_t const stack_size = type_names.size();
-
 		// Parse all statements in the function.
 		while (tokens[index].type != TokenType::close_brace)
 		{
 			try_call(statement_block.statements.push_back, parse_statement(tokens, index));
 		}
-		type_names.resize(stack_size);
 
 		// Skip closing brace.
 		index++;
@@ -1166,7 +1151,6 @@ namespace parser
 		index++;
 
 		incomplete::statement::For for_statement;
-		size_t const stack_size = type_names.size();
 
 		// Parse init statement. Must be an expression or a declaration.
 		try_call_decl(incomplete::Statement init_statement, parse_statement(tokens, index));
@@ -1190,8 +1174,6 @@ namespace parser
 
 		// Parse body
 		try_call(assign_to(for_statement.body), parse_statement(tokens, index));
-
-		type_names.resize(stack_size);
 
 		return std::move(for_statement);
 	}
@@ -1226,9 +1208,7 @@ namespace parser
 		while (tokens[index].type != TokenType::close_brace)
 		{
 			incomplete::MemberVariable var;
-			try_call_decl(auto var_type, parse_type_name(tokens, index));
-			if (!var_type.has_value()) return make_syntax_error(tokens[index], "Expected type in struct member declaration.");
-			var.type = std::move(*var_type);
+			try_call(assign_to(var.type), parse_type_name(tokens, index));
 			if (var.type.is_reference) return make_syntax_error(tokens[index], "Member variable cannot be reference.");
 			if (var.type.is_mutable) return make_syntax_error(tokens[index], "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
 
@@ -1262,15 +1242,7 @@ namespace parser
 		incomplete::StructTemplate struct_template;
 		try_call(assign_to(struct_template.template_parameters), parse_template_parameter_list(tokens, index));
 
-		size_t const type_name_stack_size = type_names.size();
-		for (incomplete::TemplateParameter const & param : struct_template.template_parameters)
-			type_names.push_back({param.name, TypeName::Type::template_parameter});
-
 		try_call(assign_to(static_cast<incomplete::Struct &>(struct_template)), parse_struct(tokens, index));
-
-		type_names.resize(type_name_stack_size);
-
-		type_names.push_back({struct_template.name, TypeName::Type::struct_template});
 
 		return incomplete::statement::StructTemplateDeclaration{struct_template};
 	}
@@ -1284,7 +1256,6 @@ namespace parser
 			return parse_struct_template_declaration(tokens, index);
 
 		try_call_decl(incomplete::Struct declared_struct, parse_struct(tokens, index));
-		type_names.push_back({declared_struct.name, TypeName::Type::type});
 		return incomplete::statement::StructDeclaration{std::move(declared_struct)};
 	}
 
@@ -1307,14 +1278,10 @@ namespace parser
 		index++;
 
 		try_call_decl(auto type, parse_type_name(tokens, index));
-		if (!type.has_value())
-			return make_syntax_error(tokens[index].source, "Expected type after '=' in type alias declaration.");
-
-		type_names.push_back({alias_name, TypeName::Type::type});
 
 		incomplete::statement::TypeAliasDeclaration type_alias_statement;
 		type_alias_statement.name = alias_name;
-		type_alias_statement.type = std::move(*type);
+		type_alias_statement.type = std::move(type);
 		return std::move(type_alias_statement);
 	}
 
@@ -1372,7 +1339,6 @@ namespace parser
 
 	auto parse_global_scope(
 		span<lex::Token const> tokens,
-		std::vector<TypeName> & type_names,
 		std::vector<incomplete::Statement> global_initialization_statements
 	) noexcept -> expected<std::vector<incomplete::Statement>, PartialSyntaxError>
 	{
@@ -1389,64 +1355,8 @@ namespace parser
 
 		return global_initialization_statements;
 	}
-
-	auto parse_type_names(span<lex::Token const> tokens, std::vector<TypeName> type_names) noexcept -> std::vector<TypeName>
-	{
-		int brace_level = 0;
-
-		for (size_t i = 0; i < tokens.size(); ++i)
-		{
-			if (tokens[i].type == TokenType::open_brace)
-			{
-				brace_level++;
-			}
-			else if (tokens[i].type == TokenType::close_brace)
-			{
-				brace_level--;
-			}
-			else if (brace_level == 0 && tokens[i].source == "struct")
-			{
-				i++;
-				if (i < tokens.size())
-				{
-					if (tokens[i].source == "<")
-					{
-						while (i < tokens.size() && tokens[i].source != ">")
-							i++;
-						i++;
-
-						if (i < tokens.size() && tokens[i].type == TokenType::identifier && !is_keyword(tokens[i].source))
-						{
-							type_names.push_back({tokens[i].source, TypeName::Type::struct_template});
-						}
-					}
-					else
-					{
-						if (tokens[i].type == TokenType::identifier && !is_keyword(tokens[i].source))
-						{
-							type_names.push_back({tokens[i].source, TypeName::Type::type});
-						}
-					}
-				}
-			}
-		}
-
-		return type_names;
-	}
-
-	auto scan_type_names(
-		span<incomplete::Module const> modules,
-		span<std::vector<TypeName> const> module_type_names, int index,
-		out<std::vector<TypeName>> type_names) noexcept -> void
-	{
-		for (TypeName const & type_name : module_type_names[index])
-			type_names->push_back(type_name);
-
-		for (int const dependency_index : modules[index].dependencies)
-			scan_type_names(modules, module_type_names, dependency_index);
-	}
-
-	[[nodiscard]] auto parse_module(span<incomplete::Module> modules, int index, span<std::vector<TypeName>> module_type_names) noexcept -> expected<void, SyntaxError>
+	
+	[[nodiscard]] auto parse_module(span<incomplete::Module> modules, int index) noexcept -> expected<void, SyntaxError>
 	{
 		std::vector<lex::Token> tokens;
 		for (auto const & file : modules[index].files)
@@ -1458,11 +1368,6 @@ namespace parser
 				return Error(complete_syntax_error(new_tokens.error(), file.source, file.filename));
 		}
 
-		std::vector<TypeName> type_names = built_in_type_names();
-		scan_type_names(modules, module_type_names, index, out(type_names));
-		type_names = parse_type_names(tokens, std::move(type_names));
-		size_t const imported_type_count = type_names.size();
-
 		auto statements = parse_global_scope(tokens);
 		if (!statements.has_value())
 		{
@@ -1470,8 +1375,6 @@ namespace parser
 			return Error(complete_syntax_error(std::move(statements.error()), file.source, file.filename));
 		}
 
-		type_names.erase(type_names.begin().begin() + imported_type_count);
-		module_type_names[index] = std::move(type_names);
 		modules[index].statements = std::move(*statements);
 
 		return success;
@@ -1480,10 +1383,9 @@ namespace parser
 	[[nodiscard]] auto parse_modules(span<incomplete::Module> modules) noexcept -> expected<std::vector<int>, SyntaxError>
 	{
 		try_call_decl(std::vector<int> const sorted_modules, sort_modules_by_dependencies(modules));
-		std::vector<std::vector<TypeName>> module_type_names(modules.size());
 
 		for (int i : sorted_modules)
-			try_call_void(parse_module(modules, i, module_type_names));
+			try_call_void(parse_module(modules, i));
 
 		return sorted_modules;
 	}
