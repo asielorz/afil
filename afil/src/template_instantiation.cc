@@ -1147,8 +1147,7 @@ namespace instantiation
 				for (incomplete::CompilesFakeVariable const & fake_var : incomplete_expression.variables)
 				{
 					try_call_decl(complete::Expression type_expr, instantiate_expression(fake_var.type, template_parameters, scope_stack, program, current_scope_return_type));
-					if (expression_type_id(type_expr, *program) != complete::TypeId::type)
-						return make_syntax_error(fake_var.type.source, "Expected type in parameter list of compiles expression.");
+					try_call(assign_to(type_expr), insert_conversion_node(std::move(type_expr), complete::TypeId::type, *program));
 					if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
 						return make_syntax_error(fake_var.type.source, "Type in parameter list of compiles must be a constant expression.");
 
