@@ -21,7 +21,7 @@ using namespace std::literals;
 
 [[nodiscard]] auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> expected<void, PartialSyntaxError>
 {
-	if (!is_constant_expression(expression, program, constant_base_index)) return make_syntax_error("Cannot evaluate expression at compile time.");
+	assert(is_constant_expression(expression, program, constant_base_index));
 
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 256);
@@ -1128,9 +1128,16 @@ namespace instantiation
 			[&](incomplete::expression::Compiles const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				complete::Scope fake_scope;
-				for (incomplete::expression::Compiles::FakeVariable const & fake_var : incomplete_expression.variables)
+				for (incomplete::CompilesFakeVariable const & fake_var : incomplete_expression.variables)
 				{
-					try_call_decl(complete::TypeId const var_type, resolve_dependent_type(fake_var.type, template_parameters, scope_stack, program));
+					try_call_decl(complete::Expression type_expr, instantiate_expression(fake_var.type, template_parameters, scope_stack, program, current_scope_return_type));
+					if (expression_type_id(type_expr, *program) != complete::TypeId::type)
+						return make_syntax_error(fake_var.type.source, "Expected type in parameter list of compiles expression.");
+					if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
+						return make_syntax_error(fake_var.type.source, "Type in parameter list of compiles must be a constant expression.");
+
+					try_call_decl(auto const var_type, evaluate_constant_expression_as<complete::TypeId>(type_expr, *program, next_block_scope_offset(scope_stack)));
+
 					add_variable_to_scope(fake_scope, fake_var.name, var_type, 0, *program);
 				}
 				auto const guard = push_block_scope(scope_stack, fake_scope);

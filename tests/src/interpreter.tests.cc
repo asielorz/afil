@@ -2275,6 +2275,50 @@ TEST_CASE("Type aliases")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("Type of a variable in compiles block may be a expression")
+{
+	auto const src = R"(
+		let identity = fn(type t) { return t; };
+		
+		let main = fn() -> int
+		{
+			let condition = compiles(int i, identity(int) j)
+			{
+				{i + j} -> int
+			};
+
+			if (condition)
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
+TEST_CASE("Template function that takes a type")
+{
+	auto const src = R"(
+		let identity = fn<T>(T t) { return t; };
+		
+		let main = fn() -> int
+		{
+			let condition = compiles(int i, identity(int) j)
+			{
+				{i + j} -> int
+			};
+
+			if (condition)
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(

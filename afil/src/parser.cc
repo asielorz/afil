@@ -715,14 +715,12 @@ namespace parser
 
 			while (true)
 			{
-				try_call_decl(auto type, parse_type_name(tokens, index, type_names));
-				if (!type.has_value())
-					return make_syntax_error(tokens[index].source, "Expected type in parameter list of compiles expression.");
+				try_call_decl(auto type_expr, parse_expression(tokens, index, type_names));
 
 				if (tokens[index].type != TokenType::identifier || is_keyword(tokens[index].source))
 					return make_syntax_error(tokens[index].source, "Expected name after type in parameter list of compiles expression.");
 
-				compiles_expr.variables.push_back({std::move(*type), tokens[index].source});
+				compiles_expr.variables.push_back({std::move(type_expr), tokens[index].source});
 				index++;
 
 				if (tokens[index].type == TokenType::comma)

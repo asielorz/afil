@@ -10,6 +10,7 @@ namespace incomplete
 	struct Statement;
 	struct Expression;
 	struct DesignatedInitializer;
+	struct CompilesFakeVariable;
 	struct ExpressionToTest;
 
 	namespace expression
@@ -120,14 +121,7 @@ namespace incomplete
 
 		struct Compiles
 		{
-			struct FakeVariable
-			{
-				TypeId type;
-				std::string_view name;
-			};
-			
-
-			std::vector<FakeVariable> variables;
+			std::vector<CompilesFakeVariable> variables;
 			std::vector<ExpressionToTest> body;
 		};
 
@@ -178,6 +172,12 @@ namespace incomplete
 	{
 		std::string_view member_name;
 		Expression assigned_expression;
+	};
+
+	struct CompilesFakeVariable
+	{
+		Expression type;
+		std::string_view name;
 	};
 
 	struct ExpressionToTest
