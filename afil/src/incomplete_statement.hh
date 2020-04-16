@@ -71,7 +71,7 @@ namespace incomplete
 		struct TypeAliasDeclaration
 		{
 			std::string_view name;
-			incomplete::TypeId type;
+			Expression type;
 		};
 
 		using Variant = std::variant<

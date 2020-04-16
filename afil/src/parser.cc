@@ -1318,15 +1318,13 @@ namespace parser
 			return make_syntax_error(tokens[index].source, "Expected '=' after type alias name.");
 		index++;
 
-		try_call_decl(auto type, parse_type_name(tokens, index, type_names));
-		if (!type.has_value())
-			return make_syntax_error(tokens[index].source, "Expected type after '=' in type alias declaration.");
+		try_call_decl(auto type, parse_expression(tokens, index, type_names));
 
 		type_names.push_back({alias_name, TypeName::Type::type});
 
 		incomplete::statement::TypeAliasDeclaration type_alias_statement;
 		type_alias_statement.name = alias_name;
-		type_alias_statement.type = std::move(*type);
+		type_alias_statement.type = std::move(type);
 		return std::move(type_alias_statement);
 	}
 

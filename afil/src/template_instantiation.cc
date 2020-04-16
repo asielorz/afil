@@ -1481,7 +1481,14 @@ namespace instantiation
 				if (does_name_collide(scope_stack, incomplete_statement.name))
 					return make_syntax_error(incomplete_statement.name, "Type alias name collides with another name.");
 
-				try_call_decl(complete::TypeId type, resolve_dependent_type(incomplete_statement.type, template_parameters, scope_stack, program));
+				try_call_decl(complete::Expression type_expr, instantiate_expression(incomplete_statement.type, template_parameters, scope_stack, program, current_scope_return_type));
+				if (expression_type_id(type_expr, *program) != complete::TypeId::type)
+					return make_syntax_error(incomplete_statement.type.source, "Expected type after '=' in type alias declaration.");
+				if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
+					return make_syntax_error(incomplete_statement.type.source, "Type in type alias declaration must be a constant expression.");
+
+				try_call_decl(auto const type, evaluate_constant_expression_as<complete::TypeId>(type_expr, *program, next_block_scope_offset(scope_stack)));
+
 				bind_type_name(incomplete_statement.name, type, *program, scope_stack);
 
 				return std::nullopt;

@@ -2319,6 +2319,22 @@ TEST_CASE("Template function that takes a type")
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
+TEST_CASE("A type alias may take a constant expression returning a type as a parameter, not just a type literal")
+{
+	auto const src = R"(
+		let identity = fn<T>(T t) { return t; };
+		
+		type also_int = identity(int);
+		
+		let main = fn() -> also_int
+		{
+			return 5;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 //TEST_CASE("Functions that take types as parameters")
 //{
 //	auto const src = R"(
