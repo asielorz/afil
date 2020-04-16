@@ -318,7 +318,7 @@ namespace parser
 		return template_parameters;
 	}
 
-	auto parse_type_name(span<lex::Token const> tokens, size_t & index) noexcept -> expected<incomplete::TypeId, PartialSyntaxError>
+	auto parse_type_name_identifier(span<lex::Token const> tokens, size_t & index) noexcept -> expected<incomplete::TypeId, PartialSyntaxError>
 	{
 		using namespace incomplete;
 		if (tokens[index].type != TokenType::identifier || is_non_type_keyword(tokens[index].source))
@@ -337,7 +337,7 @@ namespace parser
 			type.is_reference = false;
 			type.value = std::move(template_instantiation);
 
-			return parse_mutable_pointer_array_and_reference(tokens, index, std::move(type));
+			return std::move(type);
 		}
 		else
 		{
@@ -348,8 +348,14 @@ namespace parser
 			type.is_reference = false;
 			type.value = base_case;
 
-			return parse_mutable_pointer_array_and_reference(tokens, index, std::move(type));
+			return std::move(type);
 		}
+	}
+
+	auto parse_type_name(span<lex::Token const> tokens, size_t & index) noexcept -> expected<incomplete::TypeId, PartialSyntaxError>
+	{
+		try_call_decl(incomplete::TypeId type, parse_type_name_identifier(tokens, index));
+		return parse_mutable_pointer_array_and_reference(tokens, index, std::move(type));
 	}
 
 	auto parse_template_parameter_list(span<lex::Token const> tokens, size_t & index) noexcept -> expected<std::vector<incomplete::TemplateParameter>, PartialSyntaxError>
@@ -857,7 +863,7 @@ namespace parser
 		else if (tokens[index].type == TokenType::identifier)
 		{
 			// It can be either a constructor call or the naming of a variable/function
-			try_call_decl(auto type, parse_type_name(tokens, index));
+			try_call_decl(auto type, parse_type_name_identifier(tokens, index));
 			if (auto const b = try_get<incomplete::TypeId::BaseCase>(type.value))
 			{
 				incomplete::expression::Identifier id_node;
