@@ -57,6 +57,7 @@ namespace complete
 		std::vector<Statement> statements;
 		std::string ABI_name;
 		bool is_callable_at_compile_time;
+		bool is_callable_at_runtime;
 	};
 
 	struct ExternFunction
@@ -214,6 +215,7 @@ namespace complete
 	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>;
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool;
+	auto is_callable_at_runtime(Program const & program, FunctionId id) noexcept -> bool;
 
 	auto ABI_name(Program & program, FunctionId id) noexcept -> std::string &;
 	auto ABI_name(Program const & program, FunctionId id) noexcept -> std::string_view;

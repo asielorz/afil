@@ -423,6 +423,16 @@ namespace complete
 			return program.functions[id.index].is_callable_at_compile_time;
 	}
 
+	auto is_callable_at_runtime(Program const & program, FunctionId id) noexcept -> bool
+	{
+		if (id.type == FunctionId::Type::instrinsic)
+			return true;
+		else if (id.type == FunctionId::Type::imported)
+			return true;
+		else
+			return program.functions[id.index].is_callable_at_runtime;
+	}
+
 	auto ABI_name(Program & program, FunctionId id) noexcept -> std::string &
 	{
 		assert(id.type != FunctionId::Type::instrinsic);

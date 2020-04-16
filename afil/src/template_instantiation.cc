@@ -547,6 +547,7 @@ namespace instantiation
 		scope_stack.pop_back();
 
 		function->is_callable_at_compile_time = can_be_run_in_a_constant_expression(*function, *program);
+		function->is_callable_at_runtime = can_be_run_at_runtime(*function, *program);
 
 		return success;
 	}
