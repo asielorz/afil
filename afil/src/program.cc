@@ -745,7 +745,7 @@ namespace complete
 
 				if (!discard)
 				{
-					candidates[candidate_count++] = Candidate{ conversions, function_id };
+					candidates[candidate_count++] = Candidate{conversions, function_id};
 				}
 			}
 		}

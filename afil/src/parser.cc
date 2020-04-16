@@ -392,7 +392,8 @@ namespace parser
 	{
 		std::vector<incomplete::Expression> parsed_expressions;
 
-		if (tokens[index].type != opener) return make_syntax_error(tokens[index], "Expected '('.");
+		if (tokens[index].type != opener)
+			return make_syntax_error(tokens[index], "Expected '('.");
 		index++;
 
 		// Check for empty list.
