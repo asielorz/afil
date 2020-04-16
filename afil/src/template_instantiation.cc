@@ -42,15 +42,6 @@ auto evaluate_constant_expression_as(complete::Expression const & expression, co
 	return result;
 }
 
-auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> expected<int, PartialSyntaxError>
-{
-	try_call(assign_to(expression), insert_conversion_node(std::move(expression), complete::TypeId::int_, program));
-	auto result = evaluate_constant_expression_as<int>(expression, program, constant_base_index);
-	if (!result)
-		return make_syntax_error("Unmet precondition at evaluating constant expression.");
-	return *result;
-}
-
 namespace instantiation
 {
 	auto top(ScopeStack & scope_stack) noexcept -> complete::Scope & { return *scope_stack.back().scope; }
@@ -152,6 +143,28 @@ namespace instantiation
 		return nullptr;
 	}
 
+	auto instantiate_and_evaluate_array_size_expression(
+		incomplete::Expression const & expression,
+		out<complete::Program> program,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack
+	) noexcept -> expected<int, PartialSyntaxError>
+	{
+		int const constant_base_index = next_block_scope_offset(scope_stack);
+
+		try_call_decl(complete::Expression size_expr, instantiate_expression(expression, template_parameters, scope_stack, program, nullptr));
+		if (!is_constant_expression(size_expr, *program, constant_base_index))
+			return make_syntax_error(expression.source, "Array size must be a constant expression.");
+
+		try_call(assign_to(size_expr), insert_conversion_node(std::move(size_expr), complete::TypeId::int_, *program));
+
+		auto result = evaluate_constant_expression_as<int>(size_expr, *program, constant_base_index);
+		if (!result)
+			return make_syntax_error(expression.source, "Unmet precondition at evaluating constant expression.");
+
+		return *result;
+	}
+
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type, 
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -164,7 +177,7 @@ namespace instantiation
 			{
 				complete::TypeId const type = type_with_name(base_case.name, scope_stack, template_parameters);
 				if (type == complete::TypeId::none) 
-					return make_syntax_error(join("Type not found: ", base_case.name));
+					return make_syntax_error(base_case.name, join("Type not found: ", base_case.name));
 				return type;
 			},
 			[&](incomplete::TypeId::Pointer const & pointer) -> expected<complete::TypeId, PartialSyntaxError>
@@ -176,8 +189,7 @@ namespace instantiation
 			{
 				try_call_decl(complete::TypeId const value_type, resolve_dependent_type(*array.value_type, template_parameters, scope_stack, program));
 
-				try_call_decl(complete::Expression size_expr, instantiate_expression(*array.size, template_parameters, scope_stack, program, nullptr));
-				try_call_decl(int const size, evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack)));
+				try_call_decl(int const size, instantiate_and_evaluate_array_size_expression(*array.size, program, template_parameters, scope_stack));
 				return array_type_for(value_type, size, *program);
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> expected<complete::TypeId, PartialSyntaxError>
@@ -255,9 +267,8 @@ namespace instantiation
 				try_call(assign_to(array_type.value_type), 
 					resolve_function_template_parameter_type(*array.value_type, resolved_template_parameters, unresolved_template_parameters, scope_stack, program));
 
-				try_call_decl(complete::Expression size_expr, instantiate_expression(*array.size, resolved_template_parameters, scope_stack, program, nullptr));
-				try_call(assign_to(array_type.size), evaluate_array_size_expression(std::move(size_expr), *program, next_block_scope_offset(scope_stack)));
-				return complete::FunctionTemplateParameterType{std::move(array_type), false, false};
+				try_call(assign_to(array_type.size), instantiate_and_evaluate_array_size_expression(*array.size, program, resolved_template_parameters, scope_stack));
+				return complete::FunctionTemplateParameterType{ std::move(array_type), false, false };
 			},
 			[&](incomplete::TypeId::ArrayPointer const & array_pointer) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
@@ -270,7 +281,7 @@ namespace instantiation
 			{
 				auto const template_id = struct_template_with_name(template_instantiation.template_name, scope_stack);
 				if (!template_id.has_value())
-					return make_syntax_error("Struct template not found");
+					return make_syntax_error(template_instantiation.template_name, "Struct template not found");
 
 				complete::FunctionTemplateParameterType::TemplateInstantiation template_instantiation_type;
 				template_instantiation_type.template_id = *template_id;
