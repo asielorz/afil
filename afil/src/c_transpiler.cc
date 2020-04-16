@@ -191,6 +191,7 @@ namespace c_transpiler
 			[&](expression::Literal<float>) { return true; },
 			[&](expression::Literal<bool>) { return true; },
 			[&](expression::Literal<uninit_t>) { return false; },
+			[&](expression::Literal<TypeId>) { return false; },
 			[&](expression::StringLiteral) { return true; },
 			[&](expression::LocalVariable const &) { return true; },
 			[&](expression::GlobalVariable const &) { return true; },
@@ -231,7 +232,8 @@ namespace c_transpiler
 				c_source += literal.value ? "1" : "0"; 
 			},
 			[&](expression::Literal<uninit_t>) {},
-			[&](expression::StringLiteral literal) 
+			[&](expression::Literal<TypeId>) { declare_unreachable(); },
+			[&](expression::StringLiteral literal)
 			{
 				c_source += join('"', literal.value, '"'); 
 			},
@@ -363,6 +365,7 @@ namespace c_transpiler
 				[&](expression::Literal<float>) { declare_unreachable(); },
 				[&](expression::Literal<bool>)	{ declare_unreachable(); },
 				[&](expression::Literal<uninit_t>) {},
+				[&](expression::Literal<TypeId>) { declare_unreachable(); },
 				[&](expression::StringLiteral)	{ declare_unreachable(); },
 				[&](expression::LocalVariable const &)	{ declare_unreachable(); },
 				[&](expression::GlobalVariable const &) { declare_unreachable(); },

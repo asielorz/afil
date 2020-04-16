@@ -585,6 +585,12 @@ namespace instantiation
 			{
 				return complete::expression::Literal<uninit_t>();
 			},
+			[&](incomplete::expression::Literal<incomplete::TypeId> const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
+			{
+				complete::expression::Literal<complete::TypeId> complete_expression;
+				try_call(assign_to(complete_expression.value), resolve_dependent_type(incomplete_expression.value, template_parameters, scope_stack, program));
+				return complete_expression;
+			},
 			[&](incomplete::expression::Identifier const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				auto const lookup = lookup_name(scope_stack, incomplete_expression.name);
