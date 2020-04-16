@@ -19,16 +19,15 @@
 
 using namespace std::literals;
 
-[[nodiscard]] auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept -> expected<void, PartialSyntaxError>
+[[nodiscard]] auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept
+	-> expected<void, interpreter::UnmetPrecondition>
 {
 	assert(is_constant_expression(expression, program, constant_base_index));
 
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 256);
 
-	auto const eval_result = interpreter::eval_expression(expression, stack, program);
-	if (!eval_result.has_value())
-		return make_syntax_error("Precondition not met");
+	try_call_void(interpreter::eval_expression(expression, stack, program));
 
 	memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
 
@@ -36,7 +35,7 @@ using namespace std::literals;
 }
 
 template <typename T>
-auto evaluate_constant_expression_as(complete::Expression const & expression, complete::Program const & program, int constant_base_index) noexcept -> expected<T, PartialSyntaxError>
+auto evaluate_constant_expression_as(complete::Expression const & expression, complete::Program const & program, int constant_base_index) noexcept -> expected<T, interpreter::UnmetPrecondition>
 {
 	T result;
 	try_call_void(evaluate_constant_expression(expression, program, constant_base_index, &result));
@@ -46,7 +45,10 @@ auto evaluate_constant_expression_as(complete::Expression const & expression, co
 auto evaluate_array_size_expression(complete::Expression expression, complete::Program const & program, int constant_base_index) noexcept -> expected<int, PartialSyntaxError>
 {
 	try_call(assign_to(expression), insert_conversion_node(std::move(expression), complete::TypeId::int_, program));
-	return evaluate_constant_expression_as<int>(expression, program, constant_base_index);
+	auto result = evaluate_constant_expression_as<int>(expression, program, constant_base_index);
+	if (!result)
+		return make_syntax_error("Unmet precondition at evaluating constant expression.");
+	return *result;
 }
 
 namespace instantiation
@@ -931,9 +933,11 @@ namespace instantiation
 
 				if (is_constant_expression(condition, *program, next_block_scope_offset(scope_stack)))
 				{
-					try_call_decl(bool const condition_value, evaluate_constant_expression_as<bool>(condition, *program, next_block_scope_offset(scope_stack)));
+					auto const condition_value = evaluate_constant_expression_as<bool>(condition, *program, next_block_scope_offset(scope_stack));
+					if (!condition_value.has_value())
+						return make_syntax_error(incomplete_expression.condition->source, "Unmet precondition at evaluating constant expression.");
 
-					if (condition_value)
+					if (condition_value.value())
 						return instantiate_expression(*incomplete_expression.then_case, template_parameters, scope_stack, program, current_scope_return_type);
 					else
 						return instantiate_expression(*incomplete_expression.else_case, template_parameters, scope_stack, program, current_scope_return_type);
@@ -1136,9 +1140,11 @@ namespace instantiation
 					if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
 						return make_syntax_error(fake_var.type.source, "Type in parameter list of compiles must be a constant expression.");
 
-					try_call_decl(auto const var_type, evaluate_constant_expression_as<complete::TypeId>(type_expr, *program, next_block_scope_offset(scope_stack)));
+					auto const var_type = evaluate_constant_expression_as<complete::TypeId>(type_expr, *program, next_block_scope_offset(scope_stack));
+					if (!var_type.has_value())
+						return make_syntax_error(fake_var.type.source, "Unmet precondition at evaluating constant expression.");
 
-					add_variable_to_scope(fake_scope, fake_var.name, var_type, 0, *program);
+					add_variable_to_scope(fake_scope, fake_var.name, var_type.value(), 0, *program);
 				}
 				auto const guard = push_block_scope(scope_stack, fake_scope);
 
@@ -1249,7 +1255,9 @@ namespace instantiation
 					constant.name = incomplete_statement.variable_name;
 
 					try_call(assign_to(expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
-					try_call_void(evaluate_constant_expression(expression, *program, next_block_scope_offset(scope_stack), constant.value.data()));
+					auto const eval_result = evaluate_constant_expression(expression, *program, next_block_scope_offset(scope_stack), constant.value.data());
+					if (!eval_result.has_value())
+						return make_syntax_error(incomplete_statement.assigned_expression.source, "Unmet precondition at evaluating constant expression.");
 
 					if (does_name_collide(scope_stack, incomplete_statement.variable_name)) 
 						return make_syntax_error(incomplete_statement.variable_name, "Constant name collides with another name.");
@@ -1288,9 +1296,11 @@ namespace instantiation
 
 				if (is_constant_expression(condition, *program, next_block_scope_offset(scope_stack)))
 				{
-					try_call_decl(bool const condition_value, evaluate_constant_expression_as<bool>(condition, *program, next_block_scope_offset(scope_stack)));
+					auto const condition_value = evaluate_constant_expression_as<bool>(condition, *program, next_block_scope_offset(scope_stack));
+					if (!condition_value.has_value())
+						return make_syntax_error(incomplete_statement.condition.source, "Unmet precondition at evaluating constant expression.");
 
-					if (condition_value)
+					if (condition_value.value())
 					{
 						try_call_decl(auto then_case, instantiate_statement(*incomplete_statement.then_case, template_parameters, scope_stack, program, current_scope_return_type));
 						if (!then_case.has_value())
@@ -1487,9 +1497,11 @@ namespace instantiation
 				if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
 					return make_syntax_error(incomplete_statement.type.source, "Type in type alias declaration must be a constant expression.");
 
-				try_call_decl(auto const type, evaluate_constant_expression_as<complete::TypeId>(type_expr, *program, next_block_scope_offset(scope_stack)));
+				auto const type = evaluate_constant_expression_as<complete::TypeId>(type_expr, *program, next_block_scope_offset(scope_stack));
+				if (!type.has_value())
+					return make_syntax_error(incomplete_statement.type.source, "Unmet precondition at evaluating constant expression.");
 
-				bind_type_name(incomplete_statement.name, type, *program, scope_stack);
+				bind_type_name(incomplete_statement.name, type.value(), *program, scope_stack);
 
 				return std::nullopt;
 			}
