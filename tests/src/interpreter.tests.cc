@@ -2335,29 +2335,29 @@ TEST_CASE("A type alias may take a constant expression returning a type as a par
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
-//TEST_CASE("Functions that take types as parameters")
-//{
-//	auto const src = R"(
-//		let is_ordered = fn(type t) -> bool
-//		{
-//			return compiles(t i, t j)
-//			{
-//				{i == j} -> bool;
-//				{3 <=> 4} -> int
-//			};
-//		};
-//
-//		let main = fn() -> int
-//		{
-//			if (is_ordered(int))
-//				return 1;
-//			else
-//				return 0;
-//		};
-//	)"sv;
-//
-//	REQUIRE(tests::parse_and_run(src) == 1);
-//}
+TEST_CASE("Functions that take types as parameters")
+{
+	auto const src = R"(
+		let is_ordered = fn(type t) -> bool
+		{
+			return compiles(t i, t j)
+			{
+				{i == j} -> bool;
+				{3 <=> 4} -> int
+			};
+		};
+
+		let main = fn() -> int
+		{
+			if (is_ordered(int))
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
 
 /*****************************************************************
 Backlog

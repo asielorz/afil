@@ -1532,16 +1532,17 @@ namespace instantiation
 		size_t extern_functions;
 		size_t function_templates;
 		FunctionId main_function;
-
-		// Global scope
-		int global_scope_stack_frame_size;
-		int global_scope_stack_frame_alignment;
-		size_t global_scope_variables;
-		size_t global_scope_constants;
-		size_t global_scope_functions;
-		size_t global_scope_types;
-		size_t global_scope_function_templates;
-		size_t global_scope_struct_templates;
+	};
+	struct ScopeState
+	{
+		int stack_frame_size;
+		int stack_frame_alignment;
+		size_t variables;
+		size_t constants;
+		size_t functions;
+		size_t types;
+		size_t function_templates;
+		size_t struct_templates;
 	};
 	auto capture_state(complete::Program const & program) noexcept -> ProgramState
 	{
@@ -1556,16 +1557,22 @@ namespace instantiation
 		program_state.function_templates = program.function_templates.size();
 		program_state.main_function = program.main_function;
 
-		program_state.global_scope_stack_frame_size = program.global_scope.stack_frame_size;
-		program_state.global_scope_stack_frame_alignment = program.global_scope.stack_frame_alignment;
-		program_state.global_scope_variables = program.global_scope.variables.size();
-		program_state.global_scope_constants = program.global_scope.constants.size();
-		program_state.global_scope_functions = program.global_scope.functions.size();
-		program_state.global_scope_types = program.global_scope.types.size();
-		program_state.global_scope_function_templates = program.global_scope.function_templates.size();
-		program_state.global_scope_struct_templates = program.global_scope.struct_templates.size();
-
 		return program_state;
+	}
+	auto capture_state(complete::Scope const & scope) noexcept -> ScopeState
+	{
+		ScopeState scope_state;
+
+		scope_state.stack_frame_size = scope.stack_frame_size;
+		scope_state.stack_frame_alignment = scope.stack_frame_alignment;
+		scope_state.variables = scope.variables.size();
+		scope_state.constants = scope.constants.size();
+		scope_state.functions = scope.functions.size();
+		scope_state.types = scope.types.size();
+		scope_state.function_templates = scope.function_templates.size();
+		scope_state.struct_templates = scope.struct_templates.size();
+
+		return scope_state;
 	}
 
 	auto restore_state(out<complete::Program> program, ProgramState const & program_state) noexcept -> void
@@ -1578,15 +1585,17 @@ namespace instantiation
 		program->extern_functions.resize(program_state.extern_functions);
 		program->function_templates.resize(program_state.function_templates);
 		program->main_function = program_state.main_function;
-
-		program->global_scope.stack_frame_size = program_state.global_scope_stack_frame_size;
-		program->global_scope.stack_frame_alignment = program_state.global_scope_stack_frame_alignment;
-		program->global_scope.variables.resize(program_state.global_scope_variables);
-		program->global_scope.constants.resize(program_state.global_scope_constants);
-		program->global_scope.functions.resize(program_state.global_scope_functions);
-		program->global_scope.types.resize(program_state.global_scope_types);
-		program->global_scope.function_templates.resize(program_state.global_scope_function_templates);
-		program->global_scope.struct_templates.resize(program_state.global_scope_struct_templates);
+	}
+	auto restore_state(out<complete::Scope> scope, ScopeState const & scope_state) noexcept -> void
+	{
+		scope->stack_frame_size = scope_state.stack_frame_size;
+		scope->stack_frame_alignment = scope_state.stack_frame_alignment;
+		scope->variables.resize(scope_state.variables);
+		scope->constants.resize(scope_state.constants);
+		scope->functions.resize(scope_state.functions);
+		scope->types.resize(scope_state.types);
+		scope->function_templates.resize(scope_state.function_templates);
+		scope->struct_templates.resize(scope_state.struct_templates);
 	}
 
 	[[nodiscard]] auto semantic_analysis(
@@ -1609,6 +1618,7 @@ namespace instantiation
 			erase_if(unparsed_statements, [&](size_t i)
 			{
 				ProgramState const program_state = capture_state(*complete_program);
+				ScopeState const global_scope_state = capture_state(*scope_stack.back().scope);
 
 				auto complete_statement = instantiate_statement(incomplete_program[i], template_parameters, scope_stack, out(complete_program), nullptr);
 				if (complete_statement.has_value())
@@ -1627,6 +1637,7 @@ namespace instantiation
 					scope_stack.resize(scope_stack_original_size);
 					template_parameters.clear();
 					restore_state(complete_program, program_state);
+					restore_state(out(*scope_stack.back().scope), global_scope_state);
 					return false;
 				}
 			});
@@ -1665,10 +1676,10 @@ namespace instantiation
 		out<ScopeStack> scope_stack
 	) noexcept -> void
 	{
-		scope_stack->push_back({&module_global_scopes[module_index], ScopeType::global, 0});
-
 		for (int dependency_index : incomplete_modules[module_index].dependencies)
 			push_global_scopes_of_dependent_modules(incomplete_modules, dependency_index, module_global_scopes, scope_stack);
+
+		scope_stack->push_back({&module_global_scopes[module_index], ScopeType::global, 0});
 	}
 
 	auto semantic_analysis(
