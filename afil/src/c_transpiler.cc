@@ -122,7 +122,7 @@ namespace c_transpiler
 
 	auto write_function_call(FunctionId function_id, span<std::string const> parameters, complete::Program const & program, std::string & c_source)
 	{
-		if (function_id.type == FunctionId::Type::instrinsic)
+		if (function_id.type == FunctionId::Type::intrinsic)
 		{
 			c_source += '(';
 			if (parameters.size() == 1)

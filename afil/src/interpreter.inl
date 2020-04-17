@@ -48,7 +48,7 @@ namespace interpreter
 	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, int return_address) noexcept 
 		-> expected<void, UnmetPrecondition>
 	{
-		if (function_id.type == FunctionId::Type::instrinsic)
+		if (function_id.type == FunctionId::Type::intrinsic)
 		{
 			int const stack_top = stack.top_pointer;
 

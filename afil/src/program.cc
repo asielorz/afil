@@ -132,7 +132,7 @@ namespace complete
 		for (size_t i = 0; i < intrinsic_function_count; ++i)
 		{
 			auto const & fn = intrinsic_functions[i];
-			global_scope.functions.push_back({std::string(fn.name), {FunctionId::Type::instrinsic, static_cast<unsigned>(i)}});
+			global_scope.functions.push_back({std::string(fn.name), {FunctionId::Type::intrinsic, static_cast<unsigned>(i)}});
 		}
 	}
 
@@ -385,7 +385,7 @@ namespace complete
 
 	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>
 	{
-		if (id.type == FunctionId::Type::instrinsic)
+		if (id.type == FunctionId::Type::intrinsic)
 		{
 			return intrinsic_functions[id.index].parameter_types;
 		}
@@ -405,7 +405,7 @@ namespace complete
 
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId
 	{
-		if (id.type == FunctionId::Type::instrinsic)
+		if (id.type == FunctionId::Type::intrinsic)
 			return intrinsic_functions[id.index].return_type;
 		else if (id.type == FunctionId::Type::imported)
 			return program.extern_functions[id.index].return_type;
@@ -415,7 +415,7 @@ namespace complete
 
 	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool
 	{
-		if (id.type == FunctionId::Type::instrinsic)
+		if (id.type == FunctionId::Type::intrinsic)
 			return true;
 		else if (id.type == FunctionId::Type::imported)
 			return false;
@@ -425,7 +425,7 @@ namespace complete
 
 	auto is_callable_at_runtime(Program const & program, FunctionId id) noexcept -> bool
 	{
-		if (id.type == FunctionId::Type::instrinsic)
+		if (id.type == FunctionId::Type::intrinsic)
 			return true;
 		else if (id.type == FunctionId::Type::imported)
 			return true;
@@ -435,7 +435,7 @@ namespace complete
 
 	auto ABI_name(Program & program, FunctionId id) noexcept -> std::string &
 	{
-		assert(id.type != FunctionId::Type::instrinsic);
+		assert(id.type != FunctionId::Type::intrinsic);
 		if (id.type == FunctionId::Type::imported)
 			return program.extern_functions[id.index].ABI_name;
 		else
@@ -444,7 +444,7 @@ namespace complete
 
 	auto ABI_name(Program const & program, FunctionId id) noexcept -> std::string_view
 	{
-		assert(id.type != FunctionId::Type::instrinsic);
+		assert(id.type != FunctionId::Type::intrinsic);
 		if (id.type == FunctionId::Type::imported)
 			return program.extern_functions[id.index].ABI_name;
 		else
