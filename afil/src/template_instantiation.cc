@@ -19,7 +19,7 @@
 
 using namespace std::literals;
 
-[[nodiscard]] auto evaluate_constant_expression(complete::Expression const & expression, complete::Program const & program, int constant_base_index, void * outValue) noexcept
+[[nodiscard]] auto evaluate_constant_expression(complete::Expression const & expression, complete::Program & program, int constant_base_index, void * outValue) noexcept
 	-> expected<void, interpreter::UnmetPrecondition>
 {
 	assert(is_constant_expression(expression, program, constant_base_index));
@@ -27,7 +27,7 @@ using namespace std::literals;
 	interpreter::ProgramStack stack;
 	alloc_stack(stack, 256);
 
-	try_call_void(interpreter::eval_expression(expression, stack, program));
+	try_call_void(interpreter::eval_expression(expression, stack, interpreter::CompileTimeContext{program}));
 
 	memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
 
@@ -35,7 +35,7 @@ using namespace std::literals;
 }
 
 template <typename T>
-auto evaluate_constant_expression_as(complete::Expression const & expression, complete::Program const & program, int constant_base_index) noexcept -> expected<T, interpreter::UnmetPrecondition>
+auto evaluate_constant_expression_as(complete::Expression const & expression, complete::Program & program, int constant_base_index) noexcept -> expected<T, interpreter::UnmetPrecondition>
 {
 	T result;
 	try_call_void(evaluate_constant_expression(expression, program, constant_base_index, &result));
