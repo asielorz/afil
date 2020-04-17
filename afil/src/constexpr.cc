@@ -101,7 +101,8 @@ namespace complete
 				return
 					is_constant_expression(*assign_node.source, program, constant_base_index) &&
 					is_constant_expression(*assign_node.destination, program, constant_base_index);
-			}
+			},
+			[](expression::Compiles const &) { return true; }
 		);
 		return std::visit(visitor, expr.as_variant());
 	}
@@ -206,7 +207,8 @@ namespace complete
 				return
 					can_be_run_at_runtime(*assign_node.source, program) &&
 					can_be_run_at_runtime(*assign_node.destination, program);
-			}
+			},
+			[](expression::Compiles const &) { return false; }
 		);
 		return std::visit(visitor, expr.as_variant());
 	}

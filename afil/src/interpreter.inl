@@ -376,14 +376,28 @@ namespace interpreter
 		return address;
 	}
 
-	inline auto eval_type_literal(ProgramStack &, RuntimeContext, int)
+	namespace detail
 	{
-		return [](complete::expression::Literal<complete::TypeId>) { declare_unreachable(); };
-	}
-	inline auto eval_type_literal(ProgramStack & stack, CompileTimeContext, int return_address)
-	{
-		return [&stack, return_address](complete::expression::Literal<complete::TypeId> literal) { write(stack, return_address, literal.value); };
-	}
+		inline auto eval_type_literal_expression(ProgramStack &, RuntimeContext, int)
+		{
+			return [](complete::expression::Literal<complete::TypeId>) { declare_unreachable(); };
+		}
+		inline auto eval_type_literal_expression(ProgramStack & stack, CompileTimeContext, int return_address)
+		{
+			return [&stack, return_address](complete::expression::Literal<complete::TypeId> literal) { write(stack, return_address, literal.value); };
+		}
+
+		inline auto eval_compiles_expression(ProgramStack &, RuntimeContext, int) noexcept
+		{
+			return [](complete::expression::Compiles const &) { declare_unreachable(); };
+		}
+		auto eval_compiles_expression_impl(complete::expression::Compiles const & compiles_expr, ProgramStack & stack, CompileTimeContext context, int return_address) noexcept
+			-> expected<void, UnmetPrecondition>;
+		inline auto eval_compiles_expression(ProgramStack & stack, CompileTimeContext context, int return_address) noexcept
+		{
+			return [=, &stack](complete::expression::Compiles const & compiles_expr) { return eval_compiles_expression_impl(compiles_expr, stack, context, return_address); };
+		}
+	} // namespace detail
 
 	template <typename ExecutionContext>
 	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, ExecutionContext context, int return_address) noexcept -> expected<void, UnmetPrecondition>
@@ -395,7 +409,7 @@ namespace interpreter
 			[&](expression::Literal<float> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<bool> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<uninit_t>) {},
-			eval_type_literal(stack, context, return_address),
+			detail::eval_type_literal_expression(stack, context, return_address),
 			[&](expression::StringLiteral literal)
 			{
 				write(stack, return_address, literal.value.data(), static_cast<int>(literal.value.size())); 
@@ -572,7 +586,8 @@ namespace interpreter
 					declare_unreachable();
 				}
 				return success;
-			}
+			},
+			detail::eval_compiles_expression(stack, context, return_address)
 		);
 		return std::visit(visitor, expr.as_variant());
 	}
@@ -693,6 +708,19 @@ namespace interpreter
 			}
 		);
 		return std::visit(visitor, tree.as_variant());
+	}
+
+	template <typename T>
+	auto evaluate_constant_expression_as(
+		complete::Expression const & expression,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		instantiation::ScopeStack & scope_stack,
+		complete::Program & program) noexcept
+		-> expected<T, UnmetPrecondition>
+	{
+		T result;
+		try_call_void(evaluate_constant_expression(expression, template_parameters, scope_stack, program, &result));
+		return result;
 	}
 
 } // namespace interpreter

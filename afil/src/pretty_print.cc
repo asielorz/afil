@@ -164,24 +164,6 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 		{
 			return join("constant<", type_name(constant_expr.type, program), ">: ", print_constant(constant_expr.type, constant_expr.value.data()), "\n");
 		},
-			//[&](expression::OverloadSet const & overload_set_expr) 
-			//{
-			//	std::set<std::string_view> function_names;
-			//	for (FunctionId const id : overload_set_expr.overload_set.function_ids)
-			//		function_names.insert(function_name(id, program));
-			//	for (FunctionTemplateId const id : overload_set_expr.overload_set.function_template_ids)
-			//		function_names.insert(function_template_name(id, program));
-			//
-			//	if (function_names.size() == 1)
-			//		return join("overload set: ", *function_names.begin(), '\n');
-			//	else
-			//	{
-			//		std::string str = "overload set\n";
-			//		for (std::string_view const name : function_names)
-			//			str += join(indent(indentation_level + 1), name, '\n');
-			//		return str;
-			//	}
-			//},
 		[&](expression::FunctionCall const & func_call_expr)
 		{
 			std::string str = join("function call: ", function_name(func_call_expr.function_id, program), '\n');
@@ -248,6 +230,10 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 				pretty_print(*assignment_expr.destination, program, scope_stack, indentation_level + 1),
 				pretty_print(*assignment_expr.source, program, scope_stack, indentation_level + 1)
 			);
+		},
+		[&](expression::Compiles const &)
+		{
+			return join("compiles\n");
 		}
 	);
 

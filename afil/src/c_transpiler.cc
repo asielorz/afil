@@ -205,7 +205,8 @@ namespace c_transpiler
 			[&](expression::Assignment const &) { return false; },
 			[&](expression::If const &) { return false; },
 			[&](expression::StatementBlock const &) { return false; },
-			[&](expression::Constructor const &) { return false; }
+			[&](expression::Constructor const &) { return false; },
+			[&](expression::Compiles const &) { return false; }
 		);
 		return std::visit(visitor, expr.as_variant());
 	}
@@ -313,7 +314,8 @@ namespace c_transpiler
 			[&](expression::Assignment const &)		{ declare_unreachable(); },
 			[&](expression::If const &)				{ declare_unreachable(); },
 			[&](expression::StatementBlock const &)	{ declare_unreachable(); },
-			[&](expression::Constructor const &)	{ declare_unreachable(); }
+			[&](expression::Constructor const &)	{ declare_unreachable(); },
+			[&](expression::Compiles const &)		{ declare_unreachable(); }
 		);
 		std::visit(visitor, expr.as_variant());
 	}
@@ -571,7 +573,8 @@ namespace c_transpiler
 					{
 						declare_unreachable();
 					}
-				}
+				},
+				[&](expression::Compiles const &) { declare_unreachable(); }
 			);
 			std::visit(visitor, expr.as_variant());
 		}
@@ -888,9 +891,11 @@ namespace c_transpiler
 		// Write all functions.
 		for (complete::Function const & function : program.functions)
 		{
-			auto const id = FunctionId(FunctionId::Type::program, unsigned(&function - program.functions.data()));
-
-			write_function(function, id, program, c_source);
+			if (function.is_callable_at_runtime)
+			{
+				auto const id = FunctionId(FunctionId::Type::program, unsigned(&function - program.functions.data()));
+				write_function(function, id, program, c_source);
+			}
 		}
 
 		return c_source;

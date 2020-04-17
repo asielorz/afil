@@ -1,5 +1,7 @@
 #include "interpreter.hh"
+#include "constexpr.hh"
 #include "program.hh"
+#include "template_instantiation.hh"
 
 namespace interpreter
 {
@@ -73,6 +75,56 @@ namespace interpreter
 		{
 			write(stack, return_address, pointer_at_address(stack, address));
 		}
+	}
+
+	auto detail::eval_compiles_expression_impl(complete::expression::Compiles const & compiles_expr, ProgramStack & stack, CompileTimeContext context, int return_address) noexcept 
+		-> expected<void, UnmetPrecondition>
+	{
+		complete::Scope fake_scope;
+
+		for (complete::CompilesFakeVariable const & fake_var : compiles_expr.variables)
+		{
+			try_call_decl(int const type_address, eval_expression(fake_var.type, stack, context));
+			complete::TypeId const var_type = read<complete::TypeId>(stack, type_address);
+
+			add_variable_to_scope(fake_scope, fake_var.name, var_type, 0, context.program);
+		}
+
+		auto const guard = instantiation::push_block_scope(context.scope_stack, fake_scope);
+
+		bool all_body_expressions_compile = true;
+		for (incomplete::ExpressionToTest const & expression_to_test : compiles_expr.body)
+		{
+			if (!instantiation::test_if_expression_compiles(expression_to_test, context.template_parameters, context.scope_stack, out(context.program), nullptr))
+			{
+				all_body_expressions_compile = false;
+				break;
+			}
+		}
+
+		write(stack, return_address, all_body_expressions_compile);
+		return success;
+	}
+
+	[[nodiscard]] auto evaluate_constant_expression(
+		complete::Expression const & expression, 
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		instantiation::ScopeStack & scope_stack,
+		complete::Program & program, 
+		void * outValue
+	) noexcept
+		-> expected<void, UnmetPrecondition>
+	{
+		assert(is_constant_expression(expression, program, next_block_scope_offset(scope_stack)));
+
+		interpreter::ProgramStack stack;
+		alloc_stack(stack, 256);
+
+		try_call_void(interpreter::eval_expression(expression, stack, interpreter::CompileTimeContext{program, template_parameters, scope_stack}));
+
+		memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
+
+		return success;
 	}
 
 	auto run(complete::Program const & program, int stack_size) noexcept -> expected<int, UnmetPrecondition>

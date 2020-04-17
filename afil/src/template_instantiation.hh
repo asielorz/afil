@@ -67,4 +67,25 @@ namespace instantiation
 		out<complete::Program> program)
 		-> expected<complete::TypeId, PartialSyntaxError>;
 
+	auto test_if_expression_compiles(
+		incomplete::ExpressionToTest const & expression_to_test,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program,
+		optional_out<complete::TypeId> current_scope_return_type
+	) -> bool;
+
+	template <typename Stack>
+	struct StackGuard
+	{
+		StackGuard(Stack & s) noexcept : stack(std::addressof(s)) {}
+		StackGuard(StackGuard const &) = delete;
+		StackGuard & operator = (StackGuard const &) = delete;
+		~StackGuard() { stack->pop_back(); }
+
+		Stack * stack;
+	};
+	auto push_block_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>;
+	auto next_block_scope_offset(ScopeStackView scope_stack) -> int;
+
 } // namespace instantiation

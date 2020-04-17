@@ -53,6 +53,8 @@ namespace interpreter
 	struct CompileTimeContext
 	{
 		complete::Program & program;
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters;
+		instantiation::ScopeStack & scope_stack;
 	};
 
 	template <typename ExecutionContext>
@@ -68,6 +70,23 @@ namespace interpreter
 	template <typename ExecutionContext>
 	[[nodiscard]] auto run_statement(complete::Statement const & tree, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
 		-> expected<ControlFlow, UnmetPrecondition>;
+
+	[[nodiscard]] auto evaluate_constant_expression(
+		complete::Expression const & expression, 
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		instantiation::ScopeStack & scope_stack,
+		complete::Program & program,
+		void * outValue
+	) noexcept
+		->expected<void, UnmetPrecondition>;
+
+	template <typename T>
+	[[nodiscard]] auto evaluate_constant_expression_as(
+		complete::Expression const & expression, 
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		instantiation::ScopeStack & scope_stack,
+		complete::Program & program) noexcept
+		-> expected<T, UnmetPrecondition>;
 
 	// TODO: argc, argv. Decide a good stack size.
 	auto run(complete::Program const & program, int stack_size = 2048) noexcept -> expected<int, UnmetPrecondition>;

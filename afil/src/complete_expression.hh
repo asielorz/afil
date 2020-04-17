@@ -8,10 +8,16 @@
 #include "utils/span.hh"
 #include <variant>
 
+namespace incomplete
+{
+	struct ExpressionToTest;
+}
+
 namespace complete
 {
 	struct Expression;
 	struct Statement;
+	struct CompilesFakeVariable;
 	struct OverloadSet
 	{
 		std::vector<FunctionId> function_ids;
@@ -107,6 +113,12 @@ namespace complete
 			std::vector<Statement> statements;
 			TypeId return_type;
 		};
+
+		struct Compiles
+		{
+			std::vector<CompilesFakeVariable> variables;
+			std::vector<incomplete::ExpressionToTest> body;
+		};
 		
 		namespace detail
 		{
@@ -116,7 +128,8 @@ namespace complete
 				FunctionCall, RelationalOperatorCall, Assignment,
 				Constructor,
 				Dereference, ReinterpretCast, Subscript,
-				If, StatementBlock
+				If, StatementBlock,
+				Compiles
 			>;
 		} // namespace detail
 	} // namespace expression
@@ -134,5 +147,11 @@ namespace complete
 	auto expression_type(Expression const & tree, Program const & program) noexcept -> Type const &;
 	auto expression_type_id(Expression const & tree, Program const & program) noexcept -> TypeId;
 	auto expression_type_size(Expression const & tree, Program const & program) noexcept -> int;
+
+	struct CompilesFakeVariable
+	{
+		Expression type;
+		std::string_view name;
+	};
 
 } // namespace complete

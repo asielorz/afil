@@ -19,44 +19,10 @@
 
 using namespace std::literals;
 
-[[nodiscard]] auto evaluate_constant_expression(complete::Expression const & expression, complete::Program & program, int constant_base_index, void * outValue) noexcept
-	-> expected<void, interpreter::UnmetPrecondition>
-{
-	assert(is_constant_expression(expression, program, constant_base_index));
-
-	interpreter::ProgramStack stack;
-	alloc_stack(stack, 256);
-
-	try_call_void(interpreter::eval_expression(expression, stack, interpreter::CompileTimeContext{program}));
-
-	memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
-
-	return success;
-}
-
-template <typename T>
-auto evaluate_constant_expression_as(complete::Expression const & expression, complete::Program & program, int constant_base_index) noexcept -> expected<T, interpreter::UnmetPrecondition>
-{
-	T result;
-	try_call_void(evaluate_constant_expression(expression, program, constant_base_index, &result));
-	return result;
-}
-
 namespace instantiation
 {
 	auto top(ScopeStack & scope_stack) noexcept -> complete::Scope & { return *scope_stack.back().scope; }
 	auto top(ScopeStackView scope_stack) noexcept -> complete::Scope const & { return *scope_stack.back().scope; }
-
-	template <typename Stack>
-	struct StackGuard
-	{
-		StackGuard(Stack & s) noexcept : stack(std::addressof(s)) {}
-		StackGuard(StackGuard const &) = delete;
-		StackGuard & operator = (StackGuard const &) = delete;
-		~StackGuard() { stack->pop_back(); }
-
-		Stack * stack;
-	};
 
 	auto next_block_scope_offset(ScopeStackView scope_stack) -> int
 	{
@@ -150,15 +116,13 @@ namespace instantiation
 		ScopeStack & scope_stack
 	) noexcept -> expected<int, PartialSyntaxError>
 	{
-		int const constant_base_index = next_block_scope_offset(scope_stack);
-
 		try_call_decl(complete::Expression size_expr, instantiate_expression(expression, template_parameters, scope_stack, program, nullptr));
-		if (!is_constant_expression(size_expr, *program, constant_base_index))
+		if (!is_constant_expression(size_expr, *program, next_block_scope_offset(scope_stack)))
 			return make_syntax_error(expression.source, "Array size must be a constant expression.");
 
 		try_call(assign_to(size_expr), insert_conversion_node(std::move(size_expr), complete::TypeId::int_, *program));
 
-		auto result = evaluate_constant_expression_as<int>(size_expr, *program, constant_base_index);
+		auto result = interpreter::evaluate_constant_expression_as<int>(size_expr, template_parameters, scope_stack, *program);
 		if (!result)
 			return make_syntax_error(expression.source, "Unmet precondition at evaluating constant expression.");
 
@@ -463,6 +427,82 @@ namespace instantiation
 		return {type.size, is_float};
 	}
 
+	struct ProgramState
+	{
+		size_t types;
+		size_t structs;
+		size_t struct_templates;
+		size_t overload_set_types;
+		size_t functions;
+		size_t extern_functions;
+		size_t function_templates;
+		FunctionId main_function;
+	};
+	struct ScopeState
+	{
+		int stack_frame_size;
+		int stack_frame_alignment;
+		size_t variables;
+		size_t constants;
+		size_t functions;
+		size_t types;
+		size_t function_templates;
+		size_t struct_templates;
+	};
+	auto capture_state(complete::Program const & program) noexcept -> ProgramState
+	{
+		ProgramState program_state;
+
+		program_state.types = program.types.size();
+		program_state.structs = program.structs.size();
+		program_state.struct_templates = program.struct_templates.size();
+		program_state.overload_set_types = program.overload_set_types.size();
+		program_state.functions = program.functions.size();
+		program_state.extern_functions = program.extern_functions.size();
+		program_state.function_templates = program.function_templates.size();
+		program_state.main_function = program.main_function;
+
+		return program_state;
+	}
+	auto capture_state(complete::Scope const & scope) noexcept -> ScopeState
+	{
+		ScopeState scope_state;
+
+		scope_state.stack_frame_size = scope.stack_frame_size;
+		scope_state.stack_frame_alignment = scope.stack_frame_alignment;
+		scope_state.variables = scope.variables.size();
+		scope_state.constants = scope.constants.size();
+		scope_state.functions = scope.functions.size();
+		scope_state.types = scope.types.size();
+		scope_state.function_templates = scope.function_templates.size();
+		scope_state.struct_templates = scope.struct_templates.size();
+
+		return scope_state;
+	}
+
+	auto restore_state(out<complete::Program> program, ProgramState const & program_state) noexcept -> void
+	{
+		program->types.resize(program_state.types);
+		program->structs.resize(program_state.structs);
+		program->struct_templates.resize(program_state.struct_templates);
+		program->overload_set_types.resize(program_state.overload_set_types);
+		program->functions.resize(program_state.functions);
+		program->extern_functions.resize(program_state.extern_functions);
+		program->function_templates.resize(program_state.function_templates);
+		program->main_function = program_state.main_function;
+	}
+	auto restore_state(out<complete::Scope> scope, ScopeState const & scope_state) noexcept -> void
+	{
+		scope->stack_frame_size = scope_state.stack_frame_size;
+		scope->stack_frame_alignment = scope_state.stack_frame_alignment;
+		scope->variables.resize(scope_state.variables);
+		scope->constants.resize(scope_state.constants);
+		scope->functions.resize(scope_state.functions);
+		scope->types.resize(scope_state.types);
+		scope->function_templates.resize(scope_state.function_templates);
+		scope->struct_templates.resize(scope_state.struct_templates);
+	}
+
 	auto test_if_expression_compiles(
 		incomplete::ExpressionToTest const & expression_to_test,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -471,9 +511,18 @@ namespace instantiation
 		optional_out<complete::TypeId> current_scope_return_type
 	) -> bool
 	{
+		ProgramState const program_state = capture_state(*program);
+		ScopeState const top_scope_state = capture_state(top(scope_stack));
+		size_t const scope_stack_size = scope_stack.size();
+
 		auto expr = instantiate_expression(expression_to_test.expression, template_parameters, scope_stack, program, current_scope_return_type);
 		if (!expr)
+		{
+			scope_stack.resize(scope_stack_size);
+			restore_state(program, program_state);
+			restore_state(out(top(scope_stack)), top_scope_state);
 			return false;
+		}
 
 		if (!expression_to_test.expected_type)
 			return true;
@@ -945,7 +994,7 @@ namespace instantiation
 
 				if (is_constant_expression(condition, *program, next_block_scope_offset(scope_stack)))
 				{
-					auto const condition_value = evaluate_constant_expression_as<bool>(condition, *program, next_block_scope_offset(scope_stack));
+					auto const condition_value = interpreter::evaluate_constant_expression_as<bool>(condition, template_parameters, scope_stack, *program);
 					if (!condition_value.has_value())
 						return make_syntax_error(incomplete_expression.condition->source, "Unmet precondition at evaluating constant expression.");
 
@@ -1143,32 +1192,52 @@ namespace instantiation
 			},
 			[&](incomplete::expression::Compiles const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
-				complete::Scope fake_scope;
+				std::vector<complete::CompilesFakeVariable> complete_fake_variables;
+				complete_fake_variables.reserve(incomplete_expression.variables.size());
 				for (incomplete::CompilesFakeVariable const & fake_var : incomplete_expression.variables)
 				{
 					try_call_decl(complete::Expression type_expr, instantiate_expression(fake_var.type, template_parameters, scope_stack, program, current_scope_return_type));
 					try_call(assign_to(type_expr), insert_conversion_node(std::move(type_expr), complete::TypeId::type, *program));
-					if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
-						return make_syntax_error(fake_var.type.source, "Type in parameter list of compiles must be a constant expression.");
-
-					auto const var_type = evaluate_constant_expression_as<complete::TypeId>(type_expr, *program, next_block_scope_offset(scope_stack));
-					if (!var_type.has_value())
-						return make_syntax_error(fake_var.type.source, "Unmet precondition at evaluating constant expression.");
-
-					add_variable_to_scope(fake_scope, fake_var.name, var_type.value(), 0, *program);
+					complete_fake_variables.push_back({std::move(type_expr), fake_var.name});
 				}
-				auto const guard = push_block_scope(scope_stack, fake_scope);
 
-				bool all_body_expressions_compile = true;
-				for (incomplete::ExpressionToTest const & expression_to_test : incomplete_expression.body)
+				int const constant_base_index = next_block_scope_offset(scope_stack);
+				if (std::all_of(complete_fake_variables, [&](complete::CompilesFakeVariable const & fake_var) 
+					{ return is_constant_expression(fake_var.type, *program, constant_base_index); }))
 				{
-					if (!test_if_expression_compiles(expression_to_test, template_parameters, scope_stack, program, current_scope_return_type))
+					complete::Scope fake_scope;
+
+					for (size_t i = 0; i < complete_fake_variables.size(); ++i)
 					{
-						all_body_expressions_compile = false;
-						break;
+						complete::CompilesFakeVariable const & fake_var = complete_fake_variables[i];
+
+						auto const var_type = interpreter::evaluate_constant_expression_as<complete::TypeId>(fake_var.type, template_parameters, scope_stack, *program);
+						if (!var_type.has_value())
+							return make_syntax_error(incomplete_expression.variables[i].type.source, "Unmet precondition at evaluating constant expression.");
+
+						add_variable_to_scope(fake_scope, fake_var.name, var_type.value(), 0, *program);
 					}
+
+					auto const guard = push_block_scope(scope_stack, fake_scope);
+
+					bool all_body_expressions_compile = true;
+					for (incomplete::ExpressionToTest const & expression_to_test : incomplete_expression.body)
+					{
+						if (!test_if_expression_compiles(expression_to_test, template_parameters, scope_stack, program, current_scope_return_type))
+						{
+							all_body_expressions_compile = false;
+							break;
+						}
+					}
+					return complete::expression::Literal<bool>{all_body_expressions_compile};
 				}
-				return complete::expression::Literal<bool>{all_body_expressions_compile};
+				else
+				{
+					complete::expression::Compiles complete_expression;
+					complete_expression.variables = std::move(complete_fake_variables);
+					complete_expression.body = incomplete_expression.body;
+					return std::move(complete_expression);
+				}
 			}
 		);
 
@@ -1266,7 +1335,7 @@ namespace instantiation
 					constant.name = incomplete_statement.variable_name;
 
 					try_call(assign_to(expression), insert_conversion_node(std::move(expression), assigned_expression_type, var_type, *program));
-					auto const eval_result = evaluate_constant_expression(expression, *program, next_block_scope_offset(scope_stack), constant.value.data());
+					auto const eval_result = interpreter::evaluate_constant_expression(expression, template_parameters, scope_stack, *program, constant.value.data());
 					if (!eval_result.has_value())
 						return make_syntax_error(incomplete_statement.assigned_expression.source, "Unmet precondition at evaluating constant expression.");
 
@@ -1307,7 +1376,7 @@ namespace instantiation
 
 				if (is_constant_expression(condition, *program, next_block_scope_offset(scope_stack)))
 				{
-					auto const condition_value = evaluate_constant_expression_as<bool>(condition, *program, next_block_scope_offset(scope_stack));
+					auto const condition_value = interpreter::evaluate_constant_expression_as<bool>(condition, template_parameters, scope_stack, *program);
 					if (!condition_value.has_value())
 						return make_syntax_error(incomplete_statement.condition.source, "Unmet precondition at evaluating constant expression.");
 
@@ -1507,7 +1576,7 @@ namespace instantiation
 				if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
 					return make_syntax_error(incomplete_statement.type.source, "Type in type alias declaration must be a constant expression.");
 
-				auto const type = evaluate_constant_expression_as<complete::TypeId>(type_expr, *program, next_block_scope_offset(scope_stack));
+				auto const type = interpreter::evaluate_constant_expression_as<complete::TypeId>(type_expr, template_parameters, scope_stack, *program);
 				if (!type.has_value())
 					return make_syntax_error(incomplete_statement.type.source, "Unmet precondition at evaluating constant expression.");
 
@@ -1518,82 +1587,6 @@ namespace instantiation
 		);
 
 		return std::visit(visitor, incomplete_statement_.variant);
-	}
-
-	struct ProgramState
-	{
-		size_t types;
-		size_t structs;
-		size_t struct_templates;
-		size_t overload_set_types;
-		size_t functions;
-		size_t extern_functions;
-		size_t function_templates;
-		FunctionId main_function;
-	};
-	struct ScopeState
-	{
-		int stack_frame_size;
-		int stack_frame_alignment;
-		size_t variables;
-		size_t constants;
-		size_t functions;
-		size_t types;
-		size_t function_templates;
-		size_t struct_templates;
-	};
-	auto capture_state(complete::Program const & program) noexcept -> ProgramState
-	{
-		ProgramState program_state;
-
-		program_state.types = program.types.size();
-		program_state.structs = program.structs.size();
-		program_state.struct_templates = program.struct_templates.size();
-		program_state.overload_set_types = program.overload_set_types.size();
-		program_state.functions = program.functions.size();
-		program_state.extern_functions = program.extern_functions.size();
-		program_state.function_templates = program.function_templates.size();
-		program_state.main_function = program.main_function;
-
-		return program_state;
-	}
-	auto capture_state(complete::Scope const & scope) noexcept -> ScopeState
-	{
-		ScopeState scope_state;
-
-		scope_state.stack_frame_size = scope.stack_frame_size;
-		scope_state.stack_frame_alignment = scope.stack_frame_alignment;
-		scope_state.variables = scope.variables.size();
-		scope_state.constants = scope.constants.size();
-		scope_state.functions = scope.functions.size();
-		scope_state.types = scope.types.size();
-		scope_state.function_templates = scope.function_templates.size();
-		scope_state.struct_templates = scope.struct_templates.size();
-
-		return scope_state;
-	}
-
-	auto restore_state(out<complete::Program> program, ProgramState const & program_state) noexcept -> void
-	{
-		program->types.resize(program_state.types);
-		program->structs.resize(program_state.structs);
-		program->struct_templates.resize(program_state.struct_templates);
-		program->overload_set_types.resize(program_state.overload_set_types);
-		program->functions.resize(program_state.functions);
-		program->extern_functions.resize(program_state.extern_functions);
-		program->function_templates.resize(program_state.function_templates);
-		program->main_function = program_state.main_function;
-	}
-	auto restore_state(out<complete::Scope> scope, ScopeState const & scope_state) noexcept -> void
-	{
-		scope->stack_frame_size = scope_state.stack_frame_size;
-		scope->stack_frame_alignment = scope_state.stack_frame_alignment;
-		scope->variables.resize(scope_state.variables);
-		scope->constants.resize(scope_state.constants);
-		scope->functions.resize(scope_state.functions);
-		scope->types.resize(scope_state.types);
-		scope->function_templates.resize(scope_state.function_templates);
-		scope->struct_templates.resize(scope_state.struct_templates);
 	}
 
 	[[nodiscard]] auto semantic_analysis(
@@ -1616,7 +1609,7 @@ namespace instantiation
 			erase_if(unparsed_statements, [&](size_t i)
 			{
 				ProgramState const program_state = capture_state(*complete_program);
-				ScopeState const global_scope_state = capture_state(*scope_stack.back().scope);
+				ScopeState const global_scope_state = capture_state(top(scope_stack));
 
 				auto complete_statement = instantiate_statement(incomplete_program[i], template_parameters, scope_stack, out(complete_program), nullptr);
 				if (complete_statement.has_value())
@@ -1635,7 +1628,7 @@ namespace instantiation
 					scope_stack.resize(scope_stack_original_size);
 					template_parameters.clear();
 					restore_state(complete_program, program_state);
-					restore_state(out(*scope_stack.back().scope), global_scope_state);
+					restore_state(out(top(scope_stack)), global_scope_state);
 					return false;
 				}
 			});
