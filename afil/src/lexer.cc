@@ -29,20 +29,6 @@ namespace lex
 			(c == '>') || (c == '=') || (c == '!') || (c == '&') || (c == '|') || (c == '~') || (c == '^');
 	}
 
-	auto is_operator(std::string_view src, int index) noexcept -> bool
-	{
-		char const c = src[index];
-		return 
-			is_first_char_of_operator(c)
-			|| starts_with(src, index, "=="sv)
-			|| starts_with(src, index, "!="sv)
-			|| starts_with(src, index, "and"sv)
-			|| starts_with(src, index, "or"sv)
-			|| starts_with(src, index, "xor"sv)
-			|| starts_with(src, index, "not"sv)
-			;
-	}
-
 	auto is_reserved_for_the_language(char c) noexcept -> bool
 	{
 		return (c == '(') || (c == ')') || (c == '{') || (c == '}') || (c == '[') || (c == ']') || (c == ';') || (c == ',') || (c == '.');
@@ -63,6 +49,20 @@ namespace lex
 		return !is_valid_identifier_char(c);
 	}
 
+	auto is_operator(std::string_view src, int index) noexcept -> bool
+	{
+		char const c = src[index];
+		return 
+			is_first_char_of_operator(c)
+			|| starts_with(src, index, "=="sv)
+			|| starts_with(src, index, "!="sv)
+			|| (starts_with(src, index, "and"sv) && is_valid_after_literal(src[index + 3]))
+			|| (starts_with(src, index, "or"sv) && is_valid_after_literal(src[index + 2]))
+			|| (starts_with(src, index, "xor"sv) && is_valid_after_literal(src[index + 3]))
+			|| (starts_with(src, index, "not"sv) && is_valid_after_literal(src[index + 3]))
+			;
+	}
+
 	auto is_arrow(std::string_view src, int index) noexcept -> bool
 	{
 		return starts_with(src, index, "->"sv);
@@ -70,7 +70,9 @@ namespace lex
 
 	auto is_boolean(std::string_view src, int index) noexcept -> bool
 	{
-		return starts_with(src, index, "true"sv) || starts_with(src, index, "false"sv);
+		return 
+			(starts_with(src, index, "true"sv) && is_valid_after_literal(src[index + 4])) ||
+			(starts_with(src, index, "false"sv) && is_valid_after_literal(src[index + 5]));
 	}
 
 	auto end_reached(std::string_view src, int index) noexcept -> bool

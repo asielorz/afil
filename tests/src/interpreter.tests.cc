@@ -2383,6 +2383,62 @@ TEST_CASE("Compiles can depend on non literal types, round 2")
 	REQUIRE(tests::parse_and_run(src) == 0);
 }
 
+TEST_CASE("An identifier name may start with a keyword. This test catches possible bugs in the lexer.")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let falsehood = false;		// Starts with "false"
+			let true_story = 6;			// Starts with "true"
+			let ordered = 5;			// Starts with "or"
+			let nottingham = 9;			// Starts with "not"
+			let xorshift = 1;			// Starts with "xor"
+			let andreas = 8;			// Starts with "and"
+
+			if (falsehood)
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 0);
+}
+
+TEST_CASE("A function can be constrained by concepts")
+{
+	auto const src = R"(
+		let ordered = fn(type t) -> bool
+		{
+			return compiles(t i, t j)
+			{
+				{i == j} -> bool;
+				{i <=> j} -> int
+			};
+		};
+
+		let less = fn<ordered T>(T a, T b) -> bool
+		{
+			return a < b;
+		};
+
+		let main = fn() -> int
+		{
+			let mut i = 0;
+
+			if (compiles{less(3, 4)})
+				i = i + 1;
+
+			if (not compiles{less(true, false)})
+				i = i + 1;
+			
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 2);
+}
+
 /*****************************************************************
 Backlog
 - concepts

@@ -368,13 +368,26 @@ namespace parser
 
 		for (;;)
 		{
-			if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier.");
+			if (tokens[index].type != TokenType::identifier) 
+				return make_syntax_error(tokens[index], "Expected identifier.");
 
 			incomplete::TemplateParameter param;
-			if (is_keyword(tokens[index].source)) return make_syntax_error(tokens[index], "Cannot use a keyword as template parameter name.");
 			param.name = tokens[index].source;
-			parsed_parameters.push_back(std::move(param));
 			index++;
+
+			if (tokens[index].type == TokenType::identifier)
+			{
+				param.concept = param.name;
+				param.name = tokens[index].source;
+				index++;
+			}
+
+			if (is_keyword(param.name))
+				return make_syntax_error(param.name, "Cannot use a keyword as template parameter name.");
+			if (!param.concept.empty() && is_keyword(param.concept))
+				return make_syntax_error(param.concept, "Cannot use a keyword as concept name.");
+
+			parsed_parameters.push_back(std::move(param));
 
 			if (tokens[index].source == ">")
 			{

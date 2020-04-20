@@ -340,18 +340,18 @@ namespace instantiation
 			return overload_set;
 	}
 
-	auto named_overload_set(std::string_view name, ScopeStackView scope_stack) -> complete::OverloadSet
+	auto named_overload_set(std::string_view name, ScopeStackView scope_stack) -> std::optional<complete::OverloadSet>
 	{
 		auto const visitor = overload(
-			[](lookup_result::Nothing const &) -> complete::OverloadSet
+			[](lookup_result::Nothing const &) -> std::optional<complete::OverloadSet>
 			{
-				return {};
+				return complete::OverloadSet();
 			},
-			[](lookup_result::OverloadSet const & overload_set) -> complete::OverloadSet
+			[](lookup_result::OverloadSet const & overload_set) -> std::optional<complete::OverloadSet>
 			{
 				return overload_set;
 			},
-			[](auto const &) -> complete::OverloadSet { declare_unreachable(); }
+			[](auto const &) -> std::optional<complete::OverloadSet> { return std::nullopt; }
 		);
 
 		auto lookup = lookup_name(scope_stack, name);
@@ -360,7 +360,9 @@ namespace instantiation
 
 	auto operator_overload_set(Operator op, ScopeStackView scope_stack) noexcept -> complete::OverloadSet
 	{
-		return named_overload_set(operator_function_name(op), scope_stack);
+		auto set = named_overload_set(operator_function_name(op), scope_stack);
+		assert(set);
+		return std::move(*set);
 	}
 
 	auto type_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> complete::TypeId
@@ -796,7 +798,7 @@ namespace instantiation
 					complete::TypeId const param_types[] = { array_type_id, index_type_id };
 					complete::Expression params[] = { std::move(array), std::move(index) };
 
-					try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(named_overload_set("[]"sv, scope_stack), params, param_types, *program));
+					try_call_decl(FunctionId const function, resolve_function_overloading_and_insert_conversions(*named_overload_set("[]"sv, scope_stack), params, param_types, *program));
 
 					if (function == invalid_function_id) 
 						return make_syntax_error(incomplete_expression_.source, "Overload not found for subscript operator.");
@@ -837,6 +839,27 @@ namespace instantiation
 						scope_stack,
 						program
 					));
+				}
+
+				// Concepts
+				for (incomplete::TemplateParameter param : incomplete_expression.function_template.template_parameters)
+				{
+					if (param.concept.empty())
+					{
+						new_function_template.concepts.push_back(invalid_function_id);
+					}
+					else
+					{
+						std::optional<complete::OverloadSet> set = named_overload_set(param.concept, scope_stack);
+						if (!set)
+							return make_syntax_error(param.concept, "Name does not name a concept. A concept is a function type -> bool");
+
+						FunctionId const concept_function = resolve_function_overloading(*set, {complete::TypeId::type}, *program);
+						if (concept_function == invalid_function_id || return_type(*program, concept_function) != complete::TypeId::bool_)
+							return make_syntax_error(param.concept, "Name does not name a concept. A concept is a function type -> bool");
+
+						new_function_template.concepts.push_back(concept_function);
+					}
 				}
 
 				FunctionTemplateId const template_id = add_function_template(*program, std::move(new_function_template));

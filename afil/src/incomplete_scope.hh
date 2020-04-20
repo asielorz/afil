@@ -58,6 +58,7 @@ namespace incomplete
 
 	struct TemplateParameter
 	{
+		std::string_view concept;
 		std::string_view name;
 	};
 

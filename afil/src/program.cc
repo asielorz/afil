@@ -1,4 +1,5 @@
 #include "program.hh"
+#include "interpreter.hh"
 #include "syntax_error.hh"
 #include "template_instantiation.hh"
 #include "utils/algorithm.hh"
@@ -790,9 +791,29 @@ namespace complete
 					}
 				}
 
+				// Check concepts on resolved types.
+				expression::FunctionCall function_call;
+				std::vector<ResolvedTemplateParameter> template_parameters = fn.scope_template_parameters;
+				instantiation::ScopeStack scope_stack = fn.scope_stack;
+				for (size_t i = 0; i < dependent_type_count; ++i)
+				{
+					if (fn.concepts[i] != invalid_function_id)
+					{
+						function_call.function_id = fn.concepts[i];
+						function_call.parameters.push_back(expression::Literal<TypeId>{resolved_dependent_types[i]});
+						auto const concept_passed = interpreter::evaluate_constant_expression_as<bool>(function_call, template_parameters, scope_stack, program);
+						if (!concept_passed.has_value() || !concept_passed.value())
+						{
+							discard = true;
+							break;
+						}
+					}
+					function_call.parameters.clear();
+				}
+
 				if (!discard)
 				{
-					template_candidates[template_candidate_count++] = TemplateCandidate{ conversions, template_id };
+					template_candidates[template_candidate_count++] = TemplateCandidate{conversions, template_id};
 				}
 			}
 		}

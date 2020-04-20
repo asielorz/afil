@@ -11,6 +11,12 @@ namespace interpreter
 		reinterpret_cast<T &>(stack.memory[address]) = value;
 	}
 
+	template <typename T> auto push(ProgramStack & stack, T const & value) -> void
+	{
+		int const address = alloc(stack, sizeof(T), alignof(T));
+		write(stack, address, value);
+	}
+
 	template <typename T> auto write(ProgramStack & stack, int address, T const array[], int size) noexcept -> void
 	{
 		memcpy(pointer_at_address(stack, address), array, size * sizeof(T));

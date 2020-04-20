@@ -133,6 +133,7 @@ namespace complete
 	struct FunctionTemplate
 	{
 		incomplete::FunctionTemplate incomplete_function;
+		std::vector<FunctionId> concepts;
 		std::vector<FunctionTemplateParameterType> parameter_types;
 		std::vector<ResolvedTemplateParameter> scope_template_parameters;
 		instantiation::ScopeStack scope_stack;

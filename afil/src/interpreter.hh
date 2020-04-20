@@ -26,6 +26,7 @@ namespace interpreter
 	auto write_word(ProgramStack & stack, int address, int value) noexcept -> void;
 	template <typename T> auto read(ProgramStack const & stack, int address) noexcept -> T const &;
 	template <typename T> auto write(ProgramStack & stack, int address, T const & value) noexcept -> void;
+	template <typename T> auto push(ProgramStack & stack, T const & value) -> void;
 	auto alloc_stack(ProgramStack & stack, int stack_size_in_bytes) noexcept -> void;
 	auto alloc(ProgramStack & stack, int size, int alignment = 4) noexcept -> int;
 	auto free_up_to(ProgramStack & stack, int address) noexcept -> void;
