@@ -2483,12 +2483,13 @@ TEST_CASE("A struct may be constrained by concepts")
 
 /*****************************************************************
 Backlog
-- semantic analysis on templates based on concepts (depends on concepts)
-- synthesizing arithmetic operators
 - destructor and copy operations
-- reflection
 - namespaces
+- reflection (better make it depend on namespaces)
+- argument dependent lookup (depends on namespaces, sort of)
+- synthesizing arithmetic operators
 - closures and lambda captures
 - currying (maybe, maybe at library level?)
-- some minimalistic standard library
+- some minimalistic standard library (depends on namespaces)
+- semantic analysis on templates based on concepts
 *****************************************************************/
