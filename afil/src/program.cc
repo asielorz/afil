@@ -6,6 +6,7 @@
 #include "utils/callc.hh"
 #include "utils/function_ptr.hh"
 #include "utils/overload.hh"
+#include "utils/string.hh"
 #include "utils/unreachable.hh"
 #include "utils/variant.hh"
 #include "utils/warning_macro.hh"
@@ -94,7 +95,7 @@ namespace complete
 		intrinsic_function_descriptor<float(float, float)>("*"sv),
 		intrinsic_function_descriptor<float(float, float)>("/"sv),
 		intrinsic_function_descriptor<bool(float, float)>("=="sv),
-		intrinsic_function_descriptor<float(float, float)>("<=>"sv),
+		intrinsic_function_descriptor<int(float, float)>("<=>"sv),
 		intrinsic_function_descriptor<float(float)>("-"sv),
 
 		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("+"sv),
@@ -519,13 +520,50 @@ namespace complete
 		return instantiated_function_id;
 	}
 
-	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, PartialSyntaxError>
+	auto check_concepts(
+		span<FunctionId const> concepts, 
+		span<TypeId const> parameters, 
+		std::vector<ResolvedTemplateParameter> template_parameters,
+		instantiation::ScopeStack scope_stack,
+		Program& program
+	) noexcept -> size_t
+	{
+		assert(concepts.size() == parameters.size());
+
+		expression::FunctionCall function_call;
+		for (size_t i = 0; i < concepts.size(); ++i)
+		{
+			if (concepts[i] != invalid_function_id)
+			{
+				function_call.function_id = concepts[i];
+				function_call.parameters.push_back(expression::Literal<TypeId>{parameters[i]});
+				auto const concept_passed = interpreter::evaluate_constant_expression_as<bool>(function_call, template_parameters, scope_stack, program);
+				if (!concept_passed.has_value() || !concept_passed.value())
+					return i;
+			}
+			function_call.parameters.clear();
+		}
+
+		return concepts.size();
+	}
+
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, std::string_view instantiation_in_source) noexcept 
+		-> expected<TypeId, PartialSyntaxError>
 	{
 		StructTemplate & struct_template = program.struct_templates[template_id.index];
 
 		if (auto const it = struct_template.cached_instantiations.find(parameters);
 			it != struct_template.cached_instantiations.end())
 			return it->second;
+
+		if (parameters.size() != struct_template.incomplete_struct.template_parameters.size())
+			return make_syntax_error(instantiation_in_source, "Incorrect number of parameters for function template instantiation.");
+
+		size_t const failed_concept = check_concepts(struct_template.concepts, parameters, struct_template.scope_template_parameters, struct_template.scope_stack, program);
+		if (failed_concept != parameters.size())
+			return make_syntax_error(
+				instantiation_in_source, 
+				join("Struct template parameter does not satisfy concept \"", struct_template.incomplete_struct.template_parameters[failed_concept].concept, "\"."));
 
 		Type new_type;
 		new_type.size = 0;
@@ -542,7 +580,6 @@ namespace complete
 
 		instantiation::ScopeStack scope_stack = struct_template.scope_stack;
 
-		// Magic
 		for (incomplete::MemberVariable const & var_template : struct_template.incomplete_struct.member_variables)
 		{
 			try_call_decl(TypeId const var_type, instantiation::resolve_dependent_type(var_template.type, all_template_parameters, scope_stack, out(program)));
@@ -791,25 +828,8 @@ namespace complete
 					}
 				}
 
-				// Check concepts on resolved types.
-				expression::FunctionCall function_call;
-				std::vector<ResolvedTemplateParameter> template_parameters = fn.scope_template_parameters;
-				instantiation::ScopeStack scope_stack = fn.scope_stack;
-				for (size_t i = 0; i < dependent_type_count; ++i)
-				{
-					if (fn.concepts[i] != invalid_function_id)
-					{
-						function_call.function_id = fn.concepts[i];
-						function_call.parameters.push_back(expression::Literal<TypeId>{resolved_dependent_types[i]});
-						auto const concept_passed = interpreter::evaluate_constant_expression_as<bool>(function_call, template_parameters, scope_stack, program);
-						if (!concept_passed.has_value() || !concept_passed.value())
-						{
-							discard = true;
-							break;
-						}
-					}
-					function_call.parameters.clear();
-				}
+				if (check_concepts(fn.concepts, {resolved_dependent_types, dependent_type_count}, fn.scope_template_parameters, fn.scope_stack, program) != fn.concepts.size())
+					discard = true;
 
 				if (!discard)
 				{

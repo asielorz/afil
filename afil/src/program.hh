@@ -153,6 +153,7 @@ namespace complete
 	struct StructTemplate
 	{
 		incomplete::StructTemplate incomplete_struct;
+		std::vector<FunctionId> concepts;
 		std::vector<ResolvedTemplateParameter> scope_template_parameters;
 		instantiation::ScopeStack scope_stack;
 		std::map<std::vector<TypeId>, TypeId, MemcmpRanges> cached_instantiations;
@@ -226,7 +227,8 @@ namespace complete
 	auto ABI_name(Program const & program, StructTemplateId id) noexcept -> std::string_view;
 
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, PartialSyntaxError>;
-	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<TypeId, PartialSyntaxError>;
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, std::string_view instantiation_in_source) noexcept 
+		-> expected<TypeId, PartialSyntaxError>;
 
 	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>;
 	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>;

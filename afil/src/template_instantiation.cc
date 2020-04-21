@@ -176,7 +176,7 @@ namespace instantiation
 				for (incomplete::TypeId const & parameter : template_instantiation.parameters)
 					try_call(parameters.push_back, resolve_dependent_type(parameter, template_parameters, scope_stack, program));
 
-				return instantiate_struct_template(*program, template_id, parameters);
+				return instantiate_struct_template(*program, template_id, parameters, template_instantiation.template_name);
 			},
 			[](incomplete::TypeId::Deduce const &) -> expected<complete::TypeId, PartialSyntaxError>
 			{
@@ -536,6 +536,34 @@ namespace instantiation
 		return is_convertible(expression_type_id(*expr, *program), *expected_return_type, *program);
 	}
 
+	auto resolve_concepts(span<incomplete::TemplateParameter const> template_parameters, ScopeStack & scope_stack, out<complete::Program> program) noexcept
+		-> expected<std::vector<FunctionId>, PartialSyntaxError>
+	{
+		std::vector<FunctionId> concepts;
+
+		for (incomplete::TemplateParameter param : template_parameters)
+		{
+			if (param.concept.empty())
+			{
+				concepts.push_back(invalid_function_id);
+			}
+			else
+			{
+				std::optional<complete::OverloadSet> set = named_overload_set(param.concept, scope_stack);
+				if (!set)
+					return make_syntax_error(param.concept, "Name does not name a concept. A concept is a function type -> bool");
+
+				FunctionId const concept_function = resolve_function_overloading(*set, {complete::TypeId::type}, *program);
+				if (concept_function == invalid_function_id || return_type(*program, concept_function) != complete::TypeId::bool_)
+					return make_syntax_error(param.concept, "Name does not name a concept. A concept is a function type -> bool");
+
+				concepts.push_back(concept_function);
+			}
+		}
+
+		return std::move(concepts);
+	}
+
 	auto instantiate_statement(
 		incomplete::Statement const & incomplete_statement_,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -841,26 +869,7 @@ namespace instantiation
 					));
 				}
 
-				// Concepts
-				for (incomplete::TemplateParameter param : incomplete_expression.function_template.template_parameters)
-				{
-					if (param.concept.empty())
-					{
-						new_function_template.concepts.push_back(invalid_function_id);
-					}
-					else
-					{
-						std::optional<complete::OverloadSet> set = named_overload_set(param.concept, scope_stack);
-						if (!set)
-							return make_syntax_error(param.concept, "Name does not name a concept. A concept is a function type -> bool");
-
-						FunctionId const concept_function = resolve_function_overloading(*set, {complete::TypeId::type}, *program);
-						if (concept_function == invalid_function_id || return_type(*program, concept_function) != complete::TypeId::bool_)
-							return make_syntax_error(param.concept, "Name does not name a concept. A concept is a function type -> bool");
-
-						new_function_template.concepts.push_back(concept_function);
-					}
-				}
+				try_call(assign_to(new_function_template.concepts), resolve_concepts(incomplete_expression.function_template.template_parameters, scope_stack, program));
 
 				FunctionTemplateId const template_id = add_function_template(*program, std::move(new_function_template));
 
@@ -1584,6 +1593,7 @@ namespace instantiation
 				new_template.incomplete_struct = incomplete_statement.declared_struct_template;
 				new_template.scope_template_parameters = template_parameters;
 				new_template.scope_stack = scope_stack;
+				try_call(assign_to(new_template.concepts), resolve_concepts(incomplete_statement.declared_struct_template.template_parameters, scope_stack, program));
 				auto const id = add_struct_template(*program, std::move(new_template));
 				bind_struct_template_name(incomplete_statement.declared_struct_template.name, id, *program, scope_stack);
 

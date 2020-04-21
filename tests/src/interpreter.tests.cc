@@ -2439,9 +2439,50 @@ TEST_CASE("A function can be constrained by concepts")
 	REQUIRE(tests::parse_and_run(src) == 2);
 }
 
+TEST_CASE("A struct may be constrained by concepts")
+{
+	auto const src = R"(
+		let ordered = fn(type t) -> bool
+		{
+			return compiles(t i, t j)
+			{
+				{i == j} -> bool;
+				{i <=> j} -> int
+			};
+		};
+
+		struct<ordered T, ordered U> ordered_pair
+		{
+			T first;
+			U second;
+		}
+
+		let operator<=> = fn<T, U>(ordered_pair<T, U> a, ordered_pair<T, U> b) -> int
+		{
+			let first = a.first <=> b.first;
+			if (first != 0)
+				return first;
+			else
+				return a.second <=> b.second;
+		};
+
+		let main = fn() -> int
+		{
+			let a = ordered_pair<int, float>(5, 3.14);
+			let b = ordered_pair<int, float>(5, 2.25);
+
+			if (a > b)
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
 /*****************************************************************
 Backlog
-- concepts
 - semantic analysis on templates based on concepts (depends on concepts)
 - synthesizing arithmetic operators
 - destructor and copy operations
