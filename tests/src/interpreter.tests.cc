@@ -2489,6 +2489,7 @@ Backlog
 - argument dependent lookup (depends on namespaces, sort of)
 - synthesizing arithmetic operators
 - closures and lambda captures
+- indirect calls
 - currying (maybe, maybe at library level?)
 - some minimalistic standard library (depends on namespaces)
 - semantic analysis on templates based on concepts
