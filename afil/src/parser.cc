@@ -913,6 +913,15 @@ namespace parser
 			else
 			{
 				incomplete::expression::Identifier id_node;
+				while (tokens[index + 1].type == TokenType::scope_resolution)
+				{
+					id_node.namespaces.push_back(tokens[index].source);
+					index += 2;
+
+					if (tokens[index].type != TokenType::identifier)
+						return make_syntax_error(tokens[index].source, "Expected identifier after \"::\".");
+				}
+
 				id_node.name = tokens[index].source;
 				index++;
 				return id_node;
@@ -988,7 +997,7 @@ namespace parser
 				{
 					incomplete::expression::FunctionCall node;
 					node.parameters.reserve(params.size() + 2);
-					node.parameters.push_back(incomplete::Expression(incomplete::expression::Identifier{"[]"}, make_string_view(expr_source_start, expr_source_end)));
+					node.parameters.push_back(incomplete::Expression(incomplete::expression::Identifier("[]"), make_string_view(expr_source_start, expr_source_end)));
 					node.parameters.push_back(std::move(tree));
 					for (auto & param : params)
 						node.parameters.push_back(std::move(param));
@@ -1341,6 +1350,43 @@ namespace parser
 		return std::move(type_alias_statement);
 	}
 
+	auto parse_namespace_declaration(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept
+		-> expected<incomplete::statement::NamespaceDeclaration, PartialSyntaxError>
+	{
+		// Skip namespace token
+		index++;
+
+		incomplete::statement::NamespaceDeclaration namespace_declaration;
+
+		if (tokens[index].type != TokenType::identifier)
+			return make_syntax_error(tokens[index].source, "Expected identifier after keyword \"namespace\".");
+		namespace_declaration.names.push_back(tokens[index].source);
+		index++;
+
+		while (tokens[index].type == TokenType::scope_resolution)
+		{
+			index++;
+			if (tokens[index].type != TokenType::identifier)
+				return make_syntax_error(tokens[index].source, "Expected identifier after \"::\".");
+			namespace_declaration.names.push_back(tokens[index].source);
+			index++;
+		}
+
+		for (std::string_view const namespace_name : namespace_declaration.names)
+			if (is_keyword(namespace_name))
+				return make_syntax_error(namespace_name, "Cannot use a keyword as namespace name.");
+
+		if (tokens[index].type != TokenType::open_brace)
+			return make_syntax_error(tokens[index].source, "Expected '{' after namespace name.");
+		index++;
+
+		while (tokens[index].type != TokenType::close_brace)
+			try_call(namespace_declaration.statements.push_back, parse_statement(tokens, index, type_names));
+		index++;
+
+		return std::move(namespace_declaration);
+	}
+
 	auto parse_expression_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
 		-> expected<incomplete::statement::ExpressionStatement, PartialSyntaxError>
 	{
@@ -1375,6 +1421,8 @@ namespace parser
 			return parse_struct_declaration(tokens, index, type_names);
 		else if (tokens[index].source == "type")
 			try_call(assign_to(result), parse_type_alias(tokens, index, type_names))
+		else if (tokens[index].source == "namespace")
+			return parse_namespace_declaration(tokens, index, type_names);
 		else
 			try_call(assign_to(result), parse_expression_statement(tokens, index, type_names));
 

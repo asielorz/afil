@@ -36,7 +36,6 @@ namespace incomplete
 
 		struct StatementBlock
 		{
-			//Scope scope;
 			std::vector<Statement> statements;
 		};
 
@@ -48,7 +47,6 @@ namespace incomplete
 
 		struct For
 		{
-			//Scope scope;
 			value_ptr<Statement> init_statement;
 			Expression condition;
 			Expression end_expression;
@@ -74,11 +72,18 @@ namespace incomplete
 			Expression type;
 		};
 
+		struct NamespaceDeclaration
+		{
+			std::vector<std::string_view> names;
+			std::vector<Statement> statements;
+		};
+
 		using Variant = std::variant<
 			LetDeclaration, ExpressionStatement,
 			If, StatementBlock, While, For,
 			Return, Break, Continue,
-			StructDeclaration, StructTemplateDeclaration, TypeAliasDeclaration
+			StructDeclaration, StructTemplateDeclaration, TypeAliasDeclaration,
+			NamespaceDeclaration
 		>;
 
 	} // namespace statement

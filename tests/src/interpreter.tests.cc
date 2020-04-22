@@ -2481,10 +2481,74 @@ TEST_CASE("A struct may be constrained by concepts")
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
+TEST_CASE("Names inside namespaces must be preceded by the namespace name")
+{
+	auto const src = R"(
+		namespace ns
+		{
+			let add = fn(int i, int j)
+			{
+				return i + j;
+			};
+		}
+
+		let main = fn() -> int
+		{
+			return ns::add(3, 4);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
+TEST_CASE("Nested namespaces")
+{
+	auto const src = R"(
+		namespace ns
+		{
+			namespace ns2
+			{
+				let add = fn(int i, int j)
+				{
+					return i + j;
+				};
+			}
+		}
+
+		let main = fn() -> int
+		{
+			return ns::ns2::add(3, 4);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
+TEST_CASE("Nested namespace declaration")
+{
+	auto const src = R"(
+		namespace ns::ns2
+		{
+			let add = fn(int i, int j)
+			{
+				return i + j;
+			};
+		}
+
+		let main = fn() -> int
+		{
+			return ns::ns2::add(3, 4);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
 /*****************************************************************
 Backlog
-- destructor and copy operations
 - namespaces
+- dynamic memory allocation
+- destructor and copy operations
 - reflection (better make it depend on namespaces)
 - argument dependent lookup (depends on namespaces, sort of)
 - synthesizing arithmetic operators

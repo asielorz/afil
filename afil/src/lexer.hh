@@ -24,6 +24,7 @@ namespace lex
 			comma,									// ,
 			period,									// .
 			arrow,									// ->
+			scope_resolution,						// ::
 		};
 
 		std::string_view source;

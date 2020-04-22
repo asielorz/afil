@@ -39,6 +39,7 @@ namespace instantiation
 	namespace lookup_result
 	{
 		struct Nothing {};
+		struct NamespaceNotFound {};
 		struct Variable { complete::TypeId variable_type; int variable_offset; };
 		struct Constant { complete::Constant const * constant; };
 		struct GlobalVariable { complete::TypeId variable_type; int variable_offset; };
@@ -49,6 +50,7 @@ namespace instantiation
 	auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		->std::variant<
 			lookup_result::Nothing,
+			lookup_result::NamespaceNotFound,
 			lookup_result::Variable,
 			lookup_result::Constant,
 			lookup_result::GlobalVariable,

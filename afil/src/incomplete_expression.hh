@@ -27,6 +27,10 @@ namespace incomplete
 
 		struct Identifier
 		{
+			Identifier() noexcept = default;
+			Identifier(std::string_view name_) noexcept : name(name_) {}
+
+			std::vector<std::string_view> namespaces;
 			std::string_view name;
 		};
 

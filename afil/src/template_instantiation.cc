@@ -29,6 +29,12 @@ namespace instantiation
 		return scope_stack.back().scope_offset + top(scope_stack).stack_frame_size;
 	}
 
+	auto push_global_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>
+	{
+		scope_stack.push_back({&scope, ScopeType::global, 0});
+		return StackGuard<ScopeStack>(scope_stack);
+	}
+
 	auto push_block_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>
 	{
 		int const offset = next_block_scope_offset(scope_stack);
@@ -271,6 +277,7 @@ namespace instantiation
 	auto lookup_name(ScopeStackView scope_stack, std::string_view name) noexcept
 		->std::variant<
 			lookup_result::Nothing,
+			lookup_result::NamespaceNotFound,
 			lookup_result::Variable,
 			lookup_result::Constant,
 			lookup_result::GlobalVariable,
@@ -338,6 +345,93 @@ namespace instantiation
 			return lookup_result::Nothing();
 		else
 			return overload_set;
+	}
+
+	auto lookup_name(complete::Scope const & scope, std::string_view name) noexcept
+		-> std::variant<
+			lookup_result::Nothing,
+			lookup_result::NamespaceNotFound,
+			lookup_result::Variable,
+			lookup_result::Constant,
+			lookup_result::GlobalVariable,
+			lookup_result::OverloadSet,
+			lookup_result::Type,
+			lookup_result::StructTemplate
+		>
+	{
+		using namespace complete;
+		lookup_result::OverloadSet overload_set;
+
+		auto const var = std::find_if(scope.variables, [name](Variable const & var) { return var.name == name; });
+		if (var != scope.variables.end())
+			return lookup_result::GlobalVariable{var->type, var->offset};
+
+		auto const type = std::find_if(scope.types, [name](TypeName const & var) { return var.name == name; });
+		if (type != scope.types.end())
+			return lookup_result::Type{type->id};
+
+		auto const struct_template = std::find_if(scope.struct_templates, [name](StructTemplateName const & var) { return var.name == name; });
+		if (struct_template != scope.struct_templates.end())
+			return lookup_result::StructTemplate{struct_template->id};
+
+		auto const constant = std::find_if(scope.constants, [name](Constant const & var) { return var.name == name; });
+		if (constant != scope.constants.end())
+			return lookup_result::Constant{&*constant};
+
+		for (FunctionName const & fn : scope.functions)
+			if (fn.name == name)
+				overload_set.function_ids.push_back(fn.id);
+
+		for (FunctionTemplateName const & fn : scope.function_templates)
+			if (fn.name == name)
+				overload_set.function_template_ids.push_back(fn.id);
+
+		if (overload_set.function_ids.empty() && overload_set.function_template_ids.empty())
+			return lookup_result::Nothing();
+		else
+			return overload_set;
+	}
+
+	auto find_namespace(ScopeStackView scope_stack, span<std::string_view const> names) -> complete::Namespace *
+	{
+		int const start = static_cast<int>(scope_stack.size() - 1);
+		for (int i = start; i >= 0; --i)
+		{
+			if (scope_stack[i].type == ScopeType::global)
+			{
+				auto const ns = find_namespace(static_cast<complete::Namespace &>(*scope_stack[i].scope), names);
+				if (ns)
+					return ns;
+			}
+		}
+
+		return nullptr;
+	}
+
+	auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<std::string_view const> namespace_names) noexcept
+		-> std::variant<
+			lookup_result::Nothing,
+			lookup_result::NamespaceNotFound,
+			lookup_result::Variable,
+			lookup_result::Constant,
+			lookup_result::GlobalVariable,
+			lookup_result::OverloadSet,
+			lookup_result::Type,
+			lookup_result::StructTemplate
+		>
+	{
+		if (namespace_names.empty())
+		{
+			return lookup_name(scope_stack, name);
+		}
+		else
+		{
+			complete::Namespace * const ns = find_namespace(scope_stack, namespace_names);
+			if (ns == nullptr)
+				return lookup_result::NamespaceNotFound();
+			else
+				return lookup_name(*ns, name);
+		}
 	}
 
 	auto named_overload_set(std::string_view name, ScopeStackView scope_stack) -> std::optional<complete::OverloadSet>
@@ -606,7 +700,7 @@ namespace instantiation
 		out<complete::Function> function
 	) -> expected<void, PartialSyntaxError>
 	{
-		scope_stack.push_back({ &*function, ScopeType::function, 0 });
+		scope_stack.push_back({&*function, ScopeType::function, 0});
 
 		function->preconditions.reserve(incomplete_function.preconditions.size());
 		for (incomplete::Expression const & precondition : incomplete_function.preconditions)
@@ -686,7 +780,8 @@ namespace instantiation
 			},
 			[&](incomplete::expression::Identifier const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
-				auto const lookup = lookup_name(scope_stack, incomplete_expression.name);
+				auto const lookup = lookup_name(scope_stack, incomplete_expression.name, incomplete_expression.namespaces);
+
 				auto const lookup_visitor = overload(
 					[](lookup_result::Variable const & var) -> expected<complete::Expression, PartialSyntaxError>
 					{
@@ -714,6 +809,10 @@ namespace instantiation
 						complete::expression::Constant complete_expression;
 						complete_expression.type = type_for_overload_set(*program, var);
 						return complete_expression;
+					},
+					[&](lookup_result::NamespaceNotFound) -> expected<complete::Expression, PartialSyntaxError>
+					{
+						return make_syntax_error(incomplete_expression.namespaces[0], "Namespace not found.");
 					},
 					[&](auto const &) -> expected<complete::Expression, PartialSyntaxError>
 					{
@@ -1616,6 +1715,33 @@ namespace instantiation
 				bind_type_name(incomplete_statement.name, type.value(), *program, scope_stack);
 
 				return std::nullopt;
+			},
+			[&](incomplete::statement::NamespaceDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
+			{
+				if (scope_stack.back().type != ScopeType::global)
+					return make_syntax_error(incomplete_statement.names[0], "Namespace may only be declared at global or namespace scope.");
+
+				auto * current_namespace = &static_cast<complete::Namespace &>(top(scope_stack));
+
+				// Push all declared nested namespaces.
+				for (std::string_view const name : incomplete_statement.names)
+				{
+					current_namespace = &add_namespace(*current_namespace, name);
+					scope_stack.push_back({current_namespace, ScopeType::global, 0});
+				}
+
+				for (incomplete::Statement const & incomplete_substatement : incomplete_statement.statements)
+				{
+					try_call_decl(auto complete_substatement, instantiate_statement(incomplete_substatement, template_parameters, scope_stack, program, current_scope_return_type));
+					if (complete_substatement.has_value())
+						program->global_initialization_statements.push_back(std::move(*complete_substatement));
+				}
+
+				// Pop all namespaces pushed above.
+				for (size_t i = 0; i < incomplete_statement.names.size(); ++i)
+					scope_stack.pop_back();
+
+				return std::nullopt;
 			}
 		);
 
@@ -1696,7 +1822,7 @@ namespace instantiation
 	auto push_global_scopes_of_dependent_modules(
 		span<incomplete::Module const> incomplete_modules,
 		int module_index,
-		span<complete::Scope> module_global_scopes, 
+		span<complete::Namespace> module_global_scopes, 
 		out<ScopeStack> scope_stack
 	) noexcept -> void
 	{
@@ -1712,7 +1838,7 @@ namespace instantiation
 	) noexcept -> expected<complete::Program, SyntaxError>
 	{
 		complete::Program program;
-		std::vector<complete::Scope> module_global_scopes(incomplete_modules.size());
+		std::vector<complete::Namespace> module_global_scopes(incomplete_modules.size());
 
 		ScopeStack scope_stack;
 		scope_stack.push_back({&program.global_scope, ScopeType::global, 0});
@@ -1737,7 +1863,7 @@ namespace instantiation
 		}
 
 		// Fold all scopes into the program's global scope.
-		for (complete::Scope & module_global_scope : module_global_scopes)
+		for (complete::Namespace & module_global_scope : module_global_scopes)
 		{
 			for (complete::Constant & constant : module_global_scope.constants)
 				program.global_scope.constants.push_back(std::move(constant));
@@ -1756,6 +1882,10 @@ namespace instantiation
 
 			for (complete::Variable const & var : module_global_scope.variables)
 				add_variable_to_scope(program.global_scope, var.name, var.type, 0, program);
+
+			TODO("Merge namespaces with equal nanes");
+			for (complete::Namespace & nested_namespace : module_global_scope.nested_namespaces)
+				program.global_scope.nested_namespaces.push_back(std::move(nested_namespace));
 		}
 
 		return std::move(program);

@@ -160,6 +160,12 @@ namespace complete
 		std::string ABI_name;
 	};
 
+	struct Namespace : Scope
+	{
+		std::string name;
+		std::vector<Namespace> nested_namespaces;
+	};
+
 	struct Program
 	{
 		Program();
@@ -176,7 +182,7 @@ namespace complete
 		std::vector<ExternFunction> extern_functions;
 		std::vector<FunctionTemplate> function_templates;
 		std::vector<Statement> global_initialization_statements;
-		Scope global_scope;
+		Namespace global_scope;
 		FunctionId main_function = invalid_function_id;
 	};
 
@@ -218,6 +224,10 @@ namespace complete
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool;
 	auto is_callable_at_runtime(Program const & program, FunctionId id) noexcept -> bool;
+
+	auto find_namespace(Namespace & current_namespace, std::string_view name) noexcept -> Namespace *;
+	auto find_namespace(Namespace & current_namespace, span<std::string_view const> names) noexcept -> Namespace *;
+	auto add_namespace(Namespace & current_namespace, std::string_view name) noexcept -> Namespace &;
 
 	auto ABI_name(Program & program, FunctionId id) noexcept -> std::string &;
 	auto ABI_name(Program const & program, FunctionId id) noexcept -> std::string_view;

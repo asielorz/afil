@@ -435,6 +435,45 @@ namespace complete
 			return program.functions[id.index].is_callable_at_runtime;
 	}
 
+	auto find_namespace(Namespace & current_namespace, std::string_view name) noexcept -> Namespace *
+	{
+		auto const it = std::find_if(current_namespace.nested_namespaces, [name](Namespace const & ns) { return ns.name == name; });
+		if (it != current_namespace.nested_namespaces.end())
+			return &*it;
+		else 
+			return nullptr;
+	}
+
+	auto find_namespace(Namespace & current_namespace, span<std::string_view const> names) noexcept -> complete::Namespace *
+	{
+		assert(!names.empty());
+
+		complete::Namespace * ns = &current_namespace;
+		for (std::string_view const name : names)
+		{
+			ns = find_namespace(*ns, name);
+			if (ns == nullptr)
+				return nullptr;
+		}
+
+		return ns;
+	}
+
+	auto add_namespace(Namespace & current_namespace, std::string_view name) noexcept -> Namespace &
+	{
+		auto const it = find_namespace(current_namespace, name);
+		if (it != nullptr)
+		{
+			return *it;
+		}
+		else
+		{
+			Namespace & new_namespace = current_namespace.nested_namespaces.emplace_back();
+			new_namespace.name = name;
+			return new_namespace;
+		}
+	}
+
 	auto ABI_name(Program & program, FunctionId id) noexcept -> std::string &
 	{
 		assert(id.type != FunctionId::Type::intrinsic);
