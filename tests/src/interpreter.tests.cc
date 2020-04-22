@@ -2544,6 +2544,28 @@ TEST_CASE("Nested namespace declaration")
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
+TEST_CASE("Types inside namespaces")
+{
+	auto const src = R"(
+		namespace ns
+		{
+			struct ivec2
+			{
+				int x;
+				int y;
+			}
+		}
+
+		let main = fn() -> int
+		{
+			let v = ns::ivec2(3, 4);
+			return v.x + v.y;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

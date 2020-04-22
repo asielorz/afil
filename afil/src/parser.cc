@@ -232,6 +232,22 @@ namespace parser
 	auto parse_expression_and_trailing_subexpressions(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>;
 	auto parse_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Statement, PartialSyntaxError>;
 
+	auto parse_namespaces(span<lex::Token const> tokens, size_t & index) noexcept -> expected<std::vector<std::string_view>, PartialSyntaxError>
+	{
+		std::vector<std::string_view> namespaces;
+
+		while (tokens[index + 1].type == TokenType::scope_resolution)
+		{
+			namespaces.push_back(tokens[index].source);
+			index += 2;
+
+			if (tokens[index].type != TokenType::identifier)
+				return make_syntax_error(tokens[index].source, "Expected identifier after \"::\".");
+		}
+
+		return std::move(namespaces);
+	}
+
 	auto parse_mutable_pointer_and_array(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, incomplete::TypeId type) noexcept 
 		-> expected<incomplete::TypeId, PartialSyntaxError>
 	{
@@ -319,10 +335,17 @@ namespace parser
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<std::optional<incomplete::TypeId>, PartialSyntaxError>
 	{
 		using namespace incomplete;
+		
+		size_t const index_start = index;
+		try_call_decl(std::vector<std::string_view> namespaces, parse_namespaces(tokens, index));
+		
 		std::string_view const name_to_look_up = tokens[index].source;
 		auto const it = std::find_if(type_names.rbegin(), type_names.rend(), [name_to_look_up](TypeName const & type_name) { return type_name.name == name_to_look_up; });
 		if (it == type_names.rend())
+		{
+			index = index_start;
 			return std::nullopt;
+		}
 
 		index++;
 
@@ -335,6 +358,7 @@ namespace parser
 			{
 				TypeId::BaseCase base_case;
 				base_case.name = name_to_look_up;
+				base_case.namespaces = std::move(namespaces);
 				TypeId type;
 				type.is_mutable = false;
 				type.is_reference = false;
@@ -346,6 +370,7 @@ namespace parser
 			{
 				TypeId::TemplateInstantiation template_instantiation;
 				template_instantiation.template_name = name_to_look_up;
+				template_instantiation.namespaces = std::move(namespaces);
 				try_call(assign_to(template_instantiation.parameters), parse_template_instantiation_parameter_list(tokens, index, type_names));
 				TypeId type;
 				type.is_mutable = false;
@@ -913,14 +938,7 @@ namespace parser
 			else
 			{
 				incomplete::expression::Identifier id_node;
-				while (tokens[index + 1].type == TokenType::scope_resolution)
-				{
-					id_node.namespaces.push_back(tokens[index].source);
-					index += 2;
-
-					if (tokens[index].type != TokenType::identifier)
-						return make_syntax_error(tokens[index].source, "Expected identifier after \"::\".");
-				}
+				try_call(assign_to(id_node.namespaces), parse_namespaces(tokens, index));
 
 				id_node.name = tokens[index].source;
 				index++;

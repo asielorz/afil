@@ -16,6 +16,7 @@ namespace incomplete
 		#pragma warning (disable : 4201)
 		struct BaseCase
 		{
+			std::vector<std::string_view> namespaces;
 			std::string_view name;
 		};
 		struct Pointer
@@ -33,6 +34,7 @@ namespace incomplete
 		};
 		struct TemplateInstantiation
 		{
+			std::vector<std::string_view> namespaces;
 			std::string_view template_name;
 			std::vector<TypeId> parameters;
 		};

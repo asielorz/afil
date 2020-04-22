@@ -145,7 +145,7 @@ namespace instantiation
 		auto const visitor = overload(
 			[&](incomplete::TypeId::BaseCase const & base_case) -> expected<complete::TypeId, PartialSyntaxError>
 			{
-				complete::TypeId const type = type_with_name(base_case.name, scope_stack, template_parameters);
+				complete::TypeId const type = type_with_name(base_case.name, scope_stack, base_case.namespaces, template_parameters);
 				if (type == complete::TypeId::none) 
 					return make_syntax_error(base_case.name, join("Type not found: ", base_case.name));
 				return type;
@@ -174,7 +174,7 @@ namespace instantiation
 					[](auto const &) -> complete::StructTemplateId { declare_unreachable(); }
 				);
 
-				auto lookup = lookup_name(scope_stack, template_instantiation.template_name);
+				auto lookup = lookup_name(scope_stack, template_instantiation.template_name, template_instantiation.namespaces);
 				complete::StructTemplateId const template_id = std::visit(visitor, lookup);
 
 				std::vector<complete::TypeId> parameters;
@@ -206,7 +206,7 @@ namespace instantiation
 		auto const visitor = overload(
 			[&](incomplete::TypeId::BaseCase const & base_case) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
-				complete::TypeId const type = type_with_name(base_case.name, scope_stack, resolved_template_parameters);
+				complete::TypeId const type = type_with_name(base_case.name, scope_stack, base_case.namespaces, resolved_template_parameters);
 				if (type != complete::TypeId::none)
 					return complete::FunctionTemplateParameterType{complete::FunctionTemplateParameterType::BaseCase{type}, false, false};
 
@@ -249,7 +249,7 @@ namespace instantiation
 			},
 			[&](incomplete::TypeId::TemplateInstantiation const & template_instantiation) -> expected<complete::FunctionTemplateParameterType, PartialSyntaxError>
 			{
-				auto const template_id = struct_template_with_name(template_instantiation.template_name, scope_stack);
+				auto const template_id = struct_template_with_name(template_instantiation.template_name, scope_stack, template_instantiation.namespaces);
 				if (!template_id.has_value())
 					return make_syntax_error(template_instantiation.template_name, "Struct template not found");
 
@@ -459,7 +459,7 @@ namespace instantiation
 		return std::move(*set);
 	}
 
-	auto type_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> complete::TypeId
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<std::string_view const> namespaces) noexcept -> complete::TypeId
 	{
 		auto const visitor = overload(
 			[](lookup_result::Type const & type) -> complete::TypeId
@@ -472,13 +472,14 @@ namespace instantiation
 			}
 		);
 
-		auto lookup = lookup_name(scope_stack, name);
+		auto lookup = lookup_name(scope_stack, name, namespaces);
 		return std::visit(visitor, lookup);
 	}
 
-	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept -> complete::TypeId
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<std::string_view const> namespaces, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept
+		-> complete::TypeId
 	{
-		complete::TypeId const type = type_with_name(name, scope_stack);
+		complete::TypeId const type = type_with_name(name, scope_stack, namespaces);
 		if (type != complete::TypeId::none)
 			return type;
 
@@ -492,7 +493,7 @@ namespace instantiation
 		return complete::TypeId::none;
 	}
 
-	auto struct_template_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> std::optional<complete::StructTemplateId>
+	auto struct_template_with_name(std::string_view name, ScopeStackView scope_stack, span<std::string_view const> namespaces) noexcept -> std::optional<complete::StructTemplateId>
 	{
 		auto const visitor = overload(
 			[](lookup_result::StructTemplate const & type) -> std::optional<complete::StructTemplateId>
@@ -505,7 +506,7 @@ namespace instantiation
 			}
 		);
 
-		auto lookup = lookup_name(scope_stack, name);
+		auto lookup = lookup_name(scope_stack, name, namespaces);
 		return std::visit(visitor, lookup);
 	}
 

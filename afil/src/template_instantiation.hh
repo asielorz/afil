@@ -58,9 +58,35 @@ namespace instantiation
 			lookup_result::Type,
 			lookup_result::StructTemplate
 		>;
-	auto type_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> complete::TypeId;
-	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept -> complete::TypeId;
-	auto struct_template_with_name(std::string_view name, ScopeStackView scope_stack) noexcept -> std::optional<complete::StructTemplateId>;
+
+	auto lookup_name(complete::Scope const & scope, std::string_view name) noexcept
+		-> std::variant<
+			lookup_result::Nothing,
+			lookup_result::NamespaceNotFound,
+			lookup_result::Variable,
+			lookup_result::Constant,
+			lookup_result::GlobalVariable,
+			lookup_result::OverloadSet,
+			lookup_result::Type,
+			lookup_result::StructTemplate
+		>;
+
+	auto lookup_name(ScopeStackView scope_stack, std::string_view name, span<std::string_view const> namespace_names) noexcept
+		-> std::variant<
+			lookup_result::Nothing,
+			lookup_result::NamespaceNotFound,
+			lookup_result::Variable,
+			lookup_result::Constant,
+			lookup_result::GlobalVariable,
+			lookup_result::OverloadSet,
+			lookup_result::Type,
+			lookup_result::StructTemplate
+		>;
+
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<std::string_view const> namespaces) noexcept -> complete::TypeId;
+	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<std::string_view const> namespaces, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept
+		-> complete::TypeId;
+	auto struct_template_with_name(std::string_view name, ScopeStackView scope_stack, span<std::string_view const> namespaces) noexcept -> std::optional<complete::StructTemplateId>;
 
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type,
