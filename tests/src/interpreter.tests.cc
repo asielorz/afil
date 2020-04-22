@@ -2546,7 +2546,6 @@ TEST_CASE("Nested namespace declaration")
 
 /*****************************************************************
 Backlog
-- namespaces
 - dynamic memory allocation
 - destructor and copy operations
 - reflection (better make it depend on namespaces)
