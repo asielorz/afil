@@ -2587,6 +2587,27 @@ TEST_CASE("Type expression in constructor")
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
+TEST_CASE("Type expression in designated initializer constructor")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x;
+			int y;
+		}
+
+		let identity = fn<T>(T t) { return t; };
+
+		let main = fn() -> int
+		{
+			let v = identity(ivec2)(.x = 3, .y = 4);
+			return v.x + v.y;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
 /*****************************************************************
 Backlog
 - conversions

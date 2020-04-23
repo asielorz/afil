@@ -1276,7 +1276,9 @@ namespace instantiation
 			},
 			[&](incomplete::expression::DesignatedInitializerConstructor const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
-				try_call_decl(complete::TypeId const constructed_type_id, resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, program));
+				try_call_decl(complete::TypeId const constructed_type_id, instantiate_and_evaluate_type_expression(
+					*incomplete_expression.constructed_type, program, template_parameters, scope_stack));
+
 				complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
 
 				if (!is_struct(constructed_type)) 

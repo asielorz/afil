@@ -913,17 +913,17 @@ namespace parser
 			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (type.has_value())
 			{
-				if (tokens[index].type == TokenType::open_parenthesis && tokens[index + 1].type == TokenType::period)
-				{
-					incomplete::expression::DesignatedInitializerConstructor ctor_node;
-					ctor_node.constructed_type = std::move(*type);
-					try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
-					return std::move(ctor_node);
-				}
-				else
-				{
+				//if (tokens[index].type == TokenType::open_parenthesis && tokens[index + 1].type == TokenType::period)
+				//{
+				//	incomplete::expression::DesignatedInitializerConstructor ctor_node;
+				//	ctor_node.constructed_type = std::move(*type);
+				//	try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
+				//	return std::move(ctor_node);
+				//}
+				//else
+				//{
 					return incomplete::expression::Literal<incomplete::TypeId>(std::move(*type));
-				}
+				//}
 			}
 			else
 			{
@@ -1015,17 +1015,31 @@ namespace parser
 			// Function call
 			else if (tokens[index].type == TokenType::open_parenthesis)
 			{
-				try_call_decl(std::vector<incomplete::Expression> params, parse_comma_separated_expression_list(tokens, index, type_names));
+				if (tokens[index + 1].type == TokenType::period)
+				{
+					incomplete::expression::DesignatedInitializerConstructor ctor_node;
+					ctor_node.constructed_type = allocate(std::move(tree));
+					try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
 
-				auto const expr_source_start = begin_ptr(tree.source);
-				auto const expr_source_end = end_ptr(tokens[index - 1].source);
+					auto const expr_source_start = begin_ptr(tree.source);
+					auto const expr_source_end = end_ptr(tokens[index - 1].source);
 
-				incomplete::expression::FunctionCall node;
-				node.parameters.reserve(params.size() + 1);
-				node.parameters.push_back(std::move(tree));
-				for (auto & param : params)
-					node.parameters.push_back(std::move(param));
-				tree = incomplete::Expression(std::move(node), make_string_view(expr_source_start, expr_source_end));
+					tree = incomplete::Expression(std::move(ctor_node), make_string_view(expr_source_start, expr_source_end));
+				}
+				else
+				{
+					try_call_decl(std::vector<incomplete::Expression> params, parse_comma_separated_expression_list(tokens, index, type_names));
+
+					auto const expr_source_start = begin_ptr(tree.source);
+					auto const expr_source_end = end_ptr(tokens[index - 1].source);
+
+					incomplete::expression::FunctionCall node;
+					node.parameters.reserve(params.size() + 1);
+					node.parameters.push_back(std::move(tree));
+					for (auto & param : params)
+						node.parameters.push_back(std::move(param));
+					tree = incomplete::Expression(std::move(node), make_string_view(expr_source_start, expr_source_end));
+				}
 			}
 			else break;
 		}

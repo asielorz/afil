@@ -103,7 +103,7 @@ namespace incomplete
 
 		struct DesignatedInitializerConstructor
 		{
-			TypeId constructed_type;
+			value_ptr<Expression> constructed_type;
 			std::vector<DesignatedInitializer> parameters;
 		};
 
