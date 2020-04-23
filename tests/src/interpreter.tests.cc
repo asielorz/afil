@@ -2608,6 +2608,31 @@ TEST_CASE("Type expression in designated initializer constructor")
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
+TEST_CASE("Accessing a name from a namespace inside the namespace without namespace qualifiers")
+{
+	auto const src = R"(
+		namespace ns::ns2 
+		{
+			let add = fn(int i, int j)
+			{
+				return i + j;
+			};
+			
+			let test = fn() -> int
+			{
+				return /* sin namespace */ add(2, 3); 
+			};
+		}
+
+		let main = fn() -> int
+		{
+			return ns::ns2::test();
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - conversions
