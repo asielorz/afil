@@ -2566,16 +2566,39 @@ TEST_CASE("Types inside namespaces")
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
+TEST_CASE("Type expression in constructor")
+{
+	auto const src = R"(
+		struct ivec2
+		{
+			int x;
+			int y;
+		}
+
+		let identity = fn<T>(T t) { return t; };
+
+		let main = fn() -> int
+		{
+			let v = identity(ivec2)(3, 4);
+			return v.x + v.y;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
 /*****************************************************************
 Backlog
+- conversions
+- casting
 - dynamic memory allocation
 - destructor and copy operations
-- reflection (better make it depend on namespaces)
+- reflection
 - argument dependent lookup (depends on namespaces, sort of)
 - synthesizing arithmetic operators
 - closures and lambda captures
 - indirect calls
 - currying (maybe, maybe at library level?)
-- some minimalistic standard library (depends on namespaces)
+- some minimalistic standard library
 - semantic analysis on templates based on concepts
 *****************************************************************/

@@ -101,12 +101,6 @@ namespace incomplete
 			std::vector<incomplete::Statement> statements;
 		};
 
-		struct Constructor
-		{
-			TypeId constructed_type;
-			std::vector<Expression> parameters;
-		};
-
 		struct DesignatedInitializerConstructor
 		{
 			TypeId constructed_type;
@@ -136,7 +130,7 @@ namespace incomplete
 			Function, FunctionTemplate,	ExternFunction,
 			FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 			If, StatementBlock,
-			Constructor, DesignatedInitializerConstructor,
+			DesignatedInitializerConstructor,
 			DataCall, SizeCall, Compiles
 		>;
 

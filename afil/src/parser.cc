@@ -913,22 +913,12 @@ namespace parser
 			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (type.has_value())
 			{
-				if (tokens[index].type == TokenType::open_parenthesis)
+				if (tokens[index].type == TokenType::open_parenthesis && tokens[index + 1].type == TokenType::period)
 				{
-					if (tokens[index + 1].type == TokenType::period)
-					{
-						incomplete::expression::DesignatedInitializerConstructor ctor_node;
-						ctor_node.constructed_type = std::move(*type);
-						try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
-						return std::move(ctor_node);
-					}
-					else
-					{
-						incomplete::expression::Constructor ctor_node;
-						ctor_node.constructed_type = std::move(*type);
-						try_call(assign_to(ctor_node.parameters), parse_comma_separated_expression_list(tokens, index, type_names));
-						return std::move(ctor_node);
-					}
+					incomplete::expression::DesignatedInitializerConstructor ctor_node;
+					ctor_node.constructed_type = std::move(*type);
+					try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
+					return std::move(ctor_node);
 				}
 				else
 				{

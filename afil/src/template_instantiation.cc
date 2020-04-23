@@ -135,6 +135,25 @@ namespace instantiation
 		return *result;
 	}
 
+	auto instantiate_and_evaluate_type_expression(
+		incomplete::Expression const & type_expression,
+		out<complete::Program> program,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack
+	) noexcept -> expected<complete::TypeId, PartialSyntaxError>
+	{
+		try_call_decl(complete::Expression type_expr, instantiate_expression(type_expression, template_parameters, scope_stack, program, nullptr));
+		try_call(assign_to(type_expr), insert_conversion_node(std::move(type_expr), complete::TypeId::type, *program));
+		if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
+			return make_syntax_error(type_expression.source, "Type expression must be a constant expression.");
+
+		auto const type = interpreter::evaluate_constant_expression_as<complete::TypeId>(type_expr, template_parameters, scope_stack, *program);
+		if (!type.has_value())
+			return make_syntax_error(type_expression.source, "Unmet precondition at evaluating constant expression.");
+
+		return type.value();
+	}
+
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type, 
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -659,6 +678,78 @@ namespace instantiation
 		return std::move(concepts);
 	}
 
+	auto instantiate_constructor_call(
+		complete::TypeId constructed_type_id,
+		span<complete::Expression> parameters,
+		out<complete::Program> program,
+		std::string_view expression_source
+	) noexcept
+		-> expected<complete::Expression, PartialSyntaxError>
+	{
+		if (parameters.size() == 0) // Default constructor
+		{
+			if (!is_default_constructible(constructed_type_id, *program))
+				return make_syntax_error(expression_source, "Cannot construct with 0 parameters a type that is not default constructible.");
+			return synthesize_default_constructor(constructed_type_id, *program);
+		}
+
+		complete::expression::Constructor complete_expression;
+		complete_expression.constructed_type = constructed_type_id;
+
+		complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
+		if (is_struct(constructed_type))
+		{
+			complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
+
+			if (constructed_struct.member_variables.size() != parameters.size())
+				return make_syntax_error(expression_source, "Incorrect number of arguments for struct constructor.");
+
+			size_t const n = parameters.size();
+			complete_expression.parameters.reserve(n);
+			for (size_t i = 0; i < n; ++i)
+			{
+				try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(parameters[i]), constructed_struct.member_variables[i].type, *program));
+			}
+		}
+		else if (is_array(constructed_type))
+		{
+			complete::Type::Array const & constructed_array = std::get<complete::Type::Array>(constructed_type.extra_data);
+			complete::TypeId const array_type = constructed_array.value_type;
+			int const array_size = constructed_array.size;
+			int const param_count = static_cast<int>(parameters.size());
+
+			if (parameters.size() != 1 && param_count != array_size)
+				return make_syntax_error(expression_source, "Incorrect number of arguments for array constructor.");
+
+			complete_expression.parameters.reserve(param_count);
+			for (int i = 0; i < param_count; ++i)
+			{
+				try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(parameters[i]), array_type, *program));
+			}
+		}
+		// Not an actual array pointer but array type with deduced size.
+		else if (is_array_pointer(constructed_type))
+		{
+			int const param_count = static_cast<int>(parameters.size());
+
+			complete::TypeId const value_type = pointee_type(constructed_type);
+			complete::TypeId const constructed_array_type = array_type_for(value_type, param_count, *program);
+			complete_expression.constructed_type = constructed_array_type;
+
+			complete_expression.parameters.reserve(param_count);
+			for (int i = 0; i < param_count; ++i)
+			{
+				try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(parameters[i]), value_type, *program));
+			}
+		}
+		else
+		{
+			declare_unreachable();
+		}
+
+		return std::move(complete_expression);
+	}
+
 	auto instantiate_statement(
 		incomplete::Statement const & incomplete_statement_,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -1051,6 +1142,20 @@ namespace instantiation
 					complete_expression.parameters.erase(complete_expression.parameters.begin());
 					return std::move(complete_expression);
 				}
+				else if (first_param_type == complete::TypeId::type)
+				{
+					auto const constructed_type = 
+						interpreter::evaluate_constant_expression_as<complete::TypeId>(parameters[0], template_parameters, scope_stack, *program);
+					if (!constructed_type.has_value())
+						return make_syntax_error(incomplete_expression.parameters[0].source, "Unmet precondition when evaluation constant expression");
+
+					return instantiate_constructor_call(
+						constructed_type.value(),
+						{parameters.data() + 1, parameters.size() - 1},
+						program,
+						incomplete_expression_.source
+					);
+				}
 				else
 				{
 					mark_as_to_do("Overload of operator function call");
@@ -1167,82 +1272,6 @@ namespace instantiation
 						complete_expression.statements.push_back(std::move(*complete_substatement));
 				}
 			
-				return std::move(complete_expression);
-			},
-			[&](incomplete::expression::Constructor const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
-			{
-				try_call_decl(complete::TypeId const constructed_type_id, resolve_dependent_type(incomplete_expression.constructed_type, template_parameters, scope_stack, program));
-
-				if (incomplete_expression.parameters.size() == 0) // Default constructor
-				{
-					if (!is_default_constructible(constructed_type_id, *program)) 
-						return make_syntax_error(incomplete_expression_.source, "Cannot construct with 0 parameters a type that is not default constructible.");
-					return synthesize_default_constructor(constructed_type_id, *program);
-				}
-
-				complete::expression::Constructor complete_expression;
-				complete_expression.constructed_type = constructed_type_id;
-
-				complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
-				if (is_struct(constructed_type))
-				{
-					complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
-
-					if (constructed_struct.member_variables.size() != incomplete_expression.parameters.size())
-						return make_syntax_error(incomplete_expression_.source, "Incorrect number of arguments for struct constructor.");
-
-					size_t const n = incomplete_expression.parameters.size();
-					complete_expression.parameters.reserve(n);
-					for (size_t i = 0; i < n; ++i)
-					{
-						try_call_decl(complete::Expression complete_param,
-							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type));
-
-						try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(complete_param), constructed_struct.member_variables[i].type, *program));
-					}
-				}
-				else if (is_array(constructed_type))
-				{
-					complete::Type::Array const & constructed_array = std::get<complete::Type::Array>(constructed_type.extra_data);
-					complete::TypeId const array_type = constructed_array.value_type;
-					int const array_size = constructed_array.size;
-					int const param_count = static_cast<int>(incomplete_expression.parameters.size());
-
-					if (incomplete_expression.parameters.size() != 1 && param_count != array_size)
-						return make_syntax_error(incomplete_expression_.source, "Incorrect number of arguments for array constructor.");
-
-					complete_expression.parameters.reserve(param_count);
-					for (int i = 0; i < param_count; ++i)
-					{
-						try_call_decl(complete::Expression complete_param,
-							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type));
-
-						try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(complete_param), array_type, *program));
-					}
-				}
-				// Not an actual array pointer but array type with deduced size.
-				else if (is_array_pointer(constructed_type))
-				{
-					int const param_count = static_cast<int>(incomplete_expression.parameters.size());
-
-					complete::TypeId const value_type = pointee_type(constructed_type);
-					complete::TypeId const constructed_array_type = array_type_for(value_type, param_count, *program);
-					complete_expression.constructed_type = constructed_array_type;
-
-					complete_expression.parameters.reserve(param_count);
-					for (int i = 0; i < param_count; ++i)
-					{
-						try_call_decl(complete::Expression complete_param,
-							instantiate_expression(incomplete_expression.parameters[i], template_parameters, scope_stack, program, current_scope_return_type));
-
-						try_call(complete_expression.parameters.push_back, insert_conversion_node(std::move(complete_param), value_type, *program));
-					}
-				}
-				else
-				{
-					declare_unreachable();
-				}
-
 				return std::move(complete_expression);
 			},
 			[&](incomplete::expression::DesignatedInitializerConstructor const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
@@ -1704,16 +1733,9 @@ namespace instantiation
 				if (does_name_collide(scope_stack, incomplete_statement.name))
 					return make_syntax_error(incomplete_statement.name, "Type alias name collides with another name.");
 
-				try_call_decl(complete::Expression type_expr, instantiate_expression(incomplete_statement.type, template_parameters, scope_stack, program, current_scope_return_type));
-				try_call(assign_to(type_expr), insert_conversion_node(std::move(type_expr), complete::TypeId::type, *program));
-				if (!is_constant_expression(type_expr, *program, next_block_scope_offset(scope_stack)))
-					return make_syntax_error(incomplete_statement.type.source, "Type in type alias declaration must be a constant expression.");
+				try_call_decl(complete::TypeId const type, instantiate_and_evaluate_type_expression(incomplete_statement.type, program, template_parameters, scope_stack));
 
-				auto const type = interpreter::evaluate_constant_expression_as<complete::TypeId>(type_expr, template_parameters, scope_stack, *program);
-				if (!type.has_value())
-					return make_syntax_error(incomplete_statement.type.source, "Unmet precondition at evaluating constant expression.");
-
-				bind_type_name(incomplete_statement.name, type.value(), *program, scope_stack);
+				bind_type_name(incomplete_statement.name, type, *program, scope_stack);
 
 				return std::nullopt;
 			},
