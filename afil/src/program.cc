@@ -110,6 +110,11 @@ namespace complete
 		intrinsic_function_descriptor<bool(bool, bool)>("xor"sv),
 		intrinsic_function_descriptor<bool(bool)>("not"sv),
 		intrinsic_function_descriptor<bool(bool, bool)>("=="sv),
+
+		intrinsic_function_descriptor<float(int)>("ex conv"sv),
+		intrinsic_function_descriptor<int(float)>("ex conv"sv),
+		intrinsic_function_descriptor<unsigned char(int)>("ex conv"sv),
+		intrinsic_function_descriptor<int(unsigned char)>("ex conv"sv),
 	};
 
 	Program::Program()
@@ -647,18 +652,18 @@ namespace complete
 		return new_type_id;
 	}
 
-	auto insert_conversion_node_impl(Expression tree, TypeId from, TypeId to, Program const & program, bool allow_address_of_temporary) noexcept -> expected<Expression, ConversionNotFound>
+	auto insert_implicit_conversion_node_impl(Expression && expr, TypeId from, TypeId to, Program const & program, bool allow_address_of_temporary) noexcept -> expected<Expression, ConversionNotFound>
 	{
 		if (from.index == to.index)
 		{
 			// From reference to reference and value to value there is no conversion. A pointer is a pointer, regardless of constness.
 			if (from.is_reference == to.is_reference)
-				return std::move(tree);
+				return std::move(expr);
 
 			if (from.is_reference && !to.is_reference)
 			{
 				expression::Dereference deref_node;
-				deref_node.expression = allocate(std::move(tree));
+				deref_node.expression = allocate(std::move(expr));
 				deref_node.return_type = to;
 				return std::move(deref_node);
 			}
@@ -668,39 +673,39 @@ namespace complete
 					return Error(ConversionNotFound(from, to, "Can't bind a temporary to a mutable reference."));
 
 				if (allow_address_of_temporary)
-					return std::move(tree);
+					return std::move(expr);
 				else 
 					return Error(ConversionNotFound(from, to, "Cannot take address of temporary."));
 			}
 		}
 		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
 		{
-			return std::move(tree);
+			return std::move(expr);
 		}
 		return Error(ConversionNotFound(from, to, "Conversion between types does not exist."));
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
+	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
 	{
-		return insert_conversion_node_impl(std::move(tree), from, to, program, false);
+		return insert_implicit_conversion_node_impl(std::move(expr), from, to, program, false);
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
+	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
 	{
-		return insert_conversion_node(std::move(tree), expression_type_id(tree, program), to, program);
+		return insert_implicit_conversion_node(std::move(expr), expression_type_id(expr, program), to, program);
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
+	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
 	{
-		if (auto conversion = insert_conversion_node(std::move(tree), from, to, program))
+		if (auto conversion = insert_implicit_conversion_node(std::move(expr), from, to, program))
 			return std::move(*conversion);
 		else
 			return make_syntax_error(source, join("Error in conversion from ", conversion.error().from.index, " to ", conversion.error().to.index, ": ", conversion.error().why));
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
+	auto insert_implicit_conversion_node(Expression && tree, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
 	{
-		return insert_conversion_node(std::move(tree), expression_type_id(tree, program), to, program, source);
+		return insert_implicit_conversion_node(std::move(tree), expression_type_id(tree, program), to, program, source);
 	}
 
 	auto check_type_validness_as_overload_candidate(TypeId param_type, TypeId parsed_type, Program const & program, int & conversions) noexcept -> bool
@@ -927,6 +932,58 @@ namespace complete
 		}
 	}
 
+	auto resolve_function_overloading_for_conversions(OverloadSetView overload_set, TypeId from, TypeId to, Program & program) noexcept -> FunctionId
+	{
+		struct Candidate
+		{
+			int conversions;
+			FunctionId function_id;
+		};
+		Candidate candidates[64];
+		int candidate_count = 0;
+
+		for (FunctionId function_id : overload_set.function_ids)
+		{
+			auto const param_types = parameter_types_of(program, function_id);
+			assert(param_types.size() == 1);
+			TypeId const input_types[] = {from, to};
+			TypeId const expected_types[] = {parameter_types_of(program, function_id)[0], return_type(program, function_id)};
+			{
+				int conversions = 0;
+				bool discard = false;
+				for (size_t i = 0; i < 2; ++i)
+				{
+					if (!check_type_validness_as_overload_candidate(expected_types[i], input_types[i], program, conversions))
+					{
+						discard = true;
+						break;
+					}
+				}
+
+				if (!discard)
+				{
+					candidates[candidate_count++] = Candidate{conversions, function_id};
+				}
+			}
+		}
+
+		if (candidate_count == 0)
+		{
+			return invalid_function_id;
+		}
+		else if (candidate_count == 1)
+		{
+			return candidates[0].function_id;
+		}
+		else
+		{
+			std::partial_sort(candidates, candidates + 2, candidates + candidate_count, [](Candidate a, Candidate b) { return a.conversions < b.conversions; });
+			assert(candidates[0].conversions < candidates[1].conversions); // Ambiguous call.
+
+			return candidates[0].function_id;
+		}
+	}
+
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
 		-> FunctionId
 	{
@@ -939,7 +996,7 @@ namespace complete
 		for (size_t i = 0; i < target_parameter_types.size(); ++i)
 		{
 			if (parameter_types[i] != target_parameter_types[i])
-				parameters[i] = std::move(*insert_conversion_node_impl(std::move(parameters[i]), parameter_types[i], target_parameter_types[i], program, true));
+				parameters[i] = std::move(*insert_implicit_conversion_node_impl(std::move(parameters[i]), parameter_types[i], target_parameter_types[i], program, true));
 		}
 
 		return function_id;
@@ -954,7 +1011,7 @@ namespace complete
 		for (size_t i = 0; i < target_parameter_types.size(); ++i)
 		{
 			if (parsed_parameter_types[i] != target_parameter_types[i])
-				try_call(assign_to(parameters[i]), insert_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program));
+				try_call(assign_to(parameters[i]), insert_implicit_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program));
 		}
 
 		return success;

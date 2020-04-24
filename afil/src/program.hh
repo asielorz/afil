@@ -248,10 +248,10 @@ namespace complete
 		TypeId to;
 		std::string_view why;
 	};
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
+	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
+	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
+	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
+	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
 
 	struct OverloadSetView
 	{
@@ -265,6 +265,7 @@ namespace complete
 		span<FunctionTemplateId const> function_template_ids;
 	};
 	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
+	auto resolve_function_overloading_for_conversions(OverloadSetView overload_set, TypeId from, TypeId to, Program & program) noexcept -> FunctionId;
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
 		-> FunctionId;
 
