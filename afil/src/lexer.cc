@@ -195,6 +195,16 @@ namespace lex
 		return length;
 	}
 
+	auto token_length_char(std::string_view src, int index) noexcept -> int
+	{
+		int length = 1;
+		while (!end_reached(src, index + length) && src[index + length] != '\'')
+			++length;
+
+		++length; // The closing '"' is part of the string.
+		return length;
+	}
+
 	auto token_length_identifier(std::string_view src, int index) noexcept -> int
 	{
 		int length = 1;
@@ -210,6 +220,7 @@ namespace lex
 		if (is_scope_resolution(src, index))	return std::pair<Token::Type, int>{Token::Type::scope_resolution,	2};
 		if (is_operator(src, index))			return std::pair<Token::Type, int>{Token::Type::operator_,			token_length_operator(src, index)};
 		if (src[index] == '"')					return std::pair<Token::Type, int>{Token::Type::literal_string,		token_length_string(src, index)};
+		if (src[index] == '\'')					return std::pair<Token::Type, int>{Token::Type::literal_char,		token_length_char(src, index)};
 		if (src[index] == '(')					return std::pair<Token::Type, int>{Token::Type::open_parenthesis,	1};
 		if (src[index] == ')')					return std::pair<Token::Type, int>{Token::Type::close_parenthesis,	1};
 		if (src[index] == '{')					return std::pair<Token::Type, int>{Token::Type::open_brace,			1};

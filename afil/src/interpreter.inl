@@ -210,42 +210,42 @@ namespace interpreter
 				{
 					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
 					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<unsigned char>(stack, a_address) + read<unsigned char>(stack, b_address));
+					write(stack, return_address, read<char_t>(stack, a_address) + read<char_t>(stack, b_address));
 					break;
 				}
 				case 22: // char - char
 				{
 					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
 					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<unsigned char>(stack, a_address) - read<unsigned char>(stack, b_address));
+					write(stack, return_address, read<char_t>(stack, a_address) - read<char_t>(stack, b_address));
 					break;
 				}
 				case 23: // char * char
 				{
 					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
 					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<unsigned char>(stack, a_address) * read<unsigned char>(stack, b_address));
+					write(stack, return_address, read<char_t>(stack, a_address) * read<char_t>(stack, b_address));
 					break;
 				}
 				case 24: // char / char
 				{
 					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
 					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<unsigned char>(stack, a_address) / read<unsigned char>(stack, b_address));
+					write(stack, return_address, read<char_t>(stack, a_address) / read<char_t>(stack, b_address));
 					break;
 				}
 				case 25: // char == char
 				{
 					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
 					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<unsigned char>(stack, a_address) == read<unsigned char>(stack, b_address));
+					write(stack, return_address, read<char_t>(stack, a_address) == read<char_t>(stack, b_address));
 					break;
 				}
 				case 26: // char <=> char
 				{
 					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
 					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, int(read<unsigned char>(stack, a_address)) - int(read<unsigned char>(stack, b_address)));
+					write(stack, return_address, int(read<char_t>(stack, a_address)) - int(read<char_t>(stack, b_address)));
 					break;
 				}
 
@@ -299,16 +299,15 @@ namespace interpreter
 				case 34: // conversion int -> char
 				{
 					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, static_cast<unsigned char>(read<int>(stack, a_address)));
+					write(stack, return_address, static_cast<char_t>(read<int>(stack, a_address)));
 					break;
 				}
 				case 35: // conversion char -> int
 				{
 					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, static_cast<int>(read<unsigned char>(stack, a_address)));
+					write(stack, return_address, static_cast<int>(read<char_t>(stack, a_address)));
 					break;
 				}
-
 			}
 
 			free_up_to(stack, stack_top);
@@ -440,6 +439,7 @@ namespace interpreter
 			[&](expression::Literal<int> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<float> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<bool> literal) { write(stack, return_address, literal.value); },
+			[&](expression::Literal<char_t> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<uninit_t>) {},
 			detail::eval_type_literal_expression(stack, context, return_address),
 			[&](expression::StringLiteral literal)

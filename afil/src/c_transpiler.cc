@@ -187,26 +187,27 @@ namespace c_transpiler
 		using namespace complete;
 
 		auto const visitor = overload(
-			[&](expression::Literal<int>) { return true; },
-			[&](expression::Literal<float>) { return true; },
-			[&](expression::Literal<bool>) { return true; },
-			[&](expression::Literal<uninit_t>) { return false; },
-			[&](expression::Literal<TypeId>) { return false; },
-			[&](expression::StringLiteral) { return true; },
-			[&](expression::LocalVariable const &) { return true; },
-			[&](expression::GlobalVariable const &) { return true; },
-			[&](expression::MemberVariable const & var_node) { return can_be_written_inline(*var_node.owner); },
-			[&](expression::Constant const &) { return true; },
-			[&](expression::Dereference const & deref_node) { return can_be_written_inline(*deref_node.expression); },
-			[&](expression::ReinterpretCast const & addressof_node) { return can_be_written_inline(*addressof_node.operand); },
-			[&](expression::Subscript const & subscript_node) { return can_be_written_inline(*subscript_node.array) && can_be_written_inline(*subscript_node.index); },
-			[&](expression::FunctionCall const & func_call_node) { return std::all_of(func_call_node.parameters, can_be_written_inline); },
-			[&](expression::RelationalOperatorCall const & op_node) { return std::all_of(op_node.parameters, can_be_written_inline); },
-			[&](expression::Assignment const &) { return false; },
-			[&](expression::If const &) { return false; },
-			[&](expression::StatementBlock const &) { return false; },
-			[&](expression::Constructor const &) { return false; },
-			[&](expression::Compiles const &) { return false; }
+			[](expression::Literal<int>) { return true; },
+			[](expression::Literal<float>) { return true; },
+			[](expression::Literal<bool>) { return true; },
+			[](expression::Literal<char_t>) { return true; },
+			[](expression::Literal<uninit_t>) { return false; },
+			[](expression::Literal<TypeId>) { return false; },
+			[](expression::StringLiteral) { return true; },
+			[](expression::LocalVariable const &) { return true; },
+			[](expression::GlobalVariable const &) { return true; },
+			[](expression::MemberVariable const & var_node) { return can_be_written_inline(*var_node.owner); },
+			[](expression::Constant const &) { return true; },
+			[](expression::Dereference const & deref_node) { return can_be_written_inline(*deref_node.expression); },
+			[](expression::ReinterpretCast const & addressof_node) { return can_be_written_inline(*addressof_node.operand); },
+			[](expression::Subscript const & subscript_node) { return can_be_written_inline(*subscript_node.array) && can_be_written_inline(*subscript_node.index); },
+			[](expression::FunctionCall const & func_call_node) { return std::all_of(func_call_node.parameters, can_be_written_inline); },
+			[](expression::RelationalOperatorCall const & op_node) { return std::all_of(op_node.parameters, can_be_written_inline); },
+			[](expression::Assignment const &) { return false; },
+			[](expression::If const &) { return false; },
+			[](expression::StatementBlock const &) { return false; },
+			[](expression::Constructor const &) { return false; },
+			[](expression::Compiles const &) { return false; }
 		);
 		return std::visit(visitor, expr.as_variant());
 	}
@@ -231,6 +232,12 @@ namespace c_transpiler
 			[&](expression::Literal<bool> literal)
 			{
 				c_source += literal.value ? "1" : "0"; 
+			},
+			[&](expression::Literal<char_t> literal)
+			{
+				c_source += ' ';
+				c_source.push_back(literal.value);
+				c_source += ' ';
 			},
 			[&](expression::Literal<uninit_t>) {},
 			[&](expression::Literal<TypeId>) { declare_unreachable(); },
@@ -363,14 +370,8 @@ namespace c_transpiler
 		else
 		{
 			auto const visitor = overload(
-				[&](expression::Literal<int>)	{ declare_unreachable(); },
-				[&](expression::Literal<float>) { declare_unreachable(); },
-				[&](expression::Literal<bool>)	{ declare_unreachable(); },
+				[&](auto const &)	{ declare_unreachable(); },
 				[&](expression::Literal<uninit_t>) {},
-				[&](expression::Literal<TypeId>) { declare_unreachable(); },
-				[&](expression::StringLiteral)	{ declare_unreachable(); },
-				[&](expression::LocalVariable const &)	{ declare_unreachable(); },
-				[&](expression::GlobalVariable const &) { declare_unreachable(); },
 				[&](expression::MemberVariable const & var_node)
 				{
 					std::string const temp_var_name = add_temp_var(temp_vars, type_name(expression_type_id(*var_node.owner, program), program));
@@ -573,8 +574,7 @@ namespace c_transpiler
 					{
 						declare_unreachable();
 					}
-				},
-				[&](expression::Compiles const &) { declare_unreachable(); }
+				}
 			);
 			std::visit(visitor, expr.as_variant());
 		}

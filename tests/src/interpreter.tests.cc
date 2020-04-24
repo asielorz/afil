@@ -2657,6 +2657,19 @@ TEST_CASE("Conversion from float to int")
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
+TEST_CASE("char literals")
+{
+	auto const src = R"(
+		let main = fn() -> int
+		{
+			let c = 'A';
+			return int(c);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == int('A'));
+}
+
 /*****************************************************************
 Backlog
 - conversions

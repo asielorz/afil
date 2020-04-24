@@ -156,6 +156,12 @@ namespace parser
 		return std::string(token_source.substr(1, token_source.size() - 2));
 	}
 
+	auto parse_char_literal(std::string_view token_source) noexcept -> char_t
+	{
+		assert(token_source.length() == 3);
+		return token_source[1];
+	}
+
 	auto insert_expression(incomplete::Expression & tree, incomplete::Expression & new_node) noexcept -> void
 	{
 		using incomplete::expression::BinaryOperatorCall;
@@ -870,6 +876,8 @@ namespace parser
 			return incomplete::expression::Literal<bool>(tokens[index++].source[0] == 't');
 		else if (tokens[index].type == TokenType::literal_string)
 			return incomplete::expression::Literal<std::string>(parse_string_literal(tokens[index++].source));
+		else if (tokens[index].type == TokenType::literal_char)
+			return incomplete::expression::Literal<char_t>(parse_char_literal(tokens[index++].source));
 		else if (tokens[index].source == "uninit")
 		{
 			index++;

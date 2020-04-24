@@ -124,7 +124,7 @@ namespace incomplete
 		};
 
 		using Variant = std::variant<
-			Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<uninit_t>, Literal<TypeId>,
+			Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<char_t>, Literal<uninit_t>, Literal<TypeId>,
 			Dereference, Addressof, Subscript,
 			Identifier, MemberVariable,
 			Function, FunctionTemplate,	ExternFunction,

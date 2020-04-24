@@ -16,6 +16,7 @@ namespace lex
 			literal_float,
 			literal_bool,
 			literal_string,
+			literal_char,
 			operator_,								// + - / *
 			open_parenthesis, close_parenthesis,	// ( )
 			open_brace, close_brace,				// { }

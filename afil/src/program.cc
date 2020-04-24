@@ -35,7 +35,7 @@ namespace complete
 	template <> struct index_for_type<int> { static constexpr unsigned value = 1; };
 	template <> struct index_for_type<float> { static constexpr unsigned value = 2; };
 	template <> struct index_for_type<bool> { static constexpr unsigned value = 3; };
-	template <> struct index_for_type<unsigned char> { static constexpr unsigned value = 4; };
+	template <> struct index_for_type<char_t> { static constexpr unsigned value = 4; };
 	template <> struct index_for_type<complete::TypeId> { static constexpr unsigned value = 5; };
 	template <typename T> constexpr unsigned index_for_type_v = index_for_type<T>::value;
 
@@ -98,12 +98,12 @@ namespace complete
 		intrinsic_function_descriptor<int(float, float)>("<=>"sv),
 		intrinsic_function_descriptor<float(float)>("-"sv),
 
-		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("+"sv),
-		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("-"sv),
-		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("*"sv),
-		intrinsic_function_descriptor<unsigned char(unsigned char, unsigned char)>("/"sv),
-		intrinsic_function_descriptor<bool(unsigned char, unsigned char)>("=="sv),
-		intrinsic_function_descriptor<int(unsigned char, unsigned char)>("<=>"sv),
+		intrinsic_function_descriptor<char_t(char_t, char_t)>("+"sv),
+		intrinsic_function_descriptor<char_t(char_t, char_t)>("-"sv),
+		intrinsic_function_descriptor<char_t(char_t, char_t)>("*"sv),
+		intrinsic_function_descriptor<char_t(char_t, char_t)>("/"sv),
+		intrinsic_function_descriptor<bool(char_t, char_t)>("=="sv),
+		intrinsic_function_descriptor<int(char_t, char_t)>("<=>"sv),
 
 		intrinsic_function_descriptor<bool(bool, bool)>("and"sv),
 		intrinsic_function_descriptor<bool(bool, bool)>("or"sv),
@@ -113,8 +113,8 @@ namespace complete
 
 		intrinsic_function_descriptor<float(int)>("ex conv"sv),
 		intrinsic_function_descriptor<int(float)>("ex conv"sv),
-		intrinsic_function_descriptor<unsigned char(int)>("ex conv"sv),
-		intrinsic_function_descriptor<int(unsigned char)>("ex conv"sv),
+		intrinsic_function_descriptor<char_t(int)>("ex conv"sv),
+		intrinsic_function_descriptor<int(char_t)>("ex conv"sv),
 	};
 
 	Program::Program()

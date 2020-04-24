@@ -720,7 +720,10 @@ namespace instantiation
 				{
 					complete::expression::FunctionCall conversion_call;
 					conversion_call.function_id = conversion_function;
-					conversion_call.parameters.push_back(std::move(parameters[0]));
+
+					complete::TypeId const expected_type = parameter_types_of(*program, conversion_function)[0];
+
+					try_call(conversion_call.parameters.push_back, insert_implicit_conversion_node(std::move(parameters[0]), expected_type, *program, expression_source));
 					return std::move(conversion_call);
 				}
 			}
@@ -893,6 +896,10 @@ namespace instantiation
 				complete_expression.value = incomplete_expression.value;
 				complete_expression.type = array_type_for(complete::TypeId::char_, static_cast<int>(complete_expression.value.size()), *program);
 				return complete_expression;
+			},
+			[](incomplete::expression::Literal<char_t> const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
+			{
+				return complete::expression::Literal<char_t>{incomplete_expression.value};
 			},
 			[](incomplete::expression::Literal<uninit_t> const &) -> expected<complete::Expression, PartialSyntaxError>
 			{

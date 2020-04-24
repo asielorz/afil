@@ -143,6 +143,7 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 		[](expression::Literal<int> literal_expr) { return join("literal<int>: ", literal_expr.value, '\n'); },
 		[](expression::Literal<float> literal_expr) { return join("literal<float>: ", literal_expr.value, '\n'); },
 		[](expression::Literal<bool> literal_expr) { return join("literal<bool>: ", literal_expr.value, '\n'); },
+		[](expression::Literal<char_t> literal_expr) { return join("literal<char>: ", char(literal_expr.value), '\n'); },
 		[](expression::Literal<uninit_t>) { return "literal<uninit_t>: uninit\n"s; },
 		[&](expression::Literal<TypeId> literal_type) { return "literal<type>: ", type_name(literal_type.value, program), "\n"s; },
 		[&](expression::StringLiteral literal_expr) 
