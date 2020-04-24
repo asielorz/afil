@@ -5,11 +5,6 @@
 #include <cassert>
 #include <Windows.h>
 
-auto make_syntax_error(std::string_view msg) noexcept -> Error<PartialSyntaxError>
-{
-	return make_syntax_error(std::string_view(), msg);
-}
-
 auto make_syntax_error(
 	std::string_view error_in_source,
 	std::string_view msg) noexcept -> Error<PartialSyntaxError>

@@ -22,8 +22,6 @@ struct SyntaxError
 	int error_length;
 };
 
-auto make_syntax_error(std::string_view msg) noexcept -> Error<PartialSyntaxError>;
-
 auto make_syntax_error(
 	std::string_view error_in_source,
 	std::string_view msg) noexcept -> Error<PartialSyntaxError>;

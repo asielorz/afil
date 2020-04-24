@@ -2633,6 +2633,18 @@ TEST_CASE("Accessing a name from a namespace inside the namespace without namesp
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+//TEST_CASE("Conversion from float to int")
+//{
+//	auto const src = R"(
+//		let main = fn() -> int
+//		{
+//			return int(3.5);
+//		};
+//	)"sv;
+//
+//	REQUIRE(tests::parse_and_run(src) == 3);
+//}
+
 /*****************************************************************
 Backlog
 - conversions

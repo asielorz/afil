@@ -240,8 +240,18 @@ namespace complete
 	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, std::string_view instantiation_in_source) noexcept 
 		-> expected<TypeId, PartialSyntaxError>;
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>;
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>;
+	struct ConversionNotFound
+	{
+		constexpr ConversionNotFound(TypeId from_, TypeId to_, std::string_view why_) noexcept : from(from_), to(to_), why(why_) {}
+
+		TypeId from;
+		TypeId to;
+		std::string_view why;
+	};
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
 
 	struct OverloadSetView
 	{
@@ -256,13 +266,13 @@ namespace complete
 	};
 	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
-		-> expected<FunctionId, PartialSyntaxError>;
+		-> FunctionId;
 
 	[[nodiscard]] auto insert_conversions(
 		span<Expression> parameters,
 		span<TypeId const> parsed_parameter_types,
 		span<TypeId const> target_parameter_types,
-		Program const & program) noexcept -> expected<void, PartialSyntaxError>;
+		Program const & program) noexcept -> expected<void, ConversionNotFound>;
 
 	auto type_for_overload_set(Program & program, OverloadSet overload_set) noexcept -> TypeId;
 	auto overload_set_for_type(Program const & program, TypeId overload_set_type) noexcept -> OverloadSetView;

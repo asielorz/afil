@@ -647,7 +647,7 @@ namespace complete
 		return new_type_id;
 	}
 
-	auto insert_conversion_node_impl(Expression tree, TypeId from, TypeId to, Program const & program, bool allow_address_of_temporary) noexcept -> expected<Expression, PartialSyntaxError>
+	auto insert_conversion_node_impl(Expression tree, TypeId from, TypeId to, Program const & program, bool allow_address_of_temporary) noexcept -> expected<Expression, ConversionNotFound>
 	{
 		if (from.index == to.index)
 		{
@@ -665,29 +665,42 @@ namespace complete
 			else
 			{
 				if (to.is_mutable)
-					return make_syntax_error("Can't bind a temporary to a mutable reference.");
+					return Error(ConversionNotFound(from, to, "Can't bind a temporary to a mutable reference."));
 
 				if (allow_address_of_temporary)
 					return std::move(tree);
 				else 
-					return make_syntax_error("Cannot take address of temporary.");
+					return Error(ConversionNotFound(from, to, "Cannot take address of temporary."));
 			}
 		}
 		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
 		{
 			return std::move(tree);
 		}
-		return make_syntax_error("Conversion between types does not exist.");
+		return Error(ConversionNotFound(from, to, "Conversion between types does not exist."));
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
 	{
 		return insert_conversion_node_impl(std::move(tree), from, to, program, false);
 	}
 
-	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, PartialSyntaxError>
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
 	{
 		return insert_conversion_node(std::move(tree), expression_type_id(tree, program), to, program);
+	}
+
+	auto insert_conversion_node(Expression tree, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
+	{
+		if (auto conversion = insert_conversion_node(std::move(tree), from, to, program))
+			return std::move(*conversion);
+		else
+			return make_syntax_error(source, join("Error in conversion from ", conversion.error().from.index, " to ", conversion.error().to.index, ": ", conversion.error().why));
+	}
+
+	auto insert_conversion_node(Expression tree, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
+	{
+		return insert_conversion_node(std::move(tree), expression_type_id(tree, program), to, program, source);
 	}
 
 	auto check_type_validness_as_overload_candidate(TypeId param_type, TypeId parsed_type, Program const & program, int & conversions) noexcept -> bool
@@ -915,7 +928,7 @@ namespace complete
 	}
 
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
-		-> expected<FunctionId, PartialSyntaxError>
+		-> FunctionId
 	{
 		FunctionId const function_id = resolve_function_overloading(overload_set, parameter_types, program);
 		if (function_id == invalid_function_id)
@@ -926,7 +939,7 @@ namespace complete
 		for (size_t i = 0; i < target_parameter_types.size(); ++i)
 		{
 			if (parameter_types[i] != target_parameter_types[i])
-				try_call(assign_to(parameters[i]), insert_conversion_node_impl(std::move(parameters[i]), parameter_types[i], target_parameter_types[i], program, true));
+				parameters[i] = std::move(*insert_conversion_node_impl(std::move(parameters[i]), parameter_types[i], target_parameter_types[i], program, true));
 		}
 
 		return function_id;
@@ -936,7 +949,7 @@ namespace complete
 		span<Expression> parameters,
 		span<TypeId const> parsed_parameter_types,
 		span<TypeId const> target_parameter_types,
-		Program const & program) noexcept -> expected<void, PartialSyntaxError>
+		Program const & program) noexcept -> expected<void, ConversionNotFound>
 	{
 		for (size_t i = 0; i < target_parameter_types.size(); ++i)
 		{
