@@ -1837,6 +1837,23 @@ namespace instantiation
 					bind_function_name("conversion", function_id, *program, scope_stack);
 				}
 
+				for (FunctionTemplateId function_id : conversion_functions.function_template_ids)
+				{
+					complete::FunctionTemplate & function_template = program->function_templates[function_id.index];
+					if (function_template.parameter_types.size() != 1)
+						return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function must take exactly one parameter.");
+					if (!function_template.incomplete_function.return_type.has_value())
+						return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function template must define its return type explicitly.");
+
+					try_call(function_template.parameter_types.push_back, resolve_function_template_parameter_type(
+						*function_template.incomplete_function.return_type,
+						template_parameters,
+						function_template.incomplete_function.template_parameters,
+						scope_stack,
+						program
+					));
+				}
+
 				return std::nullopt;
 			}
 		);
