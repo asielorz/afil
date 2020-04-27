@@ -2670,6 +2670,32 @@ TEST_CASE("char literals")
 	REQUIRE(tests::parse_and_run(src) == int('A'));
 }
 
+TEST_CASE("User defined conversions")
+{
+	auto const src = R"(
+		struct TestStruct
+		{
+			int value;
+		}
+
+		conversion fn(TestStruct s) -> bool
+		{
+			return s.value != 0;
+		};
+
+		let main = fn() -> int
+		{
+			let s = TestStruct(5);
+			if (bool(s))
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
 /*****************************************************************
 Backlog
 - conversions

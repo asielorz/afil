@@ -111,10 +111,10 @@ namespace complete
 		intrinsic_function_descriptor<bool(bool)>("not"sv),
 		intrinsic_function_descriptor<bool(bool, bool)>("=="sv),
 
-		intrinsic_function_descriptor<float(int)>("ex conv"sv),
-		intrinsic_function_descriptor<int(float)>("ex conv"sv),
-		intrinsic_function_descriptor<char_t(int)>("ex conv"sv),
-		intrinsic_function_descriptor<int(char_t)>("ex conv"sv),
+		intrinsic_function_descriptor<float(int)>("conversion"sv),
+		intrinsic_function_descriptor<int(float)>("conversion"sv),
+		intrinsic_function_descriptor<char_t(int)>("conversion"sv),
+		intrinsic_function_descriptor<int(char_t)>("conversion"sv),
 	};
 
 	Program::Program()

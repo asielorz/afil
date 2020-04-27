@@ -47,6 +47,8 @@ namespace parser
 		"struct",
 		"let",
 		"mut",
+		"namespace",
+		"conversion",
 
 		// Operators
 		"and",
@@ -1417,6 +1419,17 @@ namespace parser
 		return std::move(namespace_declaration);
 	}
 
+	auto parse_conversion_declaration(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept
+		-> expected<incomplete::statement::ConversionDeclaration, PartialSyntaxError>
+	{
+		// Skip conversion token
+		index++;
+
+		incomplete::statement::ConversionDeclaration conversion_decl;
+		try_call(assign_to(conversion_decl.conversion_function), parse_expression(tokens, index, type_names));
+		return std::move(conversion_decl);
+	}
+
 	auto parse_expression_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
 		-> expected<incomplete::statement::ExpressionStatement, PartialSyntaxError>
 	{
@@ -1453,6 +1466,8 @@ namespace parser
 			try_call(assign_to(result), parse_type_alias(tokens, index, type_names))
 		else if (tokens[index].source == "namespace")
 			return parse_namespace_declaration(tokens, index, type_names);
+		else if (tokens[index].source == "conversion")
+			try_call(assign_to(result), parse_conversion_declaration(tokens, index, type_names))
 		else
 			try_call(assign_to(result), parse_expression_statement(tokens, index, type_names));
 

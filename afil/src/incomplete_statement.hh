@@ -78,12 +78,17 @@ namespace incomplete
 			std::vector<Statement> statements;
 		};
 
+		struct ConversionDeclaration
+		{
+			Expression conversion_function;
+		};
+
 		using Variant = std::variant<
 			LetDeclaration, ExpressionStatement,
 			If, StatementBlock, While, For,
 			Return, Break, Continue,
 			StructDeclaration, StructTemplateDeclaration, TypeAliasDeclaration,
-			NamespaceDeclaration
+			NamespaceDeclaration, ConversionDeclaration
 		>;
 
 	} // namespace statement

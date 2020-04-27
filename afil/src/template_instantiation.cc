@@ -711,7 +711,7 @@ namespace instantiation
 			if (implicit_conversion.has_value())
 				return std::move(*implicit_conversion);
 
-			if (auto const explicit_conversion_functions = named_overload_set("ex conv", scope_stack))
+			if (auto const explicit_conversion_functions = named_overload_set("conversion", scope_stack))
 			{
 				FunctionId const conversion_function = resolve_function_overloading_for_conversions(
 					*explicit_conversion_functions, param_type, constructed_type_id, *program);
@@ -1811,6 +1811,31 @@ namespace instantiation
 				// Pop all namespaces pushed above.
 				for (size_t i = 0; i < incomplete_statement.names.size(); ++i)
 					scope_stack.pop_back();
+
+				return std::nullopt;
+			},
+			[&](incomplete::statement::ConversionDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
+			{
+				try_call_decl(complete::Expression function, instantiate_expression(incomplete_statement.conversion_function, template_parameters, scope_stack, program, current_scope_return_type));
+
+				complete::TypeId const function_type = expression_type_id(function, *program);
+				if (!function_type.is_function)
+					return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function must be a function.");
+
+				auto const conversion_functions = overload_set_for_type(*program, function_type);
+				if (!conversion_functions.function_template_ids.empty())
+					return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function cannot be template (for now).");
+
+				for (FunctionId function_id : conversion_functions.function_ids)
+				{
+					auto const parameter_types = parameter_types_of(*program, function_id);
+					if (parameter_types.size() != 1)
+						return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function must take exactly one parameter.");
+					if (return_type(*program, function_id) == complete::TypeId::void_)
+						return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function cannot return void.");
+
+					bind_function_name("conversion", function_id, *program, scope_stack);
+				}
 
 				return std::nullopt;
 			}
