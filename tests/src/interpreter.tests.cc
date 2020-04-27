@@ -2696,6 +2696,29 @@ TEST_CASE("User defined conversions")
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
+TEST_CASE("Template functions for user defined conversions")
+{
+	auto const src = R"(
+		struct<T> Wrapper
+		{
+			T value;
+		}
+
+		conversion fn<T>(Wrapper<T> w) -> T
+		{
+			return w.value;
+		};
+
+		let main = fn() -> int
+		{
+			let w = Wrapper<int>(5);
+			return int(w);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - conversions
