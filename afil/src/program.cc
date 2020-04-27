@@ -946,8 +946,8 @@ namespace complete
 		{
 			auto const param_types = parameter_types_of(program, function_id);
 			assert(param_types.size() == 1);
-			TypeId const input_types[] = {from, to};
-			TypeId const expected_types[] = {parameter_types_of(program, function_id)[0], return_type(program, function_id)};
+			TypeId const input_types[] = {from, return_type(program, function_id) };
+			TypeId const expected_types[] = {parameter_types_of(program, function_id)[0], to};
 			{
 				int conversions = 0;
 				bool discard = false;
