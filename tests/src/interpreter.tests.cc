@@ -2742,7 +2742,6 @@ TEST_CASE("Deduce conversion function template from type converted to only")
 
 /*****************************************************************
 Backlog
-- conversions
 - dynamic memory allocation
 - destructor and copy operations
 - reflection
