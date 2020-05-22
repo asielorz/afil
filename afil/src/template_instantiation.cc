@@ -131,7 +131,7 @@ namespace instantiation
 		if (!is_constant_expression(size_expr, *program, next_block_scope_offset(scope_stack)))
 			return make_syntax_error(expression.source, "Array size must be a constant expression.");
 
-		try_call(assign_to(size_expr), insert_implicit_conversion_node(std::move(size_expr), complete::TypeId::int_, *program, expression.source));
+		try_call(assign_to(size_expr), insert_implicit_conversion_node(std::move(size_expr), complete::TypeId::int32, *program, expression.source));
 
 		auto result = interpreter::evaluate_constant_expression_as<int>(size_expr, template_parameters, scope_stack, *program);
 		if (!result)
@@ -541,7 +541,7 @@ namespace instantiation
 		if (type_id.is_reference)
 			return {sizeof(void *), false};
 
-		bool const is_float = decay(type_id) == complete::TypeId::float_;
+		bool const is_float = (decay(type_id) == complete::TypeId::float32) || (decay(type_id) == complete::TypeId::float64);
 
 		complete::Type const & type = type_with_id(program, type_id);
 		if (type.size > 8)
@@ -1035,7 +1035,7 @@ namespace instantiation
 					complete::expression::Subscript complete_expression;
 					complete_expression.return_type = value_type;
 					complete_expression.array = allocate(std::move(array));
-					try_call(assign_to(complete_expression.index), insert_implicit_conversion_node(std::move(index), complete::TypeId::int_, *program, incomplete_expression.index->source));
+					try_call(assign_to(complete_expression.index), insert_implicit_conversion_node(std::move(index), complete::TypeId::int32, *program, incomplete_expression.index->source));
 					return std::move(complete_expression);
 				}
 				else if (is_array_pointer(array_type))
@@ -1048,7 +1048,7 @@ namespace instantiation
 					complete::expression::Subscript complete_expression;
 					complete_expression.return_type = value_type;
 					try_call(assign_to(complete_expression.array), insert_implicit_conversion_node(std::move(array), decay(array_type_id), *program, incomplete_expression.array->source));
-					try_call(assign_to(complete_expression.index), insert_implicit_conversion_node(std::move(index), complete::TypeId::int_, *program, incomplete_expression.index->source));
+					try_call(assign_to(complete_expression.index), insert_implicit_conversion_node(std::move(index), complete::TypeId::int32, *program, incomplete_expression.index->source));
 					return std::move(complete_expression);
 				}
 				else
@@ -1504,7 +1504,7 @@ namespace instantiation
 
 					// Main must not take parameters and return int.
 					complete::Function const & main_function = program->functions[main_function_id.index];
-					if (main_function.return_type != complete::TypeId::int_) 
+					if (main_function.return_type != complete::TypeId::int32) 
 						return make_syntax_error(incomplete_statement.assigned_expression.source, "Main must return int.");
 					if (main_function.parameter_count != 0) 
 						return make_syntax_error(incomplete_statement.assigned_expression.source, "Main cannot take parameters.");

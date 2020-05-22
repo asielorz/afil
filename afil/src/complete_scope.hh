@@ -30,8 +30,16 @@ namespace complete
 		static constexpr auto zero_initialized() noexcept -> TypeId { return with_index(0); }
 
 		static TypeId const void_; // TODO: Maybe void can be confusing so think of another name?
-		static TypeId const int_;
-		static TypeId const float_;
+		static TypeId const int8;
+		static TypeId const int16;
+		static TypeId const int32;
+		static TypeId const int64;
+		static TypeId const uint8;
+		static TypeId const uint16;
+		static TypeId const uint32;
+		static TypeId const uint64;
+		static TypeId const float32;
+		static TypeId const float64;
 		static TypeId const bool_;
 		static TypeId const char_;
 		static TypeId const type;

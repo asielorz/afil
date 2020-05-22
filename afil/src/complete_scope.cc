@@ -7,12 +7,20 @@ namespace complete
 {
 
 	TypeId const TypeId::void_ = {false, false, false, 0};
-	TypeId const TypeId::int_ = {false, false, false, 1};
-	TypeId const TypeId::float_ = {false, false, false, 2};
-	TypeId const TypeId::bool_ = {false, false, false, 3};
-	TypeId const TypeId::char_ = { false, false, false, 4 };
-	TypeId const TypeId::type = { false, false, false, 5 };
-	TypeId const TypeId::uninit_t = { false, false, false, 6 };
+	TypeId const TypeId::int8 = {false, false, false, 1 };
+	TypeId const TypeId::int16 = {false, false, false, 2 };
+	TypeId const TypeId::int32 = {false, false, false, 3 };
+	TypeId const TypeId::int64 = {false, false, false, 4 };
+	TypeId const TypeId::uint8 = {false, false, false, 5 };
+	TypeId const TypeId::uint16 = {false, false, false, 6 };
+	TypeId const TypeId::uint32 = {false, false, false, 7 };
+	TypeId const TypeId::uint64 = {false, false, false, 8 };
+	TypeId const TypeId::float32 = {false, false, false, 9 };
+	TypeId const TypeId::float64 = {false, false, false, 10 };
+	TypeId const TypeId::bool_ = {false, false, false, 11};
+	TypeId const TypeId::char_ = {false, false, false, 5};
+	TypeId const TypeId::type = {false, false, false, 12};
+	TypeId const TypeId::uninit_t = {false, false, false, 13};
 
 	TypeId const TypeId::none = {false, false, false, (1 << 29) - 1};
 	TypeId const TypeId::deduce = {false, false, false, (1 << 29) - 1 };

@@ -61,8 +61,16 @@ namespace parser
 	{
 		return {
 			{"void",		TypeName::Type::type},
-			{"int",			TypeName::Type::type},
-			{"float",		TypeName::Type::type},
+			{"int8",		TypeName::Type::type},
+			{"int16",		TypeName::Type::type},
+			{"int32",		TypeName::Type::type},
+			{"int64",		TypeName::Type::type},
+			{"uint8",		TypeName::Type::type},
+			{"uint16",		TypeName::Type::type},
+			{"uint32",		TypeName::Type::type},
+			{"uint64",		TypeName::Type::type},
+			{"float32",		TypeName::Type::type},
+			{"float64",		TypeName::Type::type},
 			{"bool",		TypeName::Type::type},
 			{"char",		TypeName::Type::type},
 			{"type",		TypeName::Type::type},

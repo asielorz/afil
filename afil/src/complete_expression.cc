@@ -15,8 +15,8 @@ namespace complete
 	auto expression_type_id(Expression const & tree, Program const & program) noexcept -> TypeId
 	{
 		auto const visitor = overload(
-			[](expression::Literal<int>) { return TypeId::int_; },
-			[](expression::Literal<float>) { return TypeId::float_; },
+			[](expression::Literal<int>) { return TypeId::int32; },
+			[](expression::Literal<float>) { return TypeId::float32; },
 			[](expression::Literal<bool>) { return TypeId::bool_; },
 			[](expression::Literal<char_t>) { return TypeId::char_; },
 			[](expression::StringLiteral const & str_node) { return str_node.type; },

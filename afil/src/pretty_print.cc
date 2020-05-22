@@ -110,9 +110,9 @@ auto member_variable_name(TypeId owner_type, int variable_offset, Program const 
 
 auto print_constant(TypeId type, void const * data) noexcept -> std::string
 {
-	if (type == complete::TypeId::int_)
+	if (type == complete::TypeId::int32)
 		return join(*static_cast<int const *>(data));
-	if (type == complete::TypeId::float_)
+	if (type == complete::TypeId::float32)
 		return join(*static_cast<float const *>(data));
 	if (type == complete::TypeId::bool_)
 		return join(*static_cast<bool const *>(data));

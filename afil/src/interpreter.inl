@@ -50,6 +50,25 @@ namespace interpreter
 
 	auto eval_variable_node(complete::TypeId variable_type, int address, ProgramStack & stack, int return_address) noexcept -> void;
 
+	template <typename ExecutionContext, typename Ret, typename A, typename B>
+	[[nodiscard]] auto call_intrinsic_function(span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, int return_address, Ret(*function)(A, B)) 
+		-> expected<void, UnmetPrecondition>
+	{
+		try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
+		try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
+		write(stack, return_address, function(read<A>(stack, a_address), read<B>(stack, b_address)));
+		return success;
+	}
+
+	template <typename ExecutionContext, typename Ret, typename A>
+	[[nodiscard]] auto call_intrinsic_function(span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, int return_address, Ret(*function)(A))
+		-> expected<void, UnmetPrecondition>
+	{
+		try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
+		write(stack, return_address, function(read<A>(stack, a_address)));
+		return success;
+	}
+
 	template <typename ExecutionContext>
 	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, int return_address) noexcept 
 		-> expected<void, UnmetPrecondition>
@@ -60,254 +79,244 @@ namespace interpreter
 
 			switch (function_id.index)
 			{
-				case 0: // int + int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) + read<int>(stack, b_address));
-					break;
-				}
-				case 1: // int - int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) - read<int>(stack, b_address));
-					break;
-				}
-				case 2: // int * int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) * read<int>(stack, b_address));
-					break;
-				}
-				case 3: // int / int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) / read<int>(stack, b_address));
-					break;
-				}
-				case 4: // int % int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) % read<int>(stack, b_address));
-					break;
-				}
-				case 5: // int == int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) == read<int>(stack, b_address));
-					break;
-				}
-				case 6: // int <=> int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) - read<int>(stack, b_address));
-					break;
-				}
-				case 7: // -int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, -read<int>(stack, a_address));
-					break;
-				}
-				case 8: // int & int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) & read<int>(stack, b_address));
-					break;
-				}
-				case 9: // int | int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) | read<int>(stack, b_address));
-					break;
-				}
-				case 10: // int ^ int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) ^ read<int>(stack, b_address));
-					break;
-				}
-				case 11: // ~int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, ~read<int>(stack, a_address));
-					break;
-				}
-				case 12: // int >> int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) >> read<int>(stack, b_address));
-					break;
-				}
-				case 13: // int << int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<int>(stack, a_address) << read<int>(stack, b_address));
-					break;
-				}
+				case 0: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a + b; })); break;
+				case 1: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a - b; })); break;
+				case 2: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a * b; })); break;
+				case 3: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a / b; })); break;
+				case 4: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a % b; })); break;
+				case 5: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> bool { return a == b; })); break;
+				case 6: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> order_t { return a - b; })); break; // <=>
+				case 7: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> int8_t { return -a; })); break;
+				case 8: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a & b; })); break;
+				case 9: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a | b; })); break;
+				case 10: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a ^ b; })); break;
+				case 11: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> int8_t { return ~a; })); break;
+				case 12: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a >> b; })); break;
+				case 13: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a, int8_t b) -> int8_t { return a << b; })); break;
 
-				case 14: // float + float
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<float>(stack, a_address) + read<float>(stack, b_address));
-					break;
-				}
-				case 15: // float - float
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<float>(stack, a_address) - read<float>(stack, b_address));
-					break;
-				}
-				case 16: // float * float
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<float>(stack, a_address) * read<float>(stack, b_address));
-					break;
-				}
-				case 17: // float / float
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<float>(stack, a_address) / read<float>(stack, b_address));
-					break;
-				}
-				case 18: // float == float
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<float>(stack, a_address) == read<float>(stack, b_address));
-					break;
-				}
-				case 19: // float <=> float
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<float>(stack, a_address) - read<float>(stack, b_address));
-					break;
-				}
-				case 20: // -float
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, -read<float>(stack, a_address));
-					break;
-				}
+				case 14: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a + b; })); break;
+				case 15: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a - b; })); break;
+				case 16: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a * b; })); break;
+				case 17: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a / b; })); break;
+				case 18: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a % b; })); break;
+				case 19: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> bool { return a == b; })); break;
+				case 20: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> order_t { return a - b; })); break; // <=>
+				case 21: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> int16_t { return -a; })); break;
+				case 22: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a & b; })); break;
+				case 23: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a | b; })); break;
+				case 24: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a ^ b; })); break;
+				case 25: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> int16_t { return ~a; })); break;
+				case 26: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a >> b; })); break;
+				case 27: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a, int16_t b) -> int16_t { return a << b; })); break;
 
-				case 21: // char + char
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<char_t>(stack, a_address) + read<char_t>(stack, b_address));
-					break;
-				}
-				case 22: // char - char
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<char_t>(stack, a_address) - read<char_t>(stack, b_address));
-					break;
-				}
-				case 23: // char * char
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<char_t>(stack, a_address) * read<char_t>(stack, b_address));
-					break;
-				}
-				case 24: // char / char
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<char_t>(stack, a_address) / read<char_t>(stack, b_address));
-					break;
-				}
-				case 25: // char == char
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<char_t>(stack, a_address) == read<char_t>(stack, b_address));
-					break;
-				}
-				case 26: // char <=> char
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, int(read<char_t>(stack, a_address)) - int(read<char_t>(stack, b_address)));
-					break;
-				}
+				case 28: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a + b; })); break;
+				case 29: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a - b; })); break;
+				case 30: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a * b; })); break;
+				case 31: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a / b; })); break;
+				case 32: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a % b; })); break;
+				case 33: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> bool { return a == b; })); break;
+				case 34: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> order_t { return a - b; })); break; // <=>
+				case 35: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> int32_t { return -a; })); break;
+				case 36: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a & b; })); break;
+				case 37: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a | b; })); break;
+				case 38: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a ^ b; })); break;
+				case 39: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> int32_t { return ~a; })); break;
+				case 40: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a >> b; })); break;
+				case 41: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a, int32_t b) -> int32_t { return a << b; })); break;
 
-				case 27: // bool and bool
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<bool>(stack, a_address) && read<bool>(stack, b_address));
-					break;
-				}
-				case 28: // bool or bool
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<bool>(stack, a_address) || read<bool>(stack, b_address));
-					break;
-				}
-				case 29: // bool xor bool
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<bool>(stack, a_address) != read<bool>(stack, b_address));
-					break;
-				}
-				case 30: // not bool
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, !read<bool>(stack, a_address));
-					break;
-				}
-				case 31: // bool == bool
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					try_call_decl(int const b_address, eval_expression(parameters[1], stack, context));
-					write(stack, return_address, read<bool>(stack, a_address) == read<bool>(stack, b_address));
-					break;
-				}
+				case 42: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a + b; })); break;
+				case 43: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a - b; })); break;
+				case 44: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a * b; })); break;
+				case 45: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a / b; })); break;
+				case 46: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a % b; })); break;
+				case 47: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> bool { return a == b; })); break;
+				case 48: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> order_t { return order_t(a - b); })); break; // <=>
+				case 49: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> int64_t { return -a; })); break;
+				case 50: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a & b; })); break;
+				case 51: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a | b; })); break;
+				case 52: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a ^ b; })); break;
+				case 53: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> int64_t { return ~a; })); break;
+				case 54: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a >> b; })); break;
+				case 55: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a, int64_t b) -> int64_t { return a << b; })); break;
 
-				case 32: // conversion int -> float
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, static_cast<float>(read<int>(stack, a_address)));
-					break;
-				}
-				case 33: // conversion float -> int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, static_cast<int>(read<float>(stack, a_address)));
-					break;
-				}
-				case 34: // conversion int -> char
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, static_cast<char_t>(read<int>(stack, a_address)));
-					break;
-				}
-				case 35: // conversion char -> int
-				{
-					try_call_decl(int const a_address, eval_expression(parameters[0], stack, context));
-					write(stack, return_address, static_cast<int>(read<char_t>(stack, a_address)));
-					break;
-				}
+				case 56: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a + b; })); break;
+				case 57: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a - b; })); break;
+				case 58: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a * b; })); break;
+				case 59: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a / b; })); break;
+				case 60: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a % b; })); break;
+				case 61: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> bool { return a == b; })); break;
+				case 62: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> order_t { return int(a) - int(b); })); break; // <=>
+				case 63: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a & b; })); break;
+				case 64: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a | b; })); break;
+				case 65: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a ^ b; })); break;
+				case 66: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> uint8_t { return ~a; })); break;
+				case 67: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a >> b; })); break;
+				case 68: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a << b; })); break;
+
+				case 69: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a + b; })); break;
+				case 70: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a - b; })); break;
+				case 71: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a * b; })); break;
+				case 72: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a / b; })); break;
+				case 73: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a % b; })); break;
+				case 74: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> bool { return a == b; })); break;
+				case 75: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> order_t { return int(a) - int(b); })); break; // <=>
+				case 76: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a & b; })); break;
+				case 77: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a | b; })); break;
+				case 78: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a ^ b; })); break;
+				case 79: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> uint16_t { return ~a; })); break;
+				case 80: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a >> b; })); break;
+				case 81: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a << b; })); break;
+
+				case 83: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a - b; })); break;
+				case 82: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a + b; })); break;
+				case 84: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a * b; })); break;
+				case 85: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a / b; })); break;
+				case 86: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a % b; })); break;
+				case 87: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> bool { return a == b; })); break;
+				case 88: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> order_t { return int(a) - int(b); })); break; // <=>
+				case 89: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a & b; })); break;
+				case 90: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a | b; })); break;
+				case 91: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a ^ b; })); break;
+				case 92: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> uint32_t { return ~a; })); break;
+				case 93: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a >> b; })); break;
+				case 94: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a << b; })); break;
+
+				case 95: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a + b; })); break;
+				case 96: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a - b; })); break;
+				case 97: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a * b; })); break;
+				case 98: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a / b; })); break;
+				case 99: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a % b; })); break;
+				case 100: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> bool { return a == b; })); break;
+				case 101: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> order_t { return int(a) - int(b); })); break; // <=>
+				case 102: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a & b; })); break;
+				case 103: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a | b; })); break;
+				case 104: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a ^ b; })); break;
+				case 105: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> uint64_t { return ~a; })); break;
+				case 106: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a >> b; })); break;
+				case 107: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a << b; })); break;
+
+				case 108: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a, float b) -> float { return a + b; })); break;
+				case 109: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a, float b) -> float { return a - b; })); break;
+				case 110: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a, float b) -> float { return a * b; })); break;
+				case 111: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a, float b) -> float { return a / b; })); break;
+				case 112: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a, float b) -> bool { return a == b; })); break;
+				case 113: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a, float b) -> float { return a - b; })); break; // <=>
+				case 114: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> float { return -a; })); break;
+
+				case 115: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a, double b) -> double { return a + b; })); break;
+				case 116: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a, double b) -> double { return a - b; })); break;
+				case 117: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a, double b) -> double { return a * b; })); break;
+				case 118: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a, double b) -> double { return a / b; })); break;
+				case 119: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a, double b) -> bool { return a == b; })); break;
+				case 120: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a, double b) -> float { return float(a - b); })); break; // <=>
+				case 121: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> double { return -a; })); break;
+
+				case 122: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](bool a, bool b) -> bool { return a && b; })); break;
+				case 123: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](bool a, bool b) -> bool { return a || b; })); break;
+				case 124: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](bool a, bool b) -> bool { return a != b; })); break;
+				case 125: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](bool a) -> bool { return !a; })); break;
+				case 126: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](bool a, bool b) -> bool { return a == b; })); break;
+
+				// Conversions
+				case 127: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> int8_t { return int8_t(a); })); break;
+				case 128: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> int8_t { return int8_t(a); })); break;
+				case 129: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> int8_t { return int8_t(a); })); break;
+				case 130: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> int8_t { return int8_t(a); })); break;
+				case 131: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> int8_t { return int8_t(a); })); break;
+				case 132: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> int8_t { return int8_t(a); })); break;
+				case 133: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> int8_t { return int8_t(a); })); break;
+				case 134: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> int8_t { return int8_t(a); })); break;
+				case 135: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> int8_t { return int8_t(a); })); break;
+
+				case 136: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> int16_t { return int16_t(a); })); break;
+				case 137: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> int16_t { return int16_t(a); })); break;
+				case 138: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> int16_t { return int16_t(a); })); break;
+				case 139: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> int16_t { return int16_t(a); })); break;
+				case 140: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> int16_t { return int16_t(a); })); break;
+				case 141: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> int16_t { return int16_t(a); })); break;
+				case 142: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> int16_t { return int16_t(a); })); break;
+				case 143: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> int16_t { return int16_t(a); })); break;
+				case 144: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> int16_t { return int16_t(a); })); break;
+
+				case 145: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> int32_t { return int32_t(a); })); break;
+				case 146: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> int32_t { return int32_t(a); })); break;
+				case 147: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> int32_t { return int32_t(a); })); break;
+				case 148: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> int32_t { return int32_t(a); })); break;
+				case 149: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> int32_t { return int32_t(a); })); break;
+				case 150: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> int32_t { return int32_t(a); })); break;
+				case 151: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> int32_t { return int32_t(a); })); break;
+				case 152: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> int32_t { return int32_t(a); })); break;
+				case 153: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> int32_t { return int32_t(a); })); break;
+
+				case 154: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> int64_t { return int64_t(a); })); break;
+				case 155: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> int64_t { return int64_t(a); })); break;
+				case 156: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> int64_t { return int64_t(a); })); break;
+				case 157: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> int64_t { return int64_t(a); })); break;
+				case 158: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> int64_t { return int64_t(a); })); break;
+				case 159: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> int64_t { return int64_t(a); })); break;
+				case 160: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> int64_t { return int64_t(a); })); break;
+				case 161: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> int64_t { return int64_t(a); })); break;
+				case 162: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> int64_t { return int64_t(a); })); break;
+
+				case 163: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> uint8_t { return uint8_t(a); })); break;
+				case 164: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> uint8_t { return uint8_t(a); })); break;
+				case 165: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> uint8_t { return uint8_t(a); })); break;
+				case 166: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> uint8_t { return uint8_t(a); })); break;
+				case 167: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> uint8_t { return uint8_t(a); })); break;
+				case 168: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> uint8_t { return uint8_t(a); })); break;
+				case 169: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> uint8_t { return uint8_t(a); })); break;
+				case 170: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> uint8_t { return uint8_t(a); })); break;
+				case 171: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> uint8_t { return uint8_t(a); })); break;
+
+				case 172: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> uint16_t { return uint16_t(a); })); break;
+				case 173: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> uint16_t { return uint16_t(a); })); break;
+				case 174: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> uint16_t { return uint16_t(a); })); break;
+				case 175: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> uint16_t { return uint16_t(a); })); break;
+				case 176: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> uint16_t { return uint16_t(a); })); break;
+				case 177: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> uint16_t { return uint16_t(a); })); break;
+				case 178: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> uint16_t { return uint16_t(a); })); break;
+				case 179: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> uint16_t { return uint16_t(a); })); break;
+				case 180: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> uint16_t { return uint16_t(a); })); break;
+
+				case 181: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> uint32_t { return uint32_t(a); })); break;
+				case 182: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> uint32_t { return uint32_t(a); })); break;
+				case 183: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> uint32_t { return uint32_t(a); })); break;
+				case 184: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> uint32_t { return uint32_t(a); })); break;
+				case 185: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> uint32_t { return uint32_t(a); })); break;
+				case 186: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> uint32_t { return uint32_t(a); })); break;
+				case 187: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> uint32_t { return uint32_t(a); })); break;
+				case 188: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> uint32_t { return uint32_t(a); })); break;
+				case 189: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> uint32_t { return uint32_t(a); })); break;
+
+				case 190: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> uint64_t { return uint64_t(a); })); break;
+				case 191: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> uint64_t { return uint64_t(a); })); break;
+				case 192: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> uint64_t { return uint64_t(a); })); break;
+				case 193: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> uint64_t { return uint64_t(a); })); break;
+				case 194: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> uint64_t { return uint64_t(a); })); break;
+				case 195: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> uint64_t { return uint64_t(a); })); break;
+				case 196: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> uint64_t { return uint64_t(a); })); break;
+				case 197: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> uint64_t { return uint64_t(a); })); break;
+				case 198: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> uint64_t { return uint64_t(a); })); break;
+
+				case 199: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> float { return float(a); })); break;
+				case 200: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> float { return float(a); })); break;
+				case 201: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> float { return float(a); })); break;
+				case 202: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> float { return float(a); })); break;
+				case 203: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> float { return float(a); })); break;
+				case 204: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> float { return float(a); })); break;
+				case 205: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> float { return float(a); })); break;
+				case 206: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> float { return float(a); })); break;
+				case 207: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](double a) -> float { return float(a); })); break;
+
+				case 208: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int8_t a) -> double { return double(a); })); break;
+				case 209: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int16_t a) -> double { return double(a); })); break;
+				case 210: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int32_t a) -> double { return double(a); })); break;
+				case 211: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](int64_t a) -> double { return double(a); })); break;
+				case 212: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint8_t a) -> double { return double(a); })); break;
+				case 213: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint16_t a) -> double { return double(a); })); break;
+				case 214: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint32_t a) -> double { return double(a); })); break;
+				case 215: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](uint64_t a) -> double { return double(a); })); break;
+				case 216: try_call_void(call_intrinsic_function(parameters, stack, context, return_address, +[](float a) -> double { return double(a); })); break;
 			}
 
 			free_up_to(stack, stack_top);

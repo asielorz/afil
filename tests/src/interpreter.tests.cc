@@ -69,7 +69,7 @@ namespace tests
 TEST_CASE("main function")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			return 0;
 		};
@@ -89,17 +89,17 @@ auto fib(int i) -> int
 TEST_CASE("Main function that calls another function.")
 {
 	auto const src = R"(
-		let fib = fn (int i) -> int
+		let fib = fn (int32 i) -> int32
 		{
 			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
 		};		
 
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let i = fib(5);
 			let j = fib(8);
 
-			let difference = fn (int i, int j) -> int
+			let difference = fn (int32 i, int32 j) -> int32
 			{
 				return 
 					if (i > j)
@@ -129,19 +129,19 @@ TEST_CASE("C++ comments")
 {
 	auto const src = R"(
 		// Fibonacci function. Computes the ith number of the Fibonacci sequence.
-		let fib = fn (int i) -> int
+		let fib = fn (int32 i) -> int32
 		{
 			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
 		};		
 
 		// Main function. Computes the difference between the 8th and the 5th Fibonacci numbers.
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let i = fib(5);
 			let j = fib(8);
 
 			// Returns the absolute value of the subtraction of i and j.
-			let difference = fn (int i, int j) -> int
+			let difference = fn (int32 i, int32 j) -> int32
 			{
 				return 
 					if (i > j)
@@ -171,7 +171,7 @@ TEST_CASE("C comments")
 {
 	auto const src = R"(
 		/* Fibonacci function. Computes the ith number of the Fibonacci sequence. */
-		let fib = fn (int i) -> int
+		let fib = fn (int32 i) -> int32
 		{
 			return if (i <= 1) i else fib(i - 1) + fib(i - 2);
 		};		
@@ -179,13 +179,13 @@ TEST_CASE("C comments")
 		/* Main function. Computes the
 		   difference between the 8th
 		   and the 5th Fibonacci numbers. */
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let i = fib(5);
 			let j = fib(8);
 
 			/* Returns the absolute value of the subtraction of i and j. */
-			let difference = fn (int i, int j) -> int
+			let difference = fn (int32 i, int32 j) -> int32
 			{
 				return 
 					if (i > /* Comments here just because I can */j)
@@ -218,7 +218,7 @@ TEST_CASE("Accessing global variables from main function")
 	auto const src = R"(
 		let i = 5;		
 		
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			return i;
 		};
@@ -230,7 +230,7 @@ TEST_CASE("Accessing global variables from main function")
 TEST_CASE("Block expression")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			return {
 				let i = 3;
@@ -246,7 +246,7 @@ TEST_CASE("Block expression")
 TEST_CASE("Block expressions with multiple return paths")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			return {
 				let i = 3;
@@ -265,7 +265,7 @@ TEST_CASE("Block expressions with multiple return paths")
 TEST_CASE("Accessing a variable from outside the block")
 {
 	auto const src = R"(
-		let foo = fn (int i, int j) -> int
+		let foo = fn (int32 i, int32 j) -> int32
 		{
 			if (i > j)
 			{
@@ -279,7 +279,7 @@ TEST_CASE("Accessing a variable from outside the block")
 			}
 		};		
 
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			return foo(6, 10);
 		};
@@ -291,7 +291,7 @@ TEST_CASE("Accessing a variable from outside the block")
 TEST_CASE("Ensure that variables inside the block do not share an address with the variables in the function")
 {
 	auto const src = R"(
-		let foo = fn (int i, int j) -> int
+		let foo = fn (int32 i, int32 j) -> int32
 		{
 			if (i > j)
 			{
@@ -305,7 +305,7 @@ TEST_CASE("Ensure that variables inside the block do not share an address with t
 			}
 		};		
 
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			return foo(6, 10);
 		};
@@ -317,7 +317,7 @@ TEST_CASE("Ensure that variables inside the block do not share an address with t
 TEST_CASE("integer assignment")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let mut i = 5;
 			i = 6;
@@ -331,7 +331,7 @@ TEST_CASE("integer assignment")
 TEST_CASE("while loop")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let mut i = 1;
 			let mut sum = 0;
@@ -350,7 +350,7 @@ TEST_CASE("while loop")
 TEST_CASE("for loop")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let mut sum = 0;
 			for (let mut i = 1; i < 10; i = i + 1)
@@ -366,7 +366,7 @@ TEST_CASE("for loop")
 TEST_CASE("break")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let mut sum = 0;
 			for (let mut i = 1; i < 10; i = i + 1)
@@ -386,7 +386,7 @@ TEST_CASE("break")
 TEST_CASE("continue")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let mut sum = 0;
 			for (let mut i = 1; i < 10; i = i + 1)
@@ -407,12 +407,12 @@ TEST_CASE("continue")
 TEST_CASE("function that takes a reference")
 {
 	auto const src = R"(
-		let assign = fn (int mut & a, int b) -> void
+		let assign = fn (int32 mut & a, int32 b) -> void
 		{
 			a = b;
 		};	
 
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let mut i = 5;
 			assign(i, 6);
@@ -426,7 +426,7 @@ TEST_CASE("function that takes a reference")
 TEST_CASE("Reference types in the stack")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let mut i = 5;
 			let mut & ri = i;
@@ -441,9 +441,9 @@ TEST_CASE("Reference types in the stack")
 TEST_CASE("Returning references")
 {
 	auto const src = R"(
-		let id = fn (int mut & i) -> int mut & { return i; };
+		let id = fn (int32 mut & i) -> int32 mut & { return i; };
 	
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			let mut i = 0;
 			let mut & ri = id(i);
@@ -458,9 +458,9 @@ TEST_CASE("Returning references")
 TEST_CASE("Deducing return type of functions")
 {
 	auto const src = R"(
-		let id = fn (int i) { return i; };
+		let id = fn (int32 i) { return i; };
 	
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			return id(5);
 		};
@@ -472,7 +472,7 @@ TEST_CASE("Deducing return type of functions")
 TEST_CASE("Negative numbers")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			return -5;
 		};
@@ -484,7 +484,7 @@ TEST_CASE("Negative numbers")
 TEST_CASE("Negation operator")
 {
 	auto const src = R"(
-		let main = fn () -> int
+		let main = fn () -> int32
 		{
 			if (not (3 < 4))
 				return 5;
@@ -501,8 +501,8 @@ TEST_CASE("Struct")
 	auto const src = R"(
 		struct vec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 	)"sv;
 
@@ -514,8 +514,8 @@ TEST_CASE("A struct can be used inside another struct")
 	auto const src = R"(
 		struct vec2
 		{
-			float x;
-			float y;
+			float32 x;
+			float32 y;
 		}
 
 		struct AABB
@@ -533,11 +533,11 @@ TEST_CASE("A struct can be constructed by giving values to each member")
 	auto const src = R"(
 		struct vec2
 		{
-			float x;
-			float y;
+			float32 x;
+			float32 y;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = vec2(3.5, 2.22);
 			return 0;
@@ -552,11 +552,11 @@ TEST_CASE("Member access")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec2(3, -7);
 			return v.x + v.y;
@@ -571,11 +571,11 @@ TEST_CASE("Mutating a member")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let mut v = ivec2(3, -7);
 			v.x = 5;
@@ -589,23 +589,23 @@ TEST_CASE("Mutating a member")
 TEST_CASE("Conversions between reference types of different mutability")
 {
 	complete::Program program;
-	complete::TypeId const int_ = complete::TypeId::int_;
-	complete::TypeId const int_ref = make_reference(int_);
+	complete::TypeId const int32 = complete::TypeId::int32;
+	complete::TypeId const int_ref = make_reference(int32);
 	complete::TypeId const int_mut_ref = make_mutable(int_ref);
 
 	// Conversion to itself.
-	REQUIRE(is_convertible(int_, int_, program));
+	REQUIRE(is_convertible(int32, int32, program));
 	REQUIRE(is_convertible(int_ref, int_ref, program));
 	REQUIRE(is_convertible(int_mut_ref, int_mut_ref, program));
 
 	// Reference to T.
-	REQUIRE(is_convertible(int_ref, int_, program));
-	REQUIRE(is_convertible(int_mut_ref, int_, program));
+	REQUIRE(is_convertible(int_ref, int32, program));
+	REQUIRE(is_convertible(int_mut_ref, int32, program));
 
 	// Mutable reference to reference
 	REQUIRE(is_convertible(int_mut_ref, int_ref, program));
 	REQUIRE(!is_convertible(int_ref, int_mut_ref, program));
-	REQUIRE(!is_convertible(int_, int_mut_ref, program));
+	REQUIRE(!is_convertible(int32, int_mut_ref, program));
 }
 
 TEST_CASE("Member access to an rvalue")
@@ -613,11 +613,11 @@ TEST_CASE("Member access to an rvalue")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return ivec2(2, 5).y;
 		};
@@ -631,16 +631,16 @@ TEST_CASE("Member access to the result of a function")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 
-		let make_vector = fn(int x, int y)
+		let make_vector = fn(int32 x, int32 y)
 		{
 			return ivec2(x, y);
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return make_vector(2, 5).y;
 		};
@@ -654,11 +654,11 @@ TEST_CASE("Designated initializers")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec2(.y = 3, .x = 7);
 			return v.x - v.y;
@@ -673,11 +673,11 @@ TEST_CASE("Default values for struct members")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x = 0;
-			int y = 0;
+			int32 x = 0;
+			int32 y = 0;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec2(.y = 5);
 			return v.x - v.y;
@@ -692,11 +692,11 @@ TEST_CASE("Default constructor for structs that have a default value for all mem
 	auto const src = R"(
 		struct ivec2
 		{
-			int x = 0;
-			int y = 0;
+			int32 x = 0;
+			int32 y = 0;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec2();
 			return v.x + v.y;
@@ -711,8 +711,8 @@ TEST_CASE("Structs with default constructor do not need a default value for the 
 	auto const src = R"(
 		struct ivec2
 		{
-			int x = 0;
-			int y = 0;
+			int32 x = 0;
+			int32 y = 0;
 		}
 		struct aabb
 		{
@@ -721,7 +721,7 @@ TEST_CASE("Structs with default constructor do not need a default value for the 
 			ivec2 max;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let box = aabb();
 			return box.min.x;
@@ -736,15 +736,15 @@ TEST_CASE("Operator overloading")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x = 0;
-			int y = 0;
+			int32 x = 0;
+			int32 y = 0;
 		}
 		let operator+ = fn(ivec2 a, ivec2 b)
 		{
 			return ivec2(a.x + b.x, a.y + b.y);
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec2(4, 5) + ivec2(-1, 3);
 			return v.y;
@@ -757,7 +757,7 @@ TEST_CASE("Operator overloading")
 TEST_CASE("Pointers")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let mut i = 5;
 			let pi = &i;
@@ -772,7 +772,7 @@ TEST_CASE("Pointers")
 TEST_CASE("Conversion from immutable pointer to mutable pointer")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let mut i = 5;
 			let pi = &i;
@@ -791,7 +791,7 @@ TEST_CASE("A function template lets the user define generic functions")
 			return a + b; 
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return add(-3, 4);
 		};
@@ -808,7 +808,7 @@ TEST_CASE("A template parameter may be a reference or mutable")
 			a = b; 
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let mut i = 5;
 			assign(i, -225);
@@ -828,9 +828,9 @@ TEST_CASE("A structure template lets the user define generic structures")
 			U second;
 		}
 		
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let p = pair<int, int>(3, 4);
+			let p = pair<int32, int32>(3, 4);
 			return p.first + p.second;
 		};
 	)"sv;
@@ -849,11 +849,11 @@ TEST_CASE("A structure may contain a variable of a template type")
 		
 		struct aabb
 		{
-			tvec2<int> min = tvec2<int>(0, 0);
-			tvec2<int> max = tvec2<int>(0, 0);
+			tvec2<int32> min = tvec2<int32>(0, 0);
+			tvec2<int32> max = tvec2<int32>(0, 0);
 		}
 		
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let box = aabb();
 			return box.min.y;
@@ -868,14 +868,14 @@ TEST_CASE("Statement block in the default value of a member variable")
 	auto const src = R"(
 		struct test
 		{
-			int x = {
+			int32 x = {
 				let i = 3;
 				let j = 4;
 				return i * i + j * j;
 			};
 		}
 		
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let t = test();
 			return t.x;
@@ -893,7 +893,7 @@ TEST_CASE("Function template refactor: variable nodes")
 			return x; 
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return identity(1024);
 		};
@@ -910,7 +910,7 @@ TEST_CASE("Function template refactor: function call nodes")
 			return a + b; 
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return add(3, 6);
 		};
@@ -927,7 +927,7 @@ TEST_CASE("Function template refactor: operator call nodes")
 			return a == b; 
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			if (eq(3, 4))
 				return 5;
@@ -947,7 +947,7 @@ TEST_CASE("Function template refactor: relational operator call nodes")
 			return a < b; 
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			if (less(3, 4))
 				return 5;
@@ -971,7 +971,7 @@ TEST_CASE("Function template refactor: if expression")
 					a - b;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return difference(-4, 10);
 		};
@@ -991,7 +991,7 @@ TEST_CASE("Function template refactor: if statement")
 				return a - b;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return difference(-4, 10);
 		};
@@ -1012,7 +1012,7 @@ TEST_CASE("Function template refactor: variable declaration statement of a non d
 				return a - b;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return difference(-4, 10);
 		};
@@ -1033,7 +1033,7 @@ TEST_CASE("Function template refactor: variable declaration statement of a non d
 				return a - b;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return difference(10, -4);
 		};
@@ -1051,7 +1051,7 @@ TEST_CASE("Function template refactor: variable declaration of dependent type")
 			return m;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return midpoint(0, 10);
 		};
@@ -1076,10 +1076,10 @@ TEST_CASE("Function template refactor: synthesizing default constructor for vari
 
 		struct DefaultConstructible
 		{
-			int value = 5;
+			int32 value = 5;
 		}		
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let x = DefaultConstructible(7);
 			let y = return_default(x);
@@ -1095,9 +1095,9 @@ TEST_CASE("Function template refactor: struct constructor of non-dependent type"
 	auto const src = R"(
 		struct ivec3
 		{
-			int x;
-			int y;
-			int z;
+			int32 x;
+			int32 y;
+			int32 z;
 		}
 		
 		let make_vector = fn<T>(T x, T y, T z) 
@@ -1105,7 +1105,7 @@ TEST_CASE("Function template refactor: struct constructor of non-dependent type"
 			return ivec3(x, y, z);
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = make_vector(1, 2, 3);
 			return v.y;
@@ -1120,10 +1120,10 @@ TEST_CASE("Structs are assignable by default")
 	auto const src = R"(
 		struct Foo
 		{
-			int x;
+			int32 x;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let mut f = Foo(5);
 			f = Foo(6);
@@ -1139,13 +1139,13 @@ TEST_CASE("Function template refactor: Member access to dependent type")
 	auto const src = R"(
 		struct Foo
 		{
-			int x;
+			int32 x;
 		}
 		struct ivec3
 		{
-			int x;
-			int y;
-			int z;
+			int32 x;
+			int32 y;
+			int32 z;
 		}
 
 		let get_x = fn<T>(T t)
@@ -1153,7 +1153,7 @@ TEST_CASE("Function template refactor: Member access to dependent type")
 			return t.x;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let f = Foo(6);
 			let v = ivec3(1, 2, 3);
@@ -1173,9 +1173,9 @@ TEST_CASE("Member default initializer for struct templates")
 			U second = -3;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let p = test_pair<int, int>();
+			let p = test_pair<int32, int32>();
 			return p.first + p.second;
 		};
 	)"sv;
@@ -1194,7 +1194,7 @@ TEST_CASE("For loops in dependent contexts")
 			return sum;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return some_sum(0, 10, 1);
 		};
@@ -1221,7 +1221,7 @@ TEST_CASE("Statement blocks in dependent contexts")
 			}
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return add(3, 5);
 		};
@@ -1242,7 +1242,7 @@ TEST_CASE("Statement block expressions in dependent contexts")
 			};
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return add(3, 5);
 		};
@@ -1259,7 +1259,7 @@ TEST_CASE("Recursive dependent types")
 			return *p;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let x = 25;
 			return dereference(&x);
@@ -1272,9 +1272,9 @@ TEST_CASE("Recursive dependent types")
 TEST_CASE("Declaring an array")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let a = int[4](1, 2, 3, 4);
+			let a = int32[4](1, 2, 3, 4);
 			return 0;
 		};
 	)"sv;
@@ -1287,11 +1287,11 @@ TEST_CASE("Default constructed array")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x = 0;
-			int y = 0;
+			int32 x = 0;
+			int32 y = 0;
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let a = ivec2[4]();
 			return 0;
@@ -1306,13 +1306,13 @@ TEST_CASE("User can overload subscript operator for their type")
 	auto const src = R"(
 		struct ivec4
 		{
-			int x = 0;
-			int y = 0;
-			int z = 0;
-			int w = 0;
+			int32 x = 0;
+			int32 y = 0;
+			int32 z = 0;
+			int32 w = 0;
 		}
 
-		let operator[] = fn(ivec4 v, int i)
+		let operator[] = fn(ivec4 v, int32 i)
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1320,7 +1320,7 @@ TEST_CASE("User can overload subscript operator for their type")
 			return v.w;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec4(1, 3, 5, 7);
 			return v[3] - v[1];
@@ -1335,13 +1335,13 @@ TEST_CASE("Can overload based on mutability")
 	auto const src = R"(
 		struct ivec4
 		{
-			int x = 0;
-			int y = 0;
-			int z = 0;
-			int w = 0;
+			int32 x = 0;
+			int32 y = 0;
+			int32 z = 0;
+			int32 w = 0;
 		}
 
-		let operator[] = fn(ivec4 & v, int i) -> int &
+		let operator[] = fn(ivec4 & v, int32 i) -> int32 &
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1349,7 +1349,7 @@ TEST_CASE("Can overload based on mutability")
 			return v.w;
 		};
 
-		let operator[] = fn(ivec4 mut & v, int i) -> int mut &
+		let operator[] = fn(ivec4 mut & v, int32 i) -> int32 mut &
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1357,7 +1357,7 @@ TEST_CASE("Can overload based on mutability")
 			return v.w;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec4(1, 3, 5, 7);
 			let mut mv = ivec4();
@@ -1378,13 +1378,13 @@ TEST_CASE("Can overload based on mutability independent of order")
 	auto const src = R"(
 		struct ivec4
 		{
-			int x = 0;
-			int y = 0;
-			int z = 0;
-			int w = 0;
+			int32 x = 0;
+			int32 y = 0;
+			int32 z = 0;
+			int32 w = 0;
 		}
 
-		let operator[] = fn(ivec4 mut & v, int i) -> int mut &
+		let operator[] = fn(ivec4 mut & v, int32 i) -> int32 mut &
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1392,7 +1392,7 @@ TEST_CASE("Can overload based on mutability independent of order")
 			return v.w;
 		};
 
-		let operator[] = fn(ivec4 & v, int i) -> int &
+		let operator[] = fn(ivec4 & v, int32 i) -> int32 &
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1400,7 +1400,7 @@ TEST_CASE("Can overload based on mutability independent of order")
 			return v.w;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec4(1, 3, 5, 7);
 			let mut mv = ivec4();
@@ -1421,13 +1421,13 @@ TEST_CASE("Subscript on dependent types")
 	auto const src = R"(
 		struct ivec4
 		{
-			int x = 0;
-			int y = 0;
-			int z = 0;
-			int w = 0;
+			int32 x = 0;
+			int32 y = 0;
+			int32 z = 0;
+			int32 w = 0;
 		}
 
-		let operator[] = fn(ivec4 v, int i)
+		let operator[] = fn(ivec4 v, int32 i)
 		{
 			if (i == 0) return v.x;
 			if (i == 1) return v.y;
@@ -1435,12 +1435,12 @@ TEST_CASE("Subscript on dependent types")
 			return v.w;
 		};
 
-		let subscript = fn<T>(T & array, int i)
+		let subscript = fn<T>(T & array, int32 i)
 		{
 			return array[i];
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec4(1, 3, 5, 7);
 			return subscript(v, 3) - subscript(v, 0);
@@ -1455,15 +1455,15 @@ TEST_CASE("Multiple argument subscript")
 	auto const src = R"(
 		struct foo
 		{
-			int value;
+			int32 value;
 		}
 
-		let operator[] = fn(foo f, int i, int j)
+		let operator[] = fn(foo f, int32 i, int32 j)
 		{
 			return f.value + i + j;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let f = foo(3);
 			return f[4, 2];
@@ -1482,7 +1482,7 @@ TEST_CASE("Array of dependent type")
 			return 0;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return foo(8, 4);
 		};
@@ -1494,9 +1494,9 @@ TEST_CASE("Array of dependent type")
 TEST_CASE("Array pointer type")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let a = int[4](1, 2, 3, 4);
+			let a = int32[4](1, 2, 3, 4);
 			let pa = data(a);
 			return pa[2];
 		};
@@ -1508,14 +1508,14 @@ TEST_CASE("Array pointer type")
 TEST_CASE("Function template that takes array pointer")
 {
 	auto const src = R"(
-		let subscript = fn<T>(T[] array, int i)
+		let subscript = fn<T>(T[] array, int32 i)
 		{
 			return array[i];
 		};
 	
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let a = int[4](1, 2, 3, 4);
+			let a = int32[4](1, 2, 3, 4);
 			let pa = data(a);
 			return subscript(pa, 2);
 		};
@@ -1527,9 +1527,9 @@ TEST_CASE("Function template that takes array pointer")
 TEST_CASE("Subscripting array types")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let a = int[4](1, 2, 3, 4);
+			let a = int32[4](1, 2, 3, 4);
 			return a[0] + a[1] + a[2] + a[3];
 		};
 	)"sv;
@@ -1540,9 +1540,9 @@ TEST_CASE("Subscripting array types")
 TEST_CASE("Subscripting array lvalues")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			return int[4](1, 2, 3, 4)[3];
+			return int32[4](1, 2, 3, 4)[3];
 		};
 	)"sv;
 
@@ -1552,9 +1552,9 @@ TEST_CASE("Subscripting array lvalues")
 TEST_CASE("size function for arrays")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let a = int[5](1, 2, 3, 4, 5);
+			let a = int32[5](1, 2, 3, 4, 5);
 			let mut sum = 0;
 			for (let mut i = 0; i < size(a); i = i + 1)
 				sum = sum + a[i];
@@ -1568,7 +1568,7 @@ TEST_CASE("size function for arrays")
 TEST_CASE("String literals")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let s = "En un lugar de la Mancha";
 			return size(s);
@@ -1591,7 +1591,7 @@ TEST_CASE("Declaring a struct inside a template")
 			return pair(t, u);
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let p = make_pair(3, "foo");
 			return p.first + size(p.second);
@@ -1604,7 +1604,7 @@ TEST_CASE("Declaring a struct inside a template")
 TEST_CASE("Declaring a function inside a template")
 {
 	auto const src = R"(
-		let is_sorted = fn<T>(T[] array, int n)
+		let is_sorted = fn<T>(T[] array, int32 n)
 		{
 			let compare = fn(T a, T b) { return a < b; };
 			for (let mut i = 1; i < n; i = i + 1)
@@ -1614,10 +1614,10 @@ TEST_CASE("Declaring a function inside a template")
 			return true;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let sorted_array = int[6](1, 2, 3, 3, 3, 4);
-			let array_not_sorted = int[6](1, 4, 3, 3, 3, 4);
+			let sorted_array = int32[6](1, 2, 3, 3, 3, 4);
+			let array_not_sorted = int32[6](1, 4, 3, 3, 3, 4);
 
 			let mut ret = 0;
 			if (is_sorted(data(sorted_array), size(sorted_array)))
@@ -1635,19 +1635,19 @@ TEST_CASE("Declaring a function inside a template")
 TEST_CASE("import allows to import C functions from DLLs")
 {
 	auto const src = R"(
-		let putchar = fn(char c) -> int 
+		let putchar = fn(char c) -> int32 
 			extern_symbol("putchar");
 
-		let abs = fn(int x) -> int 
+		let abs = fn(int32 x) -> int32 
 			extern_symbol("abs");
 
-		let print_string = fn(char[] s, int n)
+		let print_string = fn(char[] s, int32 n)
 		{
 			for (let mut i = 0; i < n; i = i + 1)
 				putchar(s[i]);
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let s = "Hello, world!";
 			print_string(data(s), size(s));
@@ -1662,9 +1662,9 @@ TEST_CASE("import allows to import C functions from DLLs")
 TEST_CASE("Constant expressions")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let array = int[1 + 2](0);
+			let array = int32[1 + 2](0);
 			return size(array);
 		};
 	)"sv;
@@ -1675,10 +1675,10 @@ TEST_CASE("Constant expressions")
 TEST_CASE("Variables with values known at compile time are constants and can be read in a constant expression")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let s = 5;
-			let array = int[s](0);
+			let array = int32[s](0);
 			return size(array);
 		};
 	)"sv;
@@ -1689,11 +1689,11 @@ TEST_CASE("Variables with values known at compile time are constants and can be 
 TEST_CASE("Constant variable of pointer type")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let s = 5;
 			let ps = &s;
-			let array = int[*ps](0);
+			let array = int32[*ps](0);
 			return size(array);
 		};
 	)"sv;
@@ -1704,14 +1704,14 @@ TEST_CASE("Constant variable of pointer type")
 TEST_CASE("Statement blocks in constant expressions")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let s = {
 				let mut i = 3;
 				i = i * 2;
 				return i;
 			};
-			let array = int[s](0);
+			let array = int32[s](0);
 			return size(array);
 		};
 	)"sv;
@@ -1722,7 +1722,7 @@ TEST_CASE("Statement blocks in constant expressions")
 TEST_CASE("Function call in constant expression")
 {
 	auto const src = R"(
-		let int_sqrt = fn(int mut number) -> int
+		let int_sqrt = fn(int32 mut number) -> int32
 		{
 			let mut result = 0;
  			let mut result_squared = 1;
@@ -1735,10 +1735,10 @@ TEST_CASE("Function call in constant expression")
 			return result;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let s = int_sqrt(25);
-			let array = int[s](0);
+			let array = int32[s](0);
 			return size(array);
 		};
 	)"sv;
@@ -1749,7 +1749,7 @@ TEST_CASE("Function call in constant expression")
 TEST_CASE("Bitwise and")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return 25 & 7;
 		};
@@ -1761,7 +1761,7 @@ TEST_CASE("Bitwise and")
 TEST_CASE("Bitwise or")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return 25 | 7;
 		};
@@ -1773,7 +1773,7 @@ TEST_CASE("Bitwise or")
 TEST_CASE("Bitwise xor")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return 25 ^ 7;
 		};
@@ -1785,7 +1785,7 @@ TEST_CASE("Bitwise xor")
 TEST_CASE("Bitwise not")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return ~25;
 		};
@@ -1797,7 +1797,7 @@ TEST_CASE("Bitwise not")
 TEST_CASE("Bitwise right shift")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return 25 >> 7;
 		};
@@ -1809,7 +1809,7 @@ TEST_CASE("Bitwise right shift")
 TEST_CASE("Bitwise left shift")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return 25 << 7;
 		};
@@ -1821,7 +1821,7 @@ TEST_CASE("Bitwise left shift")
 TEST_CASE("Forgetting a variable name will result in a compiler error")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let = 5;
 			return 5;
@@ -1835,7 +1835,7 @@ TEST_CASE("Forgetting a variable name will result in a compiler error")
 TEST_CASE("There is no operator + for booleans")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let b = true + false;
 			return 5;
@@ -1852,18 +1852,18 @@ TEST_CASE("Functions that take a template instantiation")
 		struct<T> span
 		{
 			T[] data_;
-			int size_;
+			int32 size_;
 		}
 		
-		let operator[] = fn<T>(span<T> s, int i) -> T &
+		let operator[] = fn<T>(span<T> s, int32 i) -> T &
 		{
 			return s.data_[i];
 		};
 		
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let array = int[3](1, 2, 3);
-			let s = span<int>(data(array), size(array));
+			let array = int32[3](1, 2, 3);
+			let s = span<int32>(data(array), size(array));
 			return s[1];
 		};
 	)"sv;
@@ -1879,9 +1879,9 @@ TEST_CASE("Higher order function templates")
 			return f(a, b);
 		};
 		
-		let add = fn(int a, int b) { return a + b; };
+		let add = fn(int32 a, int32 b) { return a + b; };
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return invoke(add, 4, 5);
 		};
@@ -1898,10 +1898,10 @@ TEST_CASE("Passing an overload set to a template")
 			return f(a, b);
 		};
 		
-		let add = fn(int a, int b) { return a + b; };
-		let add = fn(float a, float b) { return a + b; };
+		let add = fn(int32 a, int32 b) { return a + b; };
+		let add = fn(float32 a, float32 b) { return a + b; };
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return invoke(add, 4, 5);
 		};
@@ -1920,7 +1920,7 @@ TEST_CASE("Passing a template to a template")
 		
 		let add = fn<T>(T a, T b) { return a + b; };
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return invoke(add, 4, 5);
 		};
@@ -1937,7 +1937,7 @@ TEST_CASE("Passing an operator overload set to a template")
 			return f(a, b);
 		};
 		
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return invoke(operator+, 4, 5);
 		};
@@ -1949,9 +1949,9 @@ TEST_CASE("Passing an operator overload set to a template")
 TEST_CASE("Deduction of array size")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let a = int[](1, 2, 3, 4, 5);
+			let a = int32[](1, 2, 3, 4, 5);
 
 			return size(a);
 		};
@@ -1964,7 +1964,7 @@ TODO("Uninit with let statements")
 //TEST_CASE("uninit allows for not initializing an object")
 //{
 //	auto const src = R"(
-//		let main = fn() -> int
+//		let main = fn() -> int32
 //		{
 //			let mut a = uninit;
 //			return a;
@@ -1977,18 +1977,18 @@ TODO("Uninit with let statements")
 TEST_CASE("Order of declarations doesn't matter")
 {
 	auto const src = R"(
-		let B = fn() -> int
+		let B = fn() -> int32
 		{
 			// A defined below!!!
 			return A();
 		};
 
-		let A = fn() -> int
+		let A = fn() -> int32
 		{
 			return 4;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return B();
 		};
@@ -2002,8 +2002,8 @@ TEST_CASE("A program may be composed of several modules")
 	auto const file1 = R"(
 		struct ivec2
 		{
-			int x = 0;
-			int y = 0;
+			int32 x = 0;
+			int32 y = 0;
 		}
 		let operator+ = fn(ivec2 a, ivec2 b)
 		{
@@ -2012,7 +2012,7 @@ TEST_CASE("A program may be composed of several modules")
 	)"sv;
 
 	auto const file2 = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec2(4, 5) + ivec2(-1, 3);
 			return v.y;
@@ -2032,15 +2032,15 @@ TEST_CASE("A program may be composed of several modules")
 TEST_CASE("A module cannot access symbols from a module it does not depend on")
 {
 	auto const file1 = R"(
-		let add = fn(int a, int b) { return a + b; };
+		let add = fn(int32 a, int32 b) { return a + b; };
 	)"sv;
 
 	auto const file2 = R"(
-		let subtract = fn(int a, int b) { add(a, -b); };
+		let subtract = fn(int32 a, int32 b) { add(a, -b); };
 	)"sv;
 
 	auto const file3 = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return subtract(5, 2);
 		};
@@ -2063,7 +2063,7 @@ TEST_CASE("A module cannot access symbols from a module it does not depend on")
 TEST_CASE("Order of declarations doesn't matter for types either")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ivec2(3, 4);
 			return v.x + v.y;
@@ -2071,8 +2071,8 @@ TEST_CASE("Order of declarations doesn't matter for types either")
 
 		struct ivec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 	)"sv;
 
@@ -2082,12 +2082,12 @@ TEST_CASE("Order of declarations doesn't matter for types either")
 TEST_CASE("Passing a temporary by constant reference")
 {
 	auto const src = R"(
-		let add = fn(int & a, int & b)
+		let add = fn(int32 & a, int32 & b)
 		{
 			return a + b;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return add(4, 5);
 		};
@@ -2099,7 +2099,7 @@ TEST_CASE("Passing a temporary by constant reference")
 TEST_CASE("compiles is a built in function that checks if ")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			if (compiles{3 + 4})
 				return 3 + 4;
@@ -2114,7 +2114,7 @@ TEST_CASE("compiles is a built in function that checks if ")
 TEST_CASE("compiles returns false when given an ill formed expression")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			if (compiles{*3})
 				return *3;
@@ -2129,9 +2129,9 @@ TEST_CASE("compiles returns false when given an ill formed expression")
 TEST_CASE("compiles can define names for using them inside its body")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			if (compiles(int i, int j){i + j})
+			if (compiles(int32 i, int32 j){i + j})
 				return 3 + 4;
 			else
 				return 0;
@@ -2144,9 +2144,9 @@ TEST_CASE("compiles can define names for using them inside its body")
 TEST_CASE("compiles can have any number of expressions, separated by semicolons. All must be true for the compiles expression to be true")
 {
 	auto const src1 = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			if (compiles(int i, int j){i + j; i - j; i < j})
+			if (compiles(int32 i, int32 j){i + j; i - j; i < j})
 				return 3 + 4;
 			else
 				return 0;
@@ -2156,9 +2156,9 @@ TEST_CASE("compiles can have any number of expressions, separated by semicolons.
 	REQUIRE(tests::parse_and_run(src1) == 7);
 
 	auto const src2 = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			if (compiles(int i, int j){i + j; i - j; i[j]}) // Last one i[j] does not compile
+			if (compiles(int32 i, int32 j){i + j; i - j; i[j]}) // Last one i[j] does not compile
 				return 3 + 4;
 			else
 				return 0;
@@ -2171,11 +2171,11 @@ TEST_CASE("compiles can have any number of expressions, separated by semicolons.
 TEST_CASE("A compiles expression may specify what the return type of the return type of a expression must be")
 {
 	auto const src1 = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let condition = compiles(int i, int j)
+			let condition = compiles(int32 i, int32 j)
 			{
-				{i + j} -> int;
+				{i + j} -> int32;
 				{i < j} -> bool
 			};
 
@@ -2189,11 +2189,11 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 	REQUIRE(tests::parse_and_run(src1) == 7);
 
 	auto const src2 = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let condition = compiles(int i, int j)
+			let condition = compiles(int32 i, int32 j)
 			{
-				{i + j} -> float; // Wrong
+				{i + j} -> float32; // Wrong
 				{i < j} -> bool
 			};
 
@@ -2210,7 +2210,7 @@ TEST_CASE("A compiles expression may specify what the return type of the return 
 TEST_CASE("Contracts let defining preconditions for a function")
 {
 	auto const src = R"(
-		let div = fn(int dividend, int divisor) -> int
+		let div = fn(int32 dividend, int32 divisor) -> int32
 			assert{divisor != 0;}
 		{
 			return dividend / divisor;
@@ -2223,13 +2223,13 @@ TEST_CASE("Contracts let defining preconditions for a function")
 TEST_CASE("Running a function out of contract at runtime will stop execution and return an error")
 {
 	auto const src = R"(
-		let div = fn(int dividend, int divisor) -> int
+		let div = fn(int32 dividend, int32 divisor) -> int32
 			assert{divisor != 0;}
 		{
 			return dividend / divisor;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return div(5, 0);
 		};
@@ -2244,13 +2244,13 @@ TEST_CASE("Running a function out of contract at runtime will stop execution and
 TEST_CASE("Running a function out of contract at compile time is a compiler error")
 {
 	auto const src = R"(
-		let div = fn(int dividend, int divisor) -> int
+		let div = fn(int32 dividend, int32 divisor) -> int32
 			assert{divisor != 0;}
 		{
 			return dividend / divisor;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let result = div(5, 0); // Result is a compile time constant
 			return result;
@@ -2264,7 +2264,7 @@ TEST_CASE("Running a function out of contract at compile time is a compiler erro
 TEST_CASE("Type aliases")
 {
 	auto const src = R"(
-		type also_int = int;
+		type also_int = int32;
 		
 		let main = fn() -> also_int
 		{
@@ -2280,11 +2280,11 @@ TEST_CASE("Type of a variable in compiles block may be a expression")
 	auto const src = R"(
 		let identity = fn(type t) { return t; };
 		
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let condition = compiles(int i, identity(int) j)
+			let condition = compiles(int32 i, identity(int32) j)
 			{
-				{i + j} -> int
+				{i + j} -> int32
 			};
 
 			if (condition)
@@ -2302,11 +2302,11 @@ TEST_CASE("Template function that takes a type")
 	auto const src = R"(
 		let identity = fn<T>(T t) { return t; };
 		
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let condition = compiles(int i, identity(int) j)
+			let condition = compiles(int32 i, identity(int32) j)
 			{
-				{i + j} -> int
+				{i + j} -> int32
 			};
 
 			if (condition)
@@ -2324,7 +2324,7 @@ TEST_CASE("A type alias may take a constant expression returning a type as a par
 	auto const src = R"(
 		let identity = fn<T>(T t) { return t; };
 		
-		type also_int = identity(int);
+		type also_int = identity(int32);
 		
 		let main = fn() -> also_int
 		{
@@ -2343,13 +2343,13 @@ TEST_CASE("Compiles can depend on non literal types")
 			return compiles(t i, t j)
 			{
 				{i == j} -> bool;
-				{i <=> j} -> int
+				{i <=> j} -> int32
 			};
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			if (is_ordered(int))
+			if (is_ordered(int32))
 				return 1;
 			else
 				return 0;
@@ -2367,11 +2367,11 @@ TEST_CASE("Compiles can depend on non literal types, round 2")
 			return compiles(t i, t j)
 			{
 				{i == j} -> bool;
-				{i <=> j} -> int
+				{i <=> j} -> int32
 			};
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			if (is_ordered(bool))
 				return 1;
@@ -2386,7 +2386,7 @@ TEST_CASE("Compiles can depend on non literal types, round 2")
 TEST_CASE("An identifier name may start with a keyword. This test catches possible bugs in the lexer.")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let falsehood = false;		// Starts with "false"
 			let true_story = 6;			// Starts with "true"
@@ -2413,7 +2413,7 @@ TEST_CASE("A function can be constrained by concepts")
 			return compiles(t i, t j)
 			{
 				{i == j} -> bool;
-				{i <=> j} -> int
+				{i <=> j} -> int32
 			};
 		};
 
@@ -2422,7 +2422,7 @@ TEST_CASE("A function can be constrained by concepts")
 			return a < b;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let mut i = 0;
 
@@ -2447,7 +2447,7 @@ TEST_CASE("A struct may be constrained by concepts")
 			return compiles(t i, t j)
 			{
 				{i == j} -> bool;
-				{i <=> j} -> int
+				{i <=> j} -> int32
 			};
 		};
 
@@ -2457,7 +2457,7 @@ TEST_CASE("A struct may be constrained by concepts")
 			U second;
 		}
 
-		let operator<=> = fn<T, U>(ordered_pair<T, U> a, ordered_pair<T, U> b) -> int
+		let operator<=> = fn<T, U>(ordered_pair<T, U> a, ordered_pair<T, U> b) -> int32
 		{
 			let first = a.first <=> b.first;
 			if (first != 0)
@@ -2466,10 +2466,10 @@ TEST_CASE("A struct may be constrained by concepts")
 				return a.second <=> b.second;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let a = ordered_pair<int, float>(5, 3.14);
-			let b = ordered_pair<int, float>(5, 2.25);
+			let a = ordered_pair<int32, float32>(5, 3.14);
+			let b = ordered_pair<int32, float32>(5, 2.25);
 
 			if (a > b)
 				return 1;
@@ -2486,13 +2486,13 @@ TEST_CASE("Names inside namespaces must be preceded by the namespace name")
 	auto const src = R"(
 		namespace ns
 		{
-			let add = fn(int i, int j)
+			let add = fn(int32 i, int32 j)
 			{
 				return i + j;
 			};
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return ns::add(3, 4);
 		};
@@ -2508,14 +2508,14 @@ TEST_CASE("Nested namespaces")
 		{
 			namespace ns2
 			{
-				let add = fn(int i, int j)
+				let add = fn(int32 i, int32 j)
 				{
 					return i + j;
 				};
 			}
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return ns::ns2::add(3, 4);
 		};
@@ -2529,13 +2529,13 @@ TEST_CASE("Nested namespace declaration")
 	auto const src = R"(
 		namespace ns::ns2
 		{
-			let add = fn(int i, int j)
+			let add = fn(int32 i, int32 j)
 			{
 				return i + j;
 			};
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return ns::ns2::add(3, 4);
 		};
@@ -2551,12 +2551,12 @@ TEST_CASE("Types inside namespaces")
 		{
 			struct ivec2
 			{
-				int x;
-				int y;
+				int32 x;
+				int32 y;
 			}
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = ns::ivec2(3, 4);
 			return v.x + v.y;
@@ -2571,13 +2571,13 @@ TEST_CASE("Type expression in constructor")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 
 		let identity = fn<T>(T t) { return t; };
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = identity(ivec2)(3, 4);
 			return v.x + v.y;
@@ -2592,13 +2592,13 @@ TEST_CASE("Type expression in designated initializer constructor")
 	auto const src = R"(
 		struct ivec2
 		{
-			int x;
-			int y;
+			int32 x;
+			int32 y;
 		}
 
 		let identity = fn<T>(T t) { return t; };
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let v = identity(ivec2)(.x = 3, .y = 4);
 			return v.x + v.y;
@@ -2613,18 +2613,18 @@ TEST_CASE("Accessing a name from a namespace inside the namespace without namesp
 	auto const src = R"(
 		namespace ns::ns2 
 		{
-			let add = fn(int i, int j)
+			let add = fn(int32 i, int32 j)
 			{
 				return i + j;
 			};
 			
-			let test = fn() -> int
+			let test = fn() -> int32
 			{
 				return /* sin namespace */ add(2, 3); 
 			};
 		}
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			return ns::ns2::test();
 		};
@@ -2636,21 +2636,21 @@ TEST_CASE("Accessing a name from a namespace inside the namespace without namesp
 TEST_CASE("Redundant conversions")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			return int(3);
+			return int32(3);
 		};
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
-TEST_CASE("Conversion from float to int")
+TEST_CASE("Conversion from float32 to int32")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			return int(3.5);
+			return int32(3.5);
 		};
 	)"sv;
 
@@ -2660,10 +2660,10 @@ TEST_CASE("Conversion from float to int")
 TEST_CASE("char literals")
 {
 	auto const src = R"(
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let c = 'A';
-			return int(c);
+			return int32(c);
 		};
 	)"sv;
 
@@ -2675,7 +2675,7 @@ TEST_CASE("User defined conversions")
 	auto const src = R"(
 		struct TestStruct
 		{
-			int value;
+			int32 value;
 		}
 
 		conversion fn(TestStruct s) -> bool
@@ -2683,7 +2683,7 @@ TEST_CASE("User defined conversions")
 			return s.value != 0;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let s = TestStruct(5);
 			if (bool(s))
@@ -2709,10 +2709,10 @@ TEST_CASE("Template functions for user defined conversions")
 			return w.value;
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
-			let w = Wrapper<int>(5);
-			return int(w);
+			let w = Wrapper<int32>(5);
+			return int32(w);
 		};
 	)"sv;
 
@@ -2730,10 +2730,10 @@ TEST_CASE("Deduce conversion function template from type converted to only")
 			return T(0);
 		};
 
-		let main = fn() -> int
+		let main = fn() -> int32
 		{
 			let zero = Zeroinator();
-			return int(zero);
+			return int32(zero);
 		};
 	)"sv;
 

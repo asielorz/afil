@@ -21,10 +21,17 @@ namespace complete
 	{
 		return {
 			{"void",		{0, 1}},
-			{"int",			{4, 4}},
-			{"float",		{4, 4}},
+			{"int8",		{1, 1}},
+			{"int16",		{2, 2}},
+			{"int32",		{4, 4}},
+			{"int64",		{8, 8}},
+			{"uint8",		{1, 1}},
+			{"uint16",		{2, 2}},
+			{"uint32",		{4, 4}},
+			{"uint64",		{8, 8}},
+			{"float32",		{4, 4}},
+			{"float64",		{8, 8}},
 			{"bool",		{1, 1}},
-			{"char",		{1, 1}},
 			{"type",		{4, 4}},
 			{"uninit_t",	{0, 1}},
 		};
@@ -32,11 +39,18 @@ namespace complete
 
 	template <typename T> struct index_for_type {};
 	template <> struct index_for_type<void> { static constexpr unsigned value = 0; };
-	template <> struct index_for_type<int> { static constexpr unsigned value = 1; };
-	template <> struct index_for_type<float> { static constexpr unsigned value = 2; };
-	template <> struct index_for_type<bool> { static constexpr unsigned value = 3; };
-	template <> struct index_for_type<char_t> { static constexpr unsigned value = 4; };
-	template <> struct index_for_type<complete::TypeId> { static constexpr unsigned value = 5; };
+	template <> struct index_for_type<int8_t> { static constexpr unsigned value = 1; };
+	template <> struct index_for_type<int16_t> { static constexpr unsigned value = 2; };
+	template <> struct index_for_type<int32_t> { static constexpr unsigned value = 3; };
+	template <> struct index_for_type<int64_t> { static constexpr unsigned value = 4; };
+	template <> struct index_for_type<uint8_t> { static constexpr unsigned value = 5; };
+	template <> struct index_for_type<uint16_t> { static constexpr unsigned value = 6; };
+	template <> struct index_for_type<uint32_t> { static constexpr unsigned value = 7; };
+	template <> struct index_for_type<uint64_t> { static constexpr unsigned value = 8; };
+	template <> struct index_for_type<float> { static constexpr unsigned value = 9; };
+	template <> struct index_for_type<double> { static constexpr unsigned value = 10; };
+	template <> struct index_for_type<bool> { static constexpr unsigned value = 11; };
+	template <> struct index_for_type<complete::TypeId> { static constexpr unsigned value = 12; };
 	template <typename T> constexpr unsigned index_for_type_v = index_for_type<T>::value;
 
 	using mpl::BoxedType;
@@ -75,35 +89,137 @@ namespace complete
 	}
 
 	const IntrinsicFunction intrinsic_functions[] = {
-		intrinsic_function_descriptor<int(int, int)>("+"sv),
-		intrinsic_function_descriptor<int(int, int)>("-"sv),
-		intrinsic_function_descriptor<int(int, int)>("*"sv),
-		intrinsic_function_descriptor<int(int, int)>("/"sv),
-		intrinsic_function_descriptor<int(int, int)>("%"sv),
-		intrinsic_function_descriptor<bool(int, int)>("=="sv),
-		intrinsic_function_descriptor<int(int, int)>("<=>"sv),
-		intrinsic_function_descriptor<int(int)>("-"sv),
-		intrinsic_function_descriptor<int(int, int)>("&"sv),
-		intrinsic_function_descriptor<int(int, int)>("|"sv),
-		intrinsic_function_descriptor<int(int, int)>("^"sv),
-		intrinsic_function_descriptor<int(int)>("~"sv),
-		intrinsic_function_descriptor<int(int, int)>(">>"sv),
-		intrinsic_function_descriptor<int(int, int)>("<<"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("+"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("-"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("*"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("/"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("%"sv),
+		intrinsic_function_descriptor<bool(int8_t, int8_t)>("=="sv),
+		intrinsic_function_descriptor<order_t(int8_t, int8_t)>("<=>"sv),
+		intrinsic_function_descriptor<int8_t(int8_t)>("-"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("&"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("|"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("^"sv),
+		intrinsic_function_descriptor<int8_t(int8_t)>("~"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>(">>"sv),
+		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("<<"sv),
 
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("+"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("-"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("*"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("/"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("%"sv),
+		intrinsic_function_descriptor<bool(int16_t, int16_t)>("=="sv),
+		intrinsic_function_descriptor<order_t(int16_t, int16_t)>("<=>"sv),
+		intrinsic_function_descriptor<int16_t(int16_t)>("-"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("&"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("|"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("^"sv),
+		intrinsic_function_descriptor<int16_t(int16_t)>("~"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>(">>"sv),
+		intrinsic_function_descriptor<int16_t(int16_t, int16_t)>("<<"sv),
+
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("+"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("-"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("*"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("/"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("%"sv),
+		intrinsic_function_descriptor<bool(int32_t, int32_t)>("=="sv),
+		intrinsic_function_descriptor<order_t(int32_t, int32_t)>("<=>"sv),
+		intrinsic_function_descriptor<int32_t(int32_t)>("-"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("&"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("|"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("^"sv),
+		intrinsic_function_descriptor<int32_t(int32_t)>("~"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>(">>"sv),
+		intrinsic_function_descriptor<int32_t(int32_t, int32_t)>("<<"sv),
+
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("+"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("-"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("*"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("/"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("%"sv),
+		intrinsic_function_descriptor<bool(int64_t, int64_t)>("=="sv),
+		intrinsic_function_descriptor<order_t(int64_t, int64_t)>("<=>"sv),
+		intrinsic_function_descriptor<int64_t(int64_t)>("-"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("&"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("|"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("^"sv),
+		intrinsic_function_descriptor<int64_t(int64_t)>("~"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>(">>"sv),
+		intrinsic_function_descriptor<int64_t(int64_t, int64_t)>("<<"sv),
+
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("+"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("-"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("*"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("/"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("%"sv),
+		intrinsic_function_descriptor<bool(uint8_t, uint8_t)>("=="sv),
+		intrinsic_function_descriptor<order_t(uint8_t, uint8_t)>("<=>"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("&"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("|"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("^"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t)>("~"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>(">>"sv),
+		intrinsic_function_descriptor<uint8_t(uint8_t, uint8_t)>("<<"sv),
+
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("+"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("-"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("*"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("/"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("%"sv),
+		intrinsic_function_descriptor<bool(uint16_t, uint16_t)>("=="sv),
+		intrinsic_function_descriptor<order_t(uint16_t, uint16_t)>("<=>"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("&"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("|"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("^"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t)>("~"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>(">>"sv),
+		intrinsic_function_descriptor<uint16_t(uint16_t, uint16_t)>("<<"sv),
+
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("+"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("-"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("*"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("/"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("%"sv),
+		intrinsic_function_descriptor<bool(uint32_t, uint32_t)>("=="sv),
+		intrinsic_function_descriptor<order_t(uint32_t, uint32_t)>("<=>"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("&"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("|"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("^"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t)>("~"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>(">>"sv),
+		intrinsic_function_descriptor<uint32_t(uint32_t, uint32_t)>("<<"sv),
+
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("+"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("-"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("*"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("/"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("%"sv),
+		intrinsic_function_descriptor<bool(uint64_t, uint64_t)>("=="sv),
+		intrinsic_function_descriptor<order_t(uint64_t, uint64_t)>("<=>"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("&"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("|"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("^"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t)>("~"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>(">>"sv),
+		intrinsic_function_descriptor<uint64_t(uint64_t, uint64_t)>("<<"sv),
+									  
 		intrinsic_function_descriptor<float(float, float)>("+"sv),
 		intrinsic_function_descriptor<float(float, float)>("-"sv),
 		intrinsic_function_descriptor<float(float, float)>("*"sv),
 		intrinsic_function_descriptor<float(float, float)>("/"sv),
 		intrinsic_function_descriptor<bool(float, float)>("=="sv),
-		intrinsic_function_descriptor<int(float, float)>("<=>"sv),
+		intrinsic_function_descriptor<order_t(float, float)>("<=>"sv),
 		intrinsic_function_descriptor<float(float)>("-"sv),
 
-		intrinsic_function_descriptor<char_t(char_t, char_t)>("+"sv),
-		intrinsic_function_descriptor<char_t(char_t, char_t)>("-"sv),
-		intrinsic_function_descriptor<char_t(char_t, char_t)>("*"sv),
-		intrinsic_function_descriptor<char_t(char_t, char_t)>("/"sv),
-		intrinsic_function_descriptor<bool(char_t, char_t)>("=="sv),
-		intrinsic_function_descriptor<int(char_t, char_t)>("<=>"sv),
+		intrinsic_function_descriptor<double(double, double)>("+"sv),
+		intrinsic_function_descriptor<double(double, double)>("-"sv),
+		intrinsic_function_descriptor<double(double, double)>("*"sv),
+		intrinsic_function_descriptor<double(double, double)>("/"sv),
+		intrinsic_function_descriptor<bool(double, double)>("=="sv),
+		intrinsic_function_descriptor<order_t(double, double)>("<=>"sv),
+		intrinsic_function_descriptor<double(double)>("-"sv),
 
 		intrinsic_function_descriptor<bool(bool, bool)>("and"sv),
 		intrinsic_function_descriptor<bool(bool, bool)>("or"sv),
@@ -111,10 +227,105 @@ namespace complete
 		intrinsic_function_descriptor<bool(bool)>("not"sv),
 		intrinsic_function_descriptor<bool(bool, bool)>("=="sv),
 
-		intrinsic_function_descriptor<float(int)>("conversion"sv),
-		intrinsic_function_descriptor<int(float)>("conversion"sv),
-		intrinsic_function_descriptor<char_t(int)>("conversion"sv),
-		intrinsic_function_descriptor<int(char_t)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(float)>("conversion"sv),
+		intrinsic_function_descriptor<int8_t(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<int16_t(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<int16_t(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<int16_t(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<int16_t(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<int16_t(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<int16_t(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<int16_t(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<int16_t(float)>("conversion"sv),
+		intrinsic_function_descriptor<int16_t(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<int32_t(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<int32_t(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<int32_t(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<int32_t(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<int32_t(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<int32_t(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<int32_t(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<int32_t(float)>("conversion"sv),
+		intrinsic_function_descriptor<int32_t(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<int64_t(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<int64_t(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<int64_t(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<int64_t(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<int64_t(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<int64_t(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<int64_t(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<int64_t(float)>("conversion"sv),
+		intrinsic_function_descriptor<int64_t(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<uint8_t(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint8_t(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint8_t(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint8_t(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint8_t(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint8_t(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint8_t(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint8_t(float)>("conversion"sv),
+		intrinsic_function_descriptor<uint8_t(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<uint16_t(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint16_t(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint16_t(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint16_t(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint16_t(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint16_t(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint16_t(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint16_t(float)>("conversion"sv),
+		intrinsic_function_descriptor<uint16_t(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<uint32_t(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint32_t(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint32_t(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint32_t(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint32_t(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint32_t(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint32_t(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint32_t(float)>("conversion"sv),
+		intrinsic_function_descriptor<uint32_t(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<uint64_t(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint64_t(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint64_t(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint64_t(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint64_t(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint64_t(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint64_t(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<uint64_t(float)>("conversion"sv),
+		intrinsic_function_descriptor<uint64_t(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<float(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<float(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<float(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<float(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<float(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<float(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<float(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<float(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<float(double)>("conversion"sv),
+
+		intrinsic_function_descriptor<double(int8_t)>("conversion"sv),
+		intrinsic_function_descriptor<double(int16_t)>("conversion"sv),
+		intrinsic_function_descriptor<double(int32_t)>("conversion"sv),
+		intrinsic_function_descriptor<double(int64_t)>("conversion"sv),
+		intrinsic_function_descriptor<double(uint8_t)>("conversion"sv),
+		intrinsic_function_descriptor<double(uint16_t)>("conversion"sv),
+		intrinsic_function_descriptor<double(uint32_t)>("conversion"sv),
+		intrinsic_function_descriptor<double(uint64_t)>("conversion"sv),
+		intrinsic_function_descriptor<double(float)>("conversion"sv),
 	};
 
 	Program::Program()
@@ -122,7 +333,7 @@ namespace complete
 		auto const built_in_types_to_add = built_in_types();
 
 		types.reserve(built_in_types_to_add.size());
-		global_scope.types.reserve(built_in_types_to_add.size());
+		global_scope.types.reserve(built_in_types_to_add.size() + 1);
 
 		for (auto const type : built_in_types_to_add)
 		{
@@ -130,6 +341,7 @@ namespace complete
 			types.push_back(type.second);
 			types.back().ABI_name = type.first;
 		}
+		global_scope.types.push_back({"char", {false, false, false, 5}}); // Add char as typedef for uint8
 
 		//*******************************************************************
 

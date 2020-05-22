@@ -65,9 +65,9 @@ namespace c_transpiler
 		}
 		type = decay(type);
 
-		if (type == complete::TypeId::int_)
+		if (type == complete::TypeId::int32)
 			return to_string(*reinterpret_cast<int const *>(memory));
-		if (type == complete::TypeId::float_)
+		if (type == complete::TypeId::float32)
 			return join(*reinterpret_cast<float const *>(memory), 'f');
 		if (type == complete::TypeId::bool_)
 			return *reinterpret_cast<bool const *>(memory) ? "1" : "0";
