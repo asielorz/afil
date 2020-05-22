@@ -1823,8 +1823,6 @@ namespace instantiation
 					return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function must be a function.");
 
 				auto const conversion_functions = overload_set_for_type(*program, function_type);
-				if (!conversion_functions.function_template_ids.empty())
-					return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function cannot be template (for now).");
 
 				for (FunctionId function_id : conversion_functions.function_ids)
 				{
@@ -1852,6 +1850,8 @@ namespace instantiation
 						scope_stack,
 						program
 					));
+					
+					bind_function_template_name("conversion", function_id, *program, scope_stack);
 				}
 
 				return std::nullopt;

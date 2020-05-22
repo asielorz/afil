@@ -932,6 +932,38 @@ namespace complete
 		}
 	}
 
+	auto check_function_template_as_conversion_candidate(
+		FunctionTemplateId template_id, TypeId from, TypeId to, 
+		size_t & dependent_type_count, span<TypeId> resolved_dependent_types, int & conversions,
+		Program & program) -> bool
+	{
+		FunctionTemplate const & fn = program.function_templates[template_id.index];
+		span<FunctionTemplateParameterType const> const fn_parameters = fn.parameter_types;
+		assert(fn_parameters.size() == 2);
+
+		dependent_type_count = fn.incomplete_function.template_parameters.size();
+		std::fill(resolved_dependent_types.begin(), resolved_dependent_types.begin() + dependent_type_count, TypeId::none);
+
+		TypeId const expected_type_from = expected_type_according_to_pattern(from, fn_parameters[0], resolved_dependent_types, program);
+		if (expected_type_from == TypeId::none)
+			return false;
+
+		if (!check_type_validness_as_overload_candidate(expected_type_from, from, program, conversions))
+			return false;
+
+		TypeId const expected_type_to = expected_type_according_to_pattern(to, fn_parameters[1], resolved_dependent_types, program);
+		if (expected_type_to == TypeId::none)
+			return false;
+
+		if (!check_type_validness_as_overload_candidate(to, expected_type_to, program, conversions))
+			return false;
+
+		if (check_concepts(fn.concepts, resolved_dependent_types.subspan(0, dependent_type_count), fn.scope_template_parameters, fn.scope_stack, program) != fn.concepts.size())
+			return false;
+
+		return true;
+	}
+
 	auto resolve_function_overloading_for_conversions(OverloadSetView overload_set, TypeId from, TypeId to, Program & program) noexcept -> FunctionId
 	{
 		struct Candidate
@@ -967,20 +999,59 @@ namespace complete
 			}
 		}
 
-		if (candidate_count == 0)
+		struct TemplateCandidate
+		{
+			int conversions;
+			FunctionTemplateId id;
+		};
+		TemplateCandidate template_candidates[64];
+		int template_candidate_count = 0;
+		TypeId resolved_dependent_types[32];
+		size_t dependent_type_count = 0;
+
+		for (FunctionTemplateId template_id : overload_set.function_template_ids)
+		{
+			int conversions = 0;
+			if (check_function_template_as_conversion_candidate(template_id, from, to, dependent_type_count, resolved_dependent_types, conversions, program))
+			{
+				template_candidates[template_candidate_count++] = TemplateCandidate{conversions, template_id};
+			}
+		}
+
+		if (candidate_count == 0 && template_candidate_count == 0)
 		{
 			return invalid_function_id;
 		}
-		else if (candidate_count == 1)
-		{
-			return candidates[0].function_id;
-		}
 		else
 		{
-			std::partial_sort(candidates, candidates + 2, candidates + candidate_count, [](Candidate a, Candidate b) { return a.conversions < b.conversions; });
-			assert(candidates[0].conversions < candidates[1].conversions); // Ambiguous call.
+			Candidate best_candidate;
+			TemplateCandidate best_template_candidate;
 
-			return candidates[0].function_id;
+			if (candidate_count > 1)
+			{
+				std::partial_sort(candidates, candidates + 2, candidates + candidate_count, [](Candidate a, Candidate b) { return a.conversions < b.conversions; });
+				assert(candidates[0].conversions < candidates[1].conversions); // Ambiguous call.
+			}
+			best_candidate = candidates[0];
+
+			if (template_candidate_count > 1)
+			{
+				std::partial_sort(template_candidates, template_candidates + 2, template_candidates + template_candidate_count,
+					[](TemplateCandidate a, TemplateCandidate b) { return a.conversions < b.conversions; });
+				assert(template_candidates[0].conversions < template_candidates[1].conversions); // Ambiguous call.
+			}
+			best_template_candidate = template_candidates[0];
+
+			if (template_candidate_count == 0 || candidate_count > 0 && best_candidate.conversions < best_template_candidate.conversions)
+				return best_candidate.function_id;
+			else
+			{
+				// Ensure that all template parameters have been resolved.
+				assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
+				auto function_id = instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
+				assert(function_id.has_value());
+				return *function_id;
+			}
 		}
 	}
 

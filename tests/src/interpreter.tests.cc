@@ -2719,10 +2719,30 @@ TEST_CASE("Template functions for user defined conversions")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("Deduce conversion function template from type converted to only")
+{
+	auto const src = R"(
+		struct Zeroinator
+		{}
+
+		conversion fn<T>(Zeroinator zero) -> T
+		{
+			return T(0);
+		};
+
+		let main = fn() -> int
+		{
+			let zero = Zeroinator();
+			return int(zero);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 0);
+}
+
 /*****************************************************************
 Backlog
 - conversions
-- casting
 - dynamic memory allocation
 - destructor and copy operations
 - reflection
@@ -2731,6 +2751,7 @@ Backlog
 - closures and lambda captures
 - indirect calls
 - currying (maybe, maybe at library level?)
+- variants and visiting
 - some minimalistic standard library
 - semantic analysis on templates based on concepts
 *****************************************************************/
