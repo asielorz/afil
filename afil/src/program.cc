@@ -864,11 +864,11 @@ namespace complete
 		return new_type_id;
 	}
 
-	auto insert_implicit_conversion_node_impl(Expression && expr, TypeId from, TypeId to, Program const & program, bool allow_address_of_temporary) noexcept -> expected<Expression, ConversionNotFound>
+	auto insert_mutref_conversion_node_impl(Expression && expr, TypeId from, TypeId to, Program const & program, bool allow_address_of_temporary) noexcept -> expected<Expression, ConversionNotFound>
 	{
 		if (from.index == to.index)
 		{
-			// From reference to reference and value to value there is no conversion. A pointer is a pointer, regardless of constness.
+			// From reference to reference and value to value there is no conversion. A pointer is a pointer, regardless of mutability.
 			if (from.is_reference == to.is_reference)
 				return std::move(expr);
 
@@ -897,27 +897,55 @@ namespace complete
 		return Error(ConversionNotFound(from, to, "Conversion between types does not exist."));
 	}
 
-	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
+	auto insert_mutref_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
 	{
-		return insert_implicit_conversion_node_impl(std::move(expr), from, to, program, false);
+		return insert_mutref_conversion_node_impl(std::move(expr), from, to, program, false);
 	}
 
-	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
+	auto insert_mutref_conversion_node(Expression && expr, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
 	{
-		return insert_implicit_conversion_node(std::move(expr), expression_type_id(expr, program), to, program);
+		complete::TypeId const from = expression_type_id(expr, program);
+		return insert_mutref_conversion_node(std::move(expr), from, to, program);
 	}
 
-	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
+	auto insert_mutref_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
 	{
-		if (auto conversion = insert_implicit_conversion_node(std::move(expr), from, to, program))
+		if (auto conversion = insert_mutref_conversion_node(std::move(expr), from, to, program))
 			return std::move(*conversion);
 		else
 			return make_syntax_error(source, join("Error in conversion from ", conversion.error().from.index, " to ", conversion.error().to.index, ": ", conversion.error().why));
 	}
 
-	auto insert_implicit_conversion_node(Expression && tree, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
+	auto insert_mutref_conversion_node(Expression && expr, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
 	{
-		return insert_implicit_conversion_node(std::move(tree), expression_type_id(tree, program), to, program, source);
+		complete::TypeId const from = expression_type_id(expr, program);
+		return insert_mutref_conversion_node(std::move(expr), from, to, program, source);
+	}
+
+	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
+	{
+		TODO("User defined implicit conversions");
+		return insert_mutref_conversion_node(std::move(expr), from, to, program);
+	}
+
+	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
+	{
+		complete::TypeId const from = expression_type_id(expr, program);
+		return insert_implicit_conversion_node(std::move(expr), from, to, program);
+	}
+
+	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
+	{
+		if (auto conversion = insert_mutref_conversion_node(std::move(expr), from, to, program))
+			return std::move(*conversion);
+		else
+			return make_syntax_error(source, join("Error in conversion from ", conversion.error().from.index, " to ", conversion.error().to.index, ": ", conversion.error().why));
+	}
+
+	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
+	{
+		complete::TypeId const from = expression_type_id(expr, program);
+		return insert_implicit_conversion_node(std::move(expr), from, to, program, source);
 	}
 
 	auto check_type_validness_as_overload_candidate(TypeId param_type, TypeId parsed_type, Program const & program, int & conversions) noexcept -> bool
@@ -1279,7 +1307,7 @@ namespace complete
 		for (size_t i = 0; i < target_parameter_types.size(); ++i)
 		{
 			if (parameter_types[i] != target_parameter_types[i])
-				parameters[i] = std::move(*insert_implicit_conversion_node_impl(std::move(parameters[i]), parameter_types[i], target_parameter_types[i], program, true));
+				parameters[i] = std::move(*insert_mutref_conversion_node_impl(std::move(parameters[i]), parameter_types[i], target_parameter_types[i], program, true));
 		}
 
 		return function_id;
