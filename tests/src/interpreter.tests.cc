@@ -2740,6 +2740,32 @@ TEST_CASE("Deduce conversion function template from type converted to only")
 	REQUIRE(tests::parse_and_run(src) == 0);
 }
 
+TEST_CASE("User defined implicit conversions")
+{
+	auto const src = R"(
+		struct TestStruct
+		{
+			int32 value;
+		}
+
+		implicit conversion fn(TestStruct s) -> bool
+		{
+			return s.value != 0;
+		};
+
+		let main = fn() -> int32
+		{
+			let s = TestStruct(5);
+			if (s)
+				return 1;
+			else
+				return 0;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

@@ -253,11 +253,6 @@ namespace complete
 	auto insert_mutref_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
 	auto insert_mutref_conversion_node(Expression && expr, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
 
-	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
-	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
-	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
-	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;
-
 	struct OverloadSetView
 	{
 		constexpr OverloadSetView() noexcept = default;
@@ -273,12 +268,6 @@ namespace complete
 	auto resolve_function_overloading_for_conversions(OverloadSetView overload_set, TypeId from, TypeId to, Program & program) noexcept -> FunctionId;
 	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
 		-> FunctionId;
-
-	[[nodiscard]] auto insert_conversions(
-		span<Expression> parameters,
-		span<TypeId const> parsed_parameter_types,
-		span<TypeId const> target_parameter_types,
-		Program const & program) noexcept -> expected<void, ConversionNotFound>;
 
 	auto type_for_overload_set(Program & program, OverloadSet overload_set) noexcept -> TypeId;
 	auto overload_set_for_type(Program const & program, TypeId overload_set_type) noexcept -> OverloadSetView;

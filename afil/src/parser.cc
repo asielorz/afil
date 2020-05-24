@@ -49,6 +49,7 @@ namespace parser
 		"mut",
 		"namespace",
 		"conversion",
+		"implicit",
 
 		// Operators
 		"and",
@@ -1438,6 +1439,22 @@ namespace parser
 		return std::move(conversion_decl);
 	}
 
+	auto parse_implicit_conversion_declaration(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept
+		-> expected<incomplete::statement::ConversionDeclaration, PartialSyntaxError>
+	{
+		// Skip conversion token
+		index++;
+
+		if (tokens[index].source != "conversion")
+			return make_syntax_error(tokens[index].source, "Expected keyword \"conversion\" after \"explicit\".");
+		index++;
+
+		incomplete::statement::ConversionDeclaration conversion_decl;
+		conversion_decl.is_implicit = true;
+		try_call(assign_to(conversion_decl.conversion_function), parse_expression(tokens, index, type_names));
+		return std::move(conversion_decl);
+	}
+
 	auto parse_expression_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
 		-> expected<incomplete::statement::ExpressionStatement, PartialSyntaxError>
 	{
@@ -1476,6 +1493,8 @@ namespace parser
 			return parse_namespace_declaration(tokens, index, type_names);
 		else if (tokens[index].source == "conversion")
 			try_call(assign_to(result), parse_conversion_declaration(tokens, index, type_names))
+		else if (tokens[index].source == "implicit")
+			try_call(assign_to(result), parse_implicit_conversion_declaration(tokens, index, type_names))
 		else
 			try_call(assign_to(result), parse_expression_statement(tokens, index, type_names));
 

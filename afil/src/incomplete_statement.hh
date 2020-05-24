@@ -80,6 +80,7 @@ namespace incomplete
 
 		struct ConversionDeclaration
 		{
+			bool is_implicit = false;
 			Expression conversion_function;
 		};
 

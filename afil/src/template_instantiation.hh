@@ -87,6 +87,7 @@ namespace instantiation
 	auto type_with_name(std::string_view name, ScopeStackView scope_stack, span<std::string_view const> namespaces, span<complete::ResolvedTemplateParameter const> template_parameters) noexcept
 		-> complete::TypeId;
 	auto struct_template_with_name(std::string_view name, ScopeStackView scope_stack, span<std::string_view const> namespaces) noexcept -> std::optional<complete::StructTemplateId>;
+	auto named_overload_set(std::string_view name, ScopeStackView scope_stack) -> std::optional<complete::OverloadSet>;
 
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type,

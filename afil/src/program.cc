@@ -913,39 +913,14 @@ namespace complete
 		if (auto conversion = insert_mutref_conversion_node(std::move(expr), from, to, program))
 			return std::move(*conversion);
 		else
-			return make_syntax_error(source, join("Error in conversion from ", conversion.error().from.index, " to ", conversion.error().to.index, ": ", conversion.error().why));
+			return make_syntax_error(source, join("Error in conversion from ", 
+				ABI_name(program, conversion.error().from), " to ", ABI_name(program, conversion.error().to), ": ", conversion.error().why));
 	}
 
 	auto insert_mutref_conversion_node(Expression && expr, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
 	{
 		complete::TypeId const from = expression_type_id(expr, program);
 		return insert_mutref_conversion_node(std::move(expr), from, to, program, source);
-	}
-
-	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
-	{
-		TODO("User defined implicit conversions");
-		return insert_mutref_conversion_node(std::move(expr), from, to, program);
-	}
-
-	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>
-	{
-		complete::TypeId const from = expression_type_id(expr, program);
-		return insert_implicit_conversion_node(std::move(expr), from, to, program);
-	}
-
-	auto insert_implicit_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
-	{
-		if (auto conversion = insert_mutref_conversion_node(std::move(expr), from, to, program))
-			return std::move(*conversion);
-		else
-			return make_syntax_error(source, join("Error in conversion from ", conversion.error().from.index, " to ", conversion.error().to.index, ": ", conversion.error().why));
-	}
-
-	auto insert_implicit_conversion_node(Expression && expr, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>
-	{
-		complete::TypeId const from = expression_type_id(expr, program);
-		return insert_implicit_conversion_node(std::move(expr), from, to, program, source);
 	}
 
 	auto check_type_validness_as_overload_candidate(TypeId param_type, TypeId parsed_type, Program const & program, int & conversions) noexcept -> bool
@@ -1311,21 +1286,6 @@ namespace complete
 		}
 
 		return function_id;
-	}
-
-	auto insert_conversions(
-		span<Expression> parameters,
-		span<TypeId const> parsed_parameter_types,
-		span<TypeId const> target_parameter_types,
-		Program const & program) noexcept -> expected<void, ConversionNotFound>
-	{
-		for (size_t i = 0; i < target_parameter_types.size(); ++i)
-		{
-			if (parsed_parameter_types[i] != target_parameter_types[i])
-				try_call(assign_to(parameters[i]), insert_implicit_conversion_node(std::move(parameters[i]), parsed_parameter_types[i], target_parameter_types[i], program));
-		}
-
-		return success;
 	}
 
 } // namespace complete
