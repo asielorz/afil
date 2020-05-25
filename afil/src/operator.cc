@@ -61,3 +61,8 @@ auto operator_function_name(Operator op) noexcept -> std::string_view
 	}
 	declare_unreachable();
 }
+
+auto is_comparison_operator(Operator op) noexcept -> bool
+{
+	return op >= Operator::equal && op <= Operator::three_way_compare;
+}

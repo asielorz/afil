@@ -2766,6 +2766,59 @@ TEST_CASE("User defined implicit conversions")
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
+TEST_CASE("Pointer comparisons")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let i = 5;
+			let j = 6;
+
+			let mut result = 0;
+
+			if (&i == &i)
+				result = result + 1;
+			
+			if (&i != &j)
+				result = result + 1;
+	
+			return result;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 2);
+}
+
+TEST_CASE("Pointer comparisons with types that convert implicitly to pointer")
+{
+	auto const src = R"(
+		struct nullptr_t
+		{}
+		let nullptr = nullptr_t();
+		let the_null_int = 0;
+
+		implicit conversion fn(nullptr_t n) -> int32 * { return &the_null_int; };
+
+		let main = fn() -> int32
+		{
+			let i = 5;
+			let j = &the_null_int;
+
+			let mut result = 0;			
+			
+			if (&i != nullptr)
+				result = result + 1;
+
+			if (j == nullptr)
+				result = result + 1;
+	
+			return result;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 2);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

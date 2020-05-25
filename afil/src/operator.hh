@@ -16,3 +16,4 @@ enum struct Operator
 };
 auto precedence(Operator op) noexcept -> int;
 auto operator_function_name(Operator op) noexcept -> std::string_view;
+auto is_comparison_operator(Operator op) noexcept -> bool;
