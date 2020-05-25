@@ -123,7 +123,7 @@ namespace complete
 		namespace detail
 		{
 			using ExpressionTreeBase = std::variant<
-				Literal<int>, Literal<float>, Literal<bool>, StringLiteral, Literal<char_t>, Literal<uninit_t>, Literal<TypeId>,
+				Literal<int>, Literal<float>, Literal<bool>, StringLiteral, Literal<char_t>, Literal<uninit_t>, Literal<null_t>, Literal<TypeId>,
 				LocalVariable, GlobalVariable, MemberVariable, Constant,
 				FunctionCall, RelationalOperatorCall, Assignment,
 				Constructor,

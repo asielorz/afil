@@ -44,6 +44,7 @@ namespace complete
 		static TypeId const char_;
 		static TypeId const type;
 		static TypeId const uninit_t;
+		static TypeId const null_t;
 
 		static TypeId const none;
 		static TypeId const deduce;

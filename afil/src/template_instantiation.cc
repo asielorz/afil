@@ -36,20 +36,20 @@ namespace instantiation
 
 	auto push_global_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>
 	{
-		scope_stack.push_back({&scope, ScopeType::global, 0});
+		scope_stack.push_back({ &scope, ScopeType::global, 0 });
 		return StackGuard<ScopeStack>(scope_stack);
 	}
 
 	auto push_block_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>
 	{
 		int const offset = next_block_scope_offset(scope_stack);
-		scope_stack.push_back({&scope, ScopeType::block, offset});
+		scope_stack.push_back({ &scope, ScopeType::block, offset });
 		return StackGuard<ScopeStack>(scope_stack);
 	}
 
 	auto bind_function_name(std::string_view name, FunctionId function_id, complete::Program & program, ScopeStack & scope_stack) -> void
 	{
-		top(scope_stack).functions.push_back({std::string(name), function_id});
+		top(scope_stack).functions.push_back({ std::string(name), function_id });
 		std::string & function_ABI_name = ABI_name(program, function_id);
 		if (function_ABI_name.empty())
 			function_ABI_name = name;
@@ -57,7 +57,7 @@ namespace instantiation
 
 	auto bind_function_template_name(std::string_view name, FunctionTemplateId function_template_id, complete::Program & program, ScopeStack & scope_stack) -> void
 	{
-		top(scope_stack).function_templates.push_back({std::string(name), function_template_id});
+		top(scope_stack).function_templates.push_back({ std::string(name), function_template_id });
 		std::string & function_ABI_name = ABI_name(program, function_template_id);
 		if (function_ABI_name.empty())
 			function_ABI_name = name;
@@ -65,7 +65,7 @@ namespace instantiation
 
 	auto bind_type_name(std::string_view name, complete::TypeId type_id, complete::Program & program, ScopeStack & scope_stack)
 	{
-		top(scope_stack).types.push_back({std::string(name), type_id});
+		top(scope_stack).types.push_back({ std::string(name), type_id });
 		std::string & type_ABI_name = ABI_name(program, type_id);
 		if (type_ABI_name.empty())
 			type_ABI_name = name;
@@ -73,7 +73,7 @@ namespace instantiation
 
 	auto bind_struct_template_name(std::string_view name, complete::StructTemplateId template_id, complete::Program & program, ScopeStack & scope_stack)
 	{
-		top(scope_stack).struct_templates.push_back({std::string(name), template_id});
+		top(scope_stack).struct_templates.push_back({ std::string(name), template_id });
 		std::string & type_ABI_name = ABI_name(program, template_id);
 		if (type_ABI_name.empty())
 			type_ABI_name = name;
@@ -108,7 +108,7 @@ namespace instantiation
 		constexpr std::string_view const loaded_dlls[] = {
 			"ucrtbase"
 		};
-		
+
 		for (std::string_view const lib : loaded_dlls)
 		{
 			DLL dll = load_library(lib);
@@ -120,6 +120,8 @@ namespace instantiation
 		return nullptr;
 	}
 
+	constexpr char null[sizeof(void *)] = {0};
+
 	auto insert_implicit_conversion_node(
 		complete::Expression && expr, 
 		complete::TypeId from, 
@@ -128,6 +130,14 @@ namespace instantiation
 		complete::Program & program
 	) noexcept -> expected<complete::Expression, complete::ConversionNotFound>
 	{
+		if (decay(from) == complete::TypeId::null_t && is_pointer(type_with_id(program, to)))
+		{
+			complete::expression::Constant constant_null_pointer;
+			constant_null_pointer.type = decay(to);
+			constant_null_pointer.value = null;
+			return insert_mutref_conversion_node(constant_null_pointer, to, program);
+		}
+
 		if (auto const implicit_conversion_functions = named_overload_set("implicit", scope_stack))
 		{
 			FunctionId const conversion_function = resolve_function_overloading_for_conversions(
@@ -774,7 +784,7 @@ namespace instantiation
 			complete::TypeId const param_type = expression_type_id(parameters[0], *program);
 
 			// Implicit conversion
-			auto const implicit_conversion = insert_implicit_conversion_node(std::move(parameters[0]), constructed_type_id, param_type, scope_stack, *program);
+			auto const implicit_conversion = insert_implicit_conversion_node(std::move(parameters[0]), param_type, constructed_type_id, scope_stack, *program);
 			if (implicit_conversion.has_value())
 				return std::move(*implicit_conversion);
 
@@ -971,6 +981,10 @@ namespace instantiation
 			[](incomplete::expression::Literal<uninit_t> const &) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				return complete::expression::Literal<uninit_t>();
+			},
+			[](incomplete::expression::Literal<null_t> const &) -> expected<complete::Expression, PartialSyntaxError>
+			{
+				return complete::expression::Literal<null_t>();
 			},
 			[&](incomplete::expression::Literal<incomplete::TypeId> const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{

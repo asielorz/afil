@@ -21,6 +21,7 @@ namespace complete
 			[](expression::Literal<char_t>) { return TypeId::char_; },
 			[](expression::StringLiteral const & str_node) { return str_node.type; },
 			[](expression::Literal<uninit_t>) { return TypeId::uninit_t; },
+			[](expression::Literal<null_t>) { return TypeId::null_t; },
 			[](expression::Literal<TypeId>) { return TypeId::type; },
 			[](expression::Variable const & var_node) { return make_reference(var_node.variable_type); },
 			[&](expression::MemberVariable const & var_node)

@@ -1,7 +1,7 @@
 #pragma once
 
 struct uninit_t{};
-constexpr uninit_t uninit;
+struct null_t {};
 
 using char_t = unsigned char;
 using order_t = int;

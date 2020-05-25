@@ -32,14 +32,8 @@ namespace parser
 		"continue",
 
 		// Built in types
-		"void",
-		"int",
-		"float",
-		"bool",
-		"char",
-		"type",
 		"uninit",
-		"uninit_t"
+		"null"
 
 		// Declarations
 		"fn",
@@ -58,25 +52,32 @@ namespace parser
 		"xor",
 	};
 
+	constexpr std::string_view built_in_type_name_keywords[] = {
+		"void",
+		"int8",
+		"int16",
+		"int32",
+		"int64",
+		"uint8",
+		"uint16",
+		"uint32",
+		"uint64",
+		"float32",
+		"float64",
+		"bool",
+		"char",
+		"type",
+		"uninit_t",
+		"null_t"
+	};
+
 	auto built_in_type_names() noexcept -> std::vector<TypeName>
 	{
-		return {
-			{"void",		TypeName::Type::type},
-			{"int8",		TypeName::Type::type},
-			{"int16",		TypeName::Type::type},
-			{"int32",		TypeName::Type::type},
-			{"int64",		TypeName::Type::type},
-			{"uint8",		TypeName::Type::type},
-			{"uint16",		TypeName::Type::type},
-			{"uint32",		TypeName::Type::type},
-			{"uint64",		TypeName::Type::type},
-			{"float32",		TypeName::Type::type},
-			{"float64",		TypeName::Type::type},
-			{"bool",		TypeName::Type::type},
-			{"char",		TypeName::Type::type},
-			{"type",		TypeName::Type::type},
-			{"uninit_t",	TypeName::Type::type}
-		};
+		std::vector<TypeName> type_names;
+		type_names.reserve(std::size(built_in_type_name_keywords));
+		for (std::string_view const name : built_in_type_name_keywords)
+			type_names.push_back({name, TypeName::Type::type});
+		return type_names;
 	}
 
 	template <typename C>
@@ -91,7 +92,8 @@ namespace parser
 	auto is_keyword(std::string_view name) noexcept -> bool
 	{
 		// TODO: Binary search
-		return std::find(keywords, std::end(keywords), name) != std::end(keywords);
+		return std::find(keywords, std::end(keywords), name) != std::end(keywords) || 
+			std::find(built_in_type_name_keywords, std::end(built_in_type_name_keywords), name) != std::end(built_in_type_name_keywords);
 	}
 
 	auto parse_operator(std::string_view token_source) noexcept -> Operator
@@ -893,6 +895,11 @@ namespace parser
 		{
 			index++;
 			return incomplete::expression::Literal<uninit_t>();
+		}
+		else if (tokens[index].source == "null")
+		{
+			index++;
+			return incomplete::expression::Literal<null_t>();
 		}
 		else if (tokens[index].source == "operator")
 		{

@@ -192,6 +192,7 @@ namespace c_transpiler
 			[](expression::Literal<bool>) { return true; },
 			[](expression::Literal<char_t>) { return true; },
 			[](expression::Literal<uninit_t>) { return false; },
+			[](expression::Literal<null_t>) { return false; },
 			[](expression::Literal<TypeId>) { return false; },
 			[](expression::StringLiteral) { return true; },
 			[](expression::LocalVariable const &) { return true; },
@@ -240,6 +241,7 @@ namespace c_transpiler
 				c_source += ' ';
 			},
 			[&](expression::Literal<uninit_t>) {},
+			[&](expression::Literal<null_t>) {},
 			[&](expression::Literal<TypeId>) { declare_unreachable(); },
 			[&](expression::StringLiteral literal)
 			{
@@ -370,8 +372,9 @@ namespace c_transpiler
 		else
 		{
 			auto const visitor = overload(
-				[&](auto const &)	{ declare_unreachable(); },
+				[&](auto const &) { declare_unreachable(); },
 				[&](expression::Literal<uninit_t>) {},
+				[&](expression::Literal<null_t>) {},
 				[&](expression::MemberVariable const & var_node)
 				{
 					std::string const temp_var_name = add_temp_var(temp_vars, type_name(expression_type_id(*var_node.owner, program), program));

@@ -2819,6 +2819,29 @@ TEST_CASE("Pointer comparisons with types that convert implicitly to pointer")
 	REQUIRE(tests::parse_and_run(src) == 2);
 }
 
+TEST_CASE("The null type that automatically converts to a null pointer of all pointer types")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let i = 5;
+			let j = int32 *(null);
+
+			let mut result = 0;			
+			
+			if (&i != null)
+				result = result + 1;
+
+			if (j == null)
+				result = result + 1;
+	
+			return result;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 2);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation
