@@ -33,7 +33,6 @@ namespace complete
 			{"float64",		{8, 8}},
 			{"bool",		{1, 1}},
 			{"type",		{4, 4}},
-			{"uninit_t",	{0, 1}},
 			{"null_t",		{0, 1}},
 		};
 	}

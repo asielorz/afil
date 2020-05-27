@@ -32,7 +32,6 @@ namespace parser
 		"continue",
 
 		// Built in types
-		"uninit",
 		"null"
 
 		// Declarations
@@ -40,6 +39,7 @@ namespace parser
 		"main",
 		"struct",
 		"let",
+		"uninit",
 		"mut",
 		"namespace",
 		"conversion",
@@ -67,7 +67,6 @@ namespace parser
 		"bool",
 		"char",
 		"type",
-		"uninit_t",
 		"null_t"
 	};
 
@@ -891,11 +890,6 @@ namespace parser
 			return incomplete::expression::Literal<std::string>(parse_string_literal(tokens[index++].source));
 		else if (tokens[index].type == TokenType::literal_char)
 			return incomplete::expression::Literal<char_t>(parse_char_literal(tokens[index++].source));
-		else if (tokens[index].source == "uninit")
-		{
-			index++;
-			return incomplete::expression::Literal<uninit_t>();
-		}
 		else if (tokens[index].source == "null")
 		{
 			index++;

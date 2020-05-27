@@ -43,7 +43,6 @@ namespace complete
 		static TypeId const bool_;
 		static TypeId const char_;
 		static TypeId const type;
-		static TypeId const uninit_t;
 		static TypeId const null_t;
 
 		static TypeId const none;

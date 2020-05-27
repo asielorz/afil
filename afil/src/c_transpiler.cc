@@ -191,7 +191,6 @@ namespace c_transpiler
 			[](expression::Literal<float>) { return true; },
 			[](expression::Literal<bool>) { return true; },
 			[](expression::Literal<char_t>) { return true; },
-			[](expression::Literal<uninit_t>) { return false; },
 			[](expression::Literal<null_t>) { return false; },
 			[](expression::Literal<TypeId>) { return false; },
 			[](expression::StringLiteral) { return true; },
@@ -240,7 +239,6 @@ namespace c_transpiler
 				c_source.push_back(literal.value);
 				c_source += ' ';
 			},
-			[&](expression::Literal<uninit_t>) {},
 			[&](expression::Literal<null_t>) {},
 			[&](expression::Literal<TypeId>) { declare_unreachable(); },
 			[&](expression::StringLiteral literal)
@@ -373,7 +371,6 @@ namespace c_transpiler
 		{
 			auto const visitor = overload(
 				[&](auto const &) { declare_unreachable(); },
-				[&](expression::Literal<uninit_t>) {},
 				[&](expression::Literal<null_t>) {},
 				[&](expression::MemberVariable const & var_node)
 				{
@@ -656,14 +653,6 @@ namespace c_transpiler
 					c_source += " = ";
 					transpile_expression_inline(node.assigned_expression, program, c_source);
 					c_source += ";\n";
-				}
-				else if (expression_type_id(node.assigned_expression, program) != complete::TypeId::uninit_t) // If constructing from uninit do nothing
-				{
-					c_source += indent(indentation);
-					std::string const var_name = join("local_", node.variable_offset);
-					c_source += var_name;
-					c_source += ";\n";
-					write_expression_as_statement_in_its_own_scope(node.assigned_expression, program, var_name, indentation, c_source);
 				}
 			},
 			[&](statement::ExpressionStatement const & expr_node)

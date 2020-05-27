@@ -978,10 +978,6 @@ namespace instantiation
 			{
 				return complete::expression::Literal<char_t>{incomplete_expression.value};
 			},
-			[](incomplete::expression::Literal<uninit_t> const &) -> expected<complete::Expression, PartialSyntaxError>
-			{
-				return complete::expression::Literal<uninit_t>();
-			},
 			[](incomplete::expression::Literal<null_t> const &) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				return complete::expression::Literal<null_t>();
@@ -1598,9 +1594,6 @@ namespace instantiation
 				complete::TypeId const assigned_expression_type = expression_type_id(expression, *program);
 				complete::TypeId const var_type = make_mutable(make_reference(assigned_expression_type, incomplete_statement.is_reference), incomplete_statement.is_mutable);
 
-				if (decay(var_type) == complete::TypeId::uninit_t)
-					return make_syntax_error(incomplete_statement.assigned_expression.source, "Cannot declare variable of type uninit_t.");
-
 				// Main function, which is somewhat special.
 				if (incomplete_statement.variable_name == "main"sv)
 				{
@@ -1683,7 +1676,8 @@ namespace instantiation
 			},
 			[&](incomplete::statement::UninitDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
-				try_call_decl(complete::TypeId const var_type, resolve_dependent_type(incomplete_statement.variable_type, template_parameters, scope_stack, program));
+				try_call_decl(complete::TypeId var_type, resolve_dependent_type(incomplete_statement.variable_type, template_parameters, scope_stack, program));
+				var_type.is_mutable = true;
 
 				if (does_name_collide(scope_stack, incomplete_statement.variable_name))
 					return make_syntax_error(incomplete_statement.variable_name, "Variable name collides with another name.");

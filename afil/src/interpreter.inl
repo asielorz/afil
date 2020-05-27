@@ -449,7 +449,6 @@ namespace interpreter
 			[&](expression::Literal<float> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<bool> literal) { write(stack, return_address, literal.value); },
 			[&](expression::Literal<char_t> literal) { write(stack, return_address, literal.value); },
-			[&](expression::Literal<uninit_t>) {},
 			[&](expression::Literal<null_t>) {},
 			detail::eval_type_literal_expression(stack, context, return_address),
 			[&](expression::StringLiteral literal)

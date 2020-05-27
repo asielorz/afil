@@ -20,8 +20,7 @@ namespace complete
 	TypeId const TypeId::bool_ = {false, false, false, 11};
 	TypeId const TypeId::char_ = {false, false, false, 5};
 	TypeId const TypeId::type = {false, false, false, 12};
-	TypeId const TypeId::uninit_t = {false, false, false, 13};
-	TypeId const TypeId::null_t = {false, false, false, 14};
+	TypeId const TypeId::null_t = {false, false, false, 13};
 
 	TypeId const TypeId::none = {false, false, false, (1 << 29) - 1};
 	TypeId const TypeId::deduce = {false, false, false, (1 << 29) - 1 };
