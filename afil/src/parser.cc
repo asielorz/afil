@@ -1151,6 +1151,39 @@ namespace parser
 		return std::move(statement);
 	}
 
+	auto parse_uninit_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::UninitDeclaration, PartialSyntaxError>
+	{
+		// Skip uninit token.
+		index++;
+
+		std::string_view const type_source = tokens[index].source;
+		try_call_decl(auto type, parse_type_name(tokens, index, type_names));
+		if (!type)
+			return make_syntax_error(type_source, "Expected type after uninit keyword.");
+
+		if (type->is_reference)
+			return make_syntax_error(type_source, "Type in uninit declaration cannot be a reference.");
+
+		if (type->is_mutable)
+			return make_syntax_error(type_source, "uninit implies mutable. Redundant mut keyword.");
+
+
+		if (tokens[index].type != TokenType::identifier)
+			return make_syntax_error(tokens[index].source, "Expected identifier after type name.");
+
+		std::string_view const variable_name = tokens[index].source;
+		index++;
+
+		if (is_keyword(variable_name))
+			return make_syntax_error(variable_name, "Cannot use a keyword as variable name.");
+
+		incomplete::statement::UninitDeclaration uninit_statement;
+		uninit_statement.variable_name = variable_name;
+		uninit_statement.variable_type = std::move(*type);
+
+		return std::move(uninit_statement);
+	}
+
 	auto parse_return_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::Return, PartialSyntaxError>
 	{
 		// Skip return token.
@@ -1477,6 +1510,8 @@ namespace parser
 
 		if (tokens[index].source == "let")
 			try_call(assign_to(result), parse_let_statement(tokens, index, type_names))
+		else if (tokens[index].source == "uninit")
+			try_call(assign_to(result), parse_uninit_statement(tokens, index, type_names))
 		else if (tokens[index].source == "return")
 			try_call(assign_to(result), parse_return_statement(tokens, index, type_names))
 			// With if, {}, while and for statements, return to avoid checking for final ';' because it is not needed.

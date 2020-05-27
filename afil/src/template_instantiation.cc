@@ -1681,6 +1681,17 @@ namespace instantiation
 					return std::move(complete_statement);
 				}
 			},
+			[&](incomplete::statement::UninitDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
+			{
+				try_call_decl(complete::TypeId const var_type, resolve_dependent_type(incomplete_statement.variable_type, template_parameters, scope_stack, program));
+
+				if (does_name_collide(scope_stack, incomplete_statement.variable_name))
+					return make_syntax_error(incomplete_statement.variable_name, "Variable name collides with another name.");
+
+				add_variable_to_scope(top(scope_stack), incomplete_statement.variable_name, var_type, scope_stack.back().scope_offset, *program);
+
+				return std::nullopt;
+			},
 			[&](incomplete::statement::ExpressionStatement const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
 				complete::statement::ExpressionStatement complete_statement;

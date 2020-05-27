@@ -1960,20 +1960,6 @@ TEST_CASE("Deduction of array size")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
-TODO("Uninit with let statements")
-//TEST_CASE("uninit allows for not initializing an object")
-//{
-//	auto const src = R"(
-//		let main = fn() -> int32
-//		{
-//			let mut a = uninit;
-//			return a;
-//		};
-//	)"sv;
-//
-//	tests::parse_and_run(src);
-//}
-
 TEST_CASE("Order of declarations doesn't matter")
 {
 	auto const src = R"(
@@ -2840,6 +2826,20 @@ TEST_CASE("The null type that automatically converts to a null pointer of all po
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 2);
+}
+
+TEST_CASE("Constructor from uninit will let the object uninitialized")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			uninit int32 i;
+			// Value of i is undefined.
+			return i;
+		};
+	)"sv;
+	
+	tests::assert_get(tests::parse_source(src));
 }
 
 /*****************************************************************

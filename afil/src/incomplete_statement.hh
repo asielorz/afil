@@ -17,6 +17,12 @@ namespace incomplete
 			bool is_reference;
 		};
 
+		struct UninitDeclaration
+		{
+			std::string variable_name;
+			TypeId variable_type;
+		};
+
 		struct ExpressionStatement
 		{
 			Expression expression;
@@ -85,7 +91,7 @@ namespace incomplete
 		};
 
 		using Variant = std::variant<
-			LetDeclaration, ExpressionStatement,
+			LetDeclaration, UninitDeclaration, ExpressionStatement,
 			If, StatementBlock, While, For,
 			Return, Break, Continue,
 			StructDeclaration, StructTemplateDeclaration, TypeAliasDeclaration,
