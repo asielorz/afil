@@ -99,11 +99,13 @@ namespace interpreter
 	template <typename ExecutionContext>
 	auto destroy_variables_in_scope_up_to(complete::Scope const & scope, int destroyed_stack_frame_size, ProgramStack & stack, ExecutionContext context) -> void
 	{
-		// TODO: Reverse
 		int const stack_frame_start = stack.base_pointer;
-		for (complete::Variable const & var : scope.variables)
+		for (auto it = scope.variables.rbegin(); it != scope.variables.rend(); ++it)
+		{
+			complete::Variable const & var = *it;
 			if (var.offset < destroyed_stack_frame_size)
 				destroy_variable(stack_frame_start + var.offset, var.type, stack, context);
+		}
 	}
 
 	template <typename ExecutionContext>
