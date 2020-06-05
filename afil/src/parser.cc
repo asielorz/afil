@@ -44,6 +44,7 @@ namespace parser
 		"namespace",
 		"conversion",
 		"implicit",
+		"destructor",
 
 		// Operators
 		"and",
@@ -1334,29 +1335,51 @@ namespace parser
 		// Parse member variables.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			incomplete::MemberVariable var;
-			try_call_decl(auto var_type, parse_type_name(tokens, index, type_names));
-			if (!var_type.has_value()) return make_syntax_error(tokens[index], "Expected type in struct member declaration.");
-			var.type = std::move(*var_type);
-			if (var.type.is_reference) return make_syntax_error(tokens[index], "Member variable cannot be reference.");
-			if (var.type.is_mutable) return make_syntax_error(tokens[index], "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
-
-			if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after type name in member variable declaration.");
-			if (is_keyword(tokens[index].source)) return make_syntax_error(tokens[index], "Cannot use a keyword as member variable name.");
-			if (is_name_locally_taken(tokens[index].source, declared_struct.member_variables)) return make_syntax_error(tokens[index], "More than one member variable with the same name.");
-			var.name = tokens[index].source;
-			index++;
-
-			// Initialization expression.
-			if (tokens[index].source == "=")
+			if (tokens[index].source == "destructor")
 			{
-				index++;
-				try_call(assign_to(var.initializer_expression), parse_expression(tokens, index, type_names));
-			}
+				if (declared_struct.destructor.has_value())
+					return make_syntax_error(tokens[index].source, "Cannot declare more than one destructor for a struct.");
 
-			if (tokens[index].type != TokenType::semicolon) return make_syntax_error(tokens[index], "Expected semicolon after struct member.");
-			declared_struct.member_variables.push_back(std::move(var));
-			index++;
+				index++;
+				incomplete::Function destructor;
+				std::string_view const first_param_source = tokens[index + 1].source;
+				try_call_void(parse_function_prototype(tokens, index, type_names, out(destructor)));
+				if (destructor.parameters.size() != 1)
+					return make_syntax_error(first_param_source, "Destructor must have exactly one parameter");
+				if (!destructor.parameters[0].type.is_mutable)
+					return make_syntax_error(first_param_source, "Type of destructor must be mutable");
+				if (!destructor.parameters[0].type.is_reference)
+					return make_syntax_error(first_param_source, "Type of destructor must be a reference");
+				try_call_void(parse_function_body(tokens, index, type_names, out(destructor)));
+
+				declared_struct.destructor = std::move(destructor);
+			}
+			else
+			{
+				incomplete::MemberVariable var;
+				try_call_decl(auto var_type, parse_type_name(tokens, index, type_names));
+				if (!var_type.has_value()) return make_syntax_error(tokens[index], "Expected type in struct member declaration.");
+				var.type = std::move(*var_type);
+				if (var.type.is_reference) return make_syntax_error(tokens[index], "Member variable cannot be reference.");
+				if (var.type.is_mutable) return make_syntax_error(tokens[index], "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
+
+				if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after type name in member variable declaration.");
+				if (is_keyword(tokens[index].source)) return make_syntax_error(tokens[index], "Cannot use a keyword as member variable name.");
+				if (is_name_locally_taken(tokens[index].source, declared_struct.member_variables)) return make_syntax_error(tokens[index], "More than one member variable with the same name.");
+				var.name = tokens[index].source;
+				index++;
+
+				// Initialization expression.
+				if (tokens[index].source == "=")
+				{
+					index++;
+					try_call(assign_to(var.initializer_expression), parse_expression(tokens, index, type_names));
+				}
+
+				if (tokens[index].type != TokenType::semicolon) return make_syntax_error(tokens[index], "Expected semicolon after struct member.");
+				declared_struct.member_variables.push_back(std::move(var));
+				index++;
+			}
 		}
 
 		// Skip } token.

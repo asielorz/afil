@@ -925,10 +925,40 @@ namespace instantiation
 
 		scope_stack.pop_back();
 
+		if (function->return_type == complete::TypeId::deduce)
+			function->return_type = complete::TypeId::void_;
+
 		function->is_callable_at_compile_time = can_be_run_in_a_constant_expression(*function, *program);
 		function->is_callable_at_runtime = can_be_run_at_runtime(*function, *program);
 
 		return success;
+	}
+
+	auto add_member_destructors(out<complete::Function> destructor, complete::TypeId destroyed_type, complete::Struct const & new_struct, complete::Program const & program) -> void
+	{
+		for (complete::MemberVariable const & member : new_struct.member_variables)
+		{
+			FunctionId const member_destructor = destructor_for(program, member.type);
+			if (member_destructor != invalid_function_id)
+			{
+				complete::expression::LocalVariable parameter_access;
+				parameter_access.variable_offset = 0;
+				parameter_access.variable_type = make_mutable(make_reference(destroyed_type));
+				
+				complete::expression::MemberVariable member_access;
+				member_access.variable_offset = member.offset;
+				member_access.variable_type = make_mutable(make_reference(member.type));
+				member_access.owner = allocate(complete::Expression(parameter_access));
+
+				complete::statement::ExpressionStatement destructor_call_statement;
+				complete::expression::FunctionCall destructor_call;
+				destructor_call.function_id = member_destructor;
+				destructor_call.parameters.push_back(std::move(member_access));
+				destructor_call_statement.expression = std::move(destructor_call);
+
+				destructor->statements.push_back(std::move(destructor_call_statement));
+			}
+		}
 	}
 
 	auto instantiate_function_template(
@@ -1808,6 +1838,7 @@ namespace instantiation
 					return make_syntax_error(incomplete_statement_.source, "A return statement cannot appear at the global scope.");
 
 				complete::statement::Return complete_statement;
+				complete_statement.destroyed_stack_frame_size = next_block_scope_offset(scope_stack);
 				try_call(assign_to(complete_statement.returned_expression),
 					instantiate_expression(incomplete_statement.returned_expression, template_parameters, scope_stack, program, current_scope_return_type));
 
@@ -1825,13 +1856,13 @@ namespace instantiation
 
 				return std::move(complete_statement);
 			},
-			[](incomplete::statement::Break const &) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
+			[&](incomplete::statement::Break const &) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
-				return complete::statement::Break();
+				return complete::statement::Break{next_block_scope_offset(scope_stack)};
 			},
-			[](incomplete::statement::Continue const &) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
+			[&](incomplete::statement::Continue const &) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
-				return complete::statement::Continue();
+				return complete::statement::Continue{next_block_scope_offset(scope_stack)};
 			},
 			[&](incomplete::statement::StructDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
@@ -1874,8 +1905,23 @@ namespace instantiation
 
 				new_type.extra_data = complete::Type::Struct{ static_cast<int>(program->structs.size()) };
 				complete::TypeId const new_type_id = add_type(*program, std::move(new_type));
-				program->structs.push_back(std::move(new_struct));
+				complete::Struct & new_struct_in_program = program->structs.emplace_back(std::move(new_struct));
 				bind_type_name(incomplete_statement.declared_struct.name, new_type_id, *program, scope_stack);
+
+				if (incomplete_statement.declared_struct.destructor.has_value())
+				{
+					try_call_decl(complete::Function destructor,
+						instantiate_function_template(*incomplete_statement.declared_struct.destructor, template_parameters, scope_stack, program));
+
+					if (destructor.return_type != complete::TypeId::void_)
+						return make_syntax_error(incomplete_statement.declared_struct.destructor->parameters[0].name, "Return type of destructor must be void.");
+					if (decay(destructor.variables[0].type) != new_type_id)
+						return make_syntax_error(incomplete_statement.declared_struct.destructor->parameters[0].name, "Parameter type of destructor must be type of struct.");
+
+					add_member_destructors(out(destructor), new_type_id, new_struct, *program);
+
+					new_struct_in_program.destructor = add_function(*program, std::move(destructor));
+				}
 
 				return std::nullopt;
 			},

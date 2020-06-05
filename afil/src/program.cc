@@ -450,6 +450,18 @@ namespace complete
 		return type_with_id(program, id).ABI_name;
 	}
 
+	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId
+	{
+		if (id.is_reference || id.is_function)
+			return invalid_function_id;
+
+		Type const & type = type_with_id(program, id);
+		if (Type::Struct const * const struct_data = try_get<Type::Struct>(type.extra_data))
+			return program.structs[struct_data->struct_index].destructor;
+		else
+			return invalid_function_id;
+	}
+
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId
 	{
 		StructTemplateId const template_id = StructTemplateId{static_cast<unsigned>(program.struct_templates.size())};
@@ -619,6 +631,54 @@ namespace complete
 			for (int i = 0; i < fn.parameter_count; ++i)
 				types[i] = fn.variables[i].type;
 			return types;
+		}
+	}
+
+	auto parameter_size(Program const & program, FunctionId id) noexcept -> int
+	{
+		if (id.type == FunctionId::Type::intrinsic)
+		{
+			return 16; // Overshoots but works for all intrinsics and 16 is not that much anyway
+		}
+		else if (id.type == FunctionId::Type::imported)
+		{
+			return program.extern_functions[id.index].parameter_size;
+		}
+		else
+		{
+			return program.functions[id.index].parameter_size;
+		}
+	}
+
+	auto parameter_alignment(Program const & program, FunctionId id) noexcept -> int
+	{
+		if (id.type == FunctionId::Type::intrinsic)
+		{
+			return 8; // Overshoots but works for all intrinsics and 16 is not that much anyway
+		}
+		else if (id.type == FunctionId::Type::imported)
+		{
+			return program.extern_functions[id.index].parameter_alignment;
+		}
+		else
+		{
+			return program.functions[id.index].stack_frame_alignment;
+		}
+	}
+
+	auto stack_frame_size(Program const & program, FunctionId id) noexcept -> int
+	{
+		if (id.type == FunctionId::Type::intrinsic)
+		{
+			return 16; // Overshoots but works for all intrinsics and 16 is not that much anyway
+		}
+		else if (id.type == FunctionId::Type::imported)
+		{
+			return program.extern_functions[id.index].parameter_size;
+		}
+		else
+		{
+			return program.functions[id.index].stack_frame_size;
 		}
 	}
 

@@ -23,6 +23,7 @@ namespace complete
 		struct Return
 		{
 			Expression returned_expression;
+			int destroyed_stack_frame_size;
 		};
 
 		struct If
@@ -53,8 +54,15 @@ namespace complete
 			value_ptr<Statement> body;
 		};
 
-		struct Break {};
-		struct Continue {};
+		struct Break 
+		{
+			int destroyed_stack_frame_size;
+		};
+
+		struct Continue 
+		{
+			int destroyed_stack_frame_size;
+		};
 
 		namespace detail
 		{

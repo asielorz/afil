@@ -159,6 +159,7 @@ namespace incomplete
 	{
 		std::string_view name;
 		std::vector<MemberVariable> member_variables;
+		std::optional<Function> destructor;
 	};
 
 	struct StructTemplate : Struct

@@ -148,6 +148,7 @@ namespace complete
 	struct Struct
 	{
 		std::vector<MemberVariable> member_variables;
+		FunctionId destructor = invalid_function_id;
 	};
 
 	struct StructTemplate
@@ -197,6 +198,7 @@ namespace complete
 	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expression::Constructor;
 	auto ABI_name(Program & program, TypeId id) noexcept -> std::string &;
 	auto ABI_name(Program const & program, TypeId id) noexcept -> std::string_view;
+	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId;
 
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId;
 	auto is_struct(Type const & type) noexcept -> bool;
@@ -221,6 +223,9 @@ namespace complete
 	auto add_function(Program & program, Function new_function) noexcept -> FunctionId;
 	auto add_function_template(Program & program, FunctionTemplate new_function_template) noexcept -> FunctionTemplateId;
 	auto parameter_types_of(Program const & program, FunctionId id) noexcept -> std::vector<TypeId>;
+	auto parameter_size(Program const & program, FunctionId id) noexcept -> int;
+	auto parameter_alignment(Program const & program, FunctionId id) noexcept -> int;
+	auto stack_frame_size(Program const & program, FunctionId id) noexcept -> int;
 	auto return_type(Program const & program, FunctionId id) noexcept -> TypeId;
 	auto is_callable_at_compile_time(Program const & program, FunctionId id) noexcept -> bool;
 	auto is_callable_at_runtime(Program const & program, FunctionId id) noexcept -> bool;

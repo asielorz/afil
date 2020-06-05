@@ -32,13 +32,19 @@ namespace interpreter
 	auto free_up_to(ProgramStack & stack, int address) noexcept -> void;
 	auto pointer_at_address(ProgramStack & stack, int address) noexcept -> char *;
 
-	enum struct ControlFlow
+	enum struct ControlFlowType
 	{
 		Nothing,
 		Return,
 		Break,
 		Continue
 	};
+	struct ControlFlow
+	{
+		ControlFlowType type = ControlFlowType::Nothing;
+		int destroyed_stack_frame_size = 0;
+	};
+	constexpr ControlFlow ControlFlow_Nothing = ControlFlow{ControlFlowType::Nothing, 0};
 
 	struct UnmetPrecondition
 	{
@@ -57,6 +63,10 @@ namespace interpreter
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters;
 		instantiation::ScopeStack & scope_stack;
 	};
+
+	template <typename ExecutionContext>
+	[[nodiscard]] auto call_function_with_parameters_already_set(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
+		->expected<void, UnmetPrecondition>;
 
 	template <typename ExecutionContext>
 	[[nodiscard]] auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, int return_address) noexcept

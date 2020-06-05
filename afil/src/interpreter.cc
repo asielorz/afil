@@ -38,29 +38,17 @@ namespace interpreter
 		return stack.memory.data() + address;
 	}
 
-	auto call_extern_function(complete::ExternFunction const & function, span<complete::Expression const> parameters, ProgramStack & stack, RuntimeContext context, int return_address)
+	auto call_extern_function(complete::ExternFunction const & function, ProgramStack & stack, RuntimeContext context, int return_address)
 		-> expected<void, UnmetPrecondition>
 	{
-		int const parameter_size = function.parameter_size;
-		int const prev_stack_top = stack.top_pointer;
-		int const parameters_start = alloc(stack, parameter_size, function.parameter_alignment);
-
-		// Evaluate the expressions that yield the parameters of the function.
-		for (int i = 0, next_parameter_address = parameters_start; i < parameters.size(); ++i)
-		{
-			try_call_void(eval_expression(parameters[i], stack, context, next_parameter_address));
-			next_parameter_address += expression_type_size(parameters[i], context.program);
-		}
-
-		function.caller(function.function_pointer, pointer_at_address(stack, parameters_start), pointer_at_address(stack, return_address));
-		free_up_to(stack, prev_stack_top);
-
+		static_cast<void>(context);
+		function.caller(function.function_pointer, pointer_at_address(stack, stack.base_pointer), pointer_at_address(stack, return_address));
 		return success;
 	}
-	auto call_extern_function(complete::ExternFunction const & function, span<complete::Expression const> parameters, ProgramStack & stack, CompileTimeContext context, int return_address)
+	auto call_extern_function(complete::ExternFunction const & function, ProgramStack & stack, CompileTimeContext context, int return_address)
 		->expected<void, UnmetPrecondition>
 	{
-		static_cast<void>(function, parameters, stack, context, return_address);
+		static_cast<void>(function, stack, context, return_address);
 		declare_unreachable();
 	}
 
