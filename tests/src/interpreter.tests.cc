@@ -2828,7 +2828,7 @@ TEST_CASE("The null type that automatically converts to a null pointer of all po
 	REQUIRE(tests::parse_and_run(src) == 2);
 }
 
-TEST_CASE("Constructor from uninit will let the object uninitialized")
+TEST_CASE("uninit lets the programmer create variables without initializing them")
 {
 	auto const src = R"(
 		let main = fn() -> int32
