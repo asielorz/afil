@@ -981,6 +981,77 @@ namespace instantiation
 		return destructor;
 	}
 
+	auto instantiate_incomplete_struct_variables(
+		incomplete::Struct const & incomplete_struct,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program
+	) -> expected<InstantiatedStruct, PartialSyntaxError>
+	{
+		InstantiatedStruct new_struct;
+		new_struct.complete_struct.member_variables.reserve(incomplete_struct.member_variables.size());
+
+		for (incomplete::MemberVariable const & member_variable : incomplete_struct.member_variables)
+		{
+			try_call_decl(complete::TypeId const member_type, resolve_dependent_type(member_variable.type, template_parameters, scope_stack, program));
+			if (!is_data_type(member_type))
+				return make_syntax_error(member_variable.name, "Member variable cannot be void.");
+			if (member_type.is_reference)
+				return make_syntax_error(member_variable.name, "Member variable cannot be reference.");
+			if (member_type.is_mutable)
+				return make_syntax_error(member_variable.name, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
+
+			add_variable_to_scope(new_struct.complete_struct.member_variables, new_struct.size, new_struct.alignment, member_variable.name, member_type, 0, *program);
+
+			complete::MemberVariable & new_variable = new_struct.complete_struct.member_variables.back();
+			if (member_variable.initializer_expression.has_value())
+			{
+				try_call_decl(complete::Expression initializer,
+					instantiate_expression(*member_variable.initializer_expression, template_parameters, scope_stack, program, nullptr));
+
+				try_call(assign_to(new_variable.initializer_expression),
+					insert_implicit_conversion_node(std::move(initializer), member_type, scope_stack, *program, member_variable.initializer_expression->source));
+			}
+			else if (is_default_constructible(member_type, *program))
+			{
+				new_variable.initializer_expression = synthesize_default_constructor(member_type, *program);
+			}
+		}
+
+		return std::move(new_struct);
+	}
+
+	auto instantiate_incomplete_struct_functions(
+		incomplete::Struct const & incomplete_struct,
+		complete::TypeId new_type_id, int new_struct_id,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program
+	) -> expected<void, PartialSyntaxError>
+	{
+		if (incomplete_struct.destructor.has_value())
+		{
+			try_call_decl(complete::Function destructor,
+				instantiate_function_template(*incomplete_struct.destructor, template_parameters, scope_stack, program));
+
+			if (destructor.return_type != complete::TypeId::void_)
+				return make_syntax_error(incomplete_struct.destructor->parameters[0].name, "Return type of destructor must be void.");
+			if (decay(destructor.variables[0].type) != new_type_id)
+				return make_syntax_error(incomplete_struct.destructor->parameters[0].name, "Parameter type of destructor must be type of struct.");
+
+			add_member_destructors(out(destructor), new_type_id, program->structs[new_struct_id].member_variables, *program);
+
+			program->structs[new_struct_id].destructor = add_function(*program, std::move(destructor));
+		}
+		else
+		{
+			complete::Function destructor = instantiation::synthesize_default_destructor(new_type_id, program->structs[new_struct_id].member_variables, *program);
+			program->structs[new_struct_id].destructor = add_function(*program, std::move(destructor));
+		}
+
+		return success;
+	}
+
 	auto synthesize_array_default_destructor(complete::TypeId destroyed_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function
 	{
 		complete::Function destructor;
@@ -1904,65 +1975,20 @@ namespace instantiation
 			},
 			[&](incomplete::statement::StructDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
-				complete::Type new_type;
-				new_type.size = 0;
-				new_type.alignment = 1;
-
-				complete::Struct new_struct;
-				new_struct.member_variables.reserve(incomplete_statement.declared_struct.member_variables.size());
-
-				for (incomplete::MemberVariable const & member_variable : incomplete_statement.declared_struct.member_variables)
-				{
-					try_call_decl(complete::TypeId const member_type, resolve_dependent_type(member_variable.type, template_parameters, scope_stack, program));
-					if (!is_data_type(member_type)) 
-						return make_syntax_error(member_variable.name, "Member variable cannot be void.");
-					if (member_type.is_reference) 
-						return make_syntax_error(member_variable.name, "Member variable cannot be reference.");
-					if (member_type.is_mutable) 
-						return make_syntax_error(member_variable.name, "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
-
-					add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, member_variable.name, member_type, 0, *program);
-
-					complete::MemberVariable & new_variable = new_struct.member_variables.back();
-					if (member_variable.initializer_expression.has_value())
-					{
-						try_call_decl(complete::Expression initializer,
-							instantiate_expression(*member_variable.initializer_expression, template_parameters, scope_stack, program, current_scope_return_type));
-
-						try_call(assign_to(new_variable.initializer_expression), 
-							insert_implicit_conversion_node(std::move(initializer), member_type, scope_stack, *program, member_variable.initializer_expression->source));
-					}
-					else if (is_default_constructible(member_type, *program))
-					{
-						new_variable.initializer_expression = synthesize_default_constructor(member_type, *program);
-					}
-				}
-
-				if (does_name_collide(scope_stack, incomplete_statement.declared_struct.name)) 
+				if (does_name_collide(scope_stack, incomplete_statement.declared_struct.name))
 					return make_syntax_error(incomplete_statement.declared_struct.name, "Struct name collides with another name.");
 
-				if (incomplete_statement.declared_struct.destructor.has_value())
-				{
-					auto const[new_type_id, new_struct_id] = add_struct_type_without_destructor(*program, std::move(new_type), std::move(new_struct));
-					bind_type_name(incomplete_statement.declared_struct.name, new_type_id, *program, scope_stack);
+				try_call_decl(InstantiatedStruct new_struct, instantiate_incomplete_struct_variables(incomplete_statement.declared_struct, template_parameters, scope_stack, program));
 
-					try_call_decl(complete::Function destructor,
-						instantiate_function_template(*incomplete_statement.declared_struct.destructor, template_parameters, scope_stack, program));
+				complete::Type new_type;
+				new_type.size = new_struct.size;
+				new_type.alignment = new_struct.alignment;
+				new_type.ABI_name = incomplete_statement.declared_struct.name;
+				
+				auto const[new_type_id, new_struct_id] = add_struct_type(*program, std::move(new_type), std::move(new_struct.complete_struct));
+				bind_type_name(incomplete_statement.declared_struct.name, new_type_id, *program, scope_stack);
 
-					if (destructor.return_type != complete::TypeId::void_)
-						return make_syntax_error(incomplete_statement.declared_struct.destructor->parameters[0].name, "Return type of destructor must be void.");
-					if (decay(destructor.variables[0].type) != new_type_id)
-						return make_syntax_error(incomplete_statement.declared_struct.destructor->parameters[0].name, "Parameter type of destructor must be type of struct.");
-
-					add_member_destructors(out(destructor), new_type_id, program->structs[new_struct_id].member_variables, *program);
-
-					program->structs[new_struct_id].destructor = add_function(*program, std::move(destructor));
-				}
-				else
-				{
-					auto const[new_type_id, new_struct_id] = add_struct_type(*program, std::move(new_type), std::move(new_struct));
-					bind_type_name(incomplete_statement.declared_struct.name, new_type_id, *program, scope_stack);
-				}
+				try_call_void(instantiate_incomplete_struct_functions(incomplete_statement.declared_struct, new_type_id, new_struct_id, template_parameters, scope_stack, program));
 
 				return std::nullopt;
 			},

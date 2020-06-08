@@ -477,19 +477,6 @@ namespace complete
 
 	auto add_struct_type(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>
 	{
-		auto const [new_type_id, new_struct_id] = add_struct_type_without_destructor(program, std::move(new_type), std::move(new_struct));
-
-		if (std::any_of(program.structs[new_struct_id].member_variables, [&](complete::MemberVariable const & var) { return !is_trivially_destructible(program, var.type); }))
-		{
-			complete::Function destructor = instantiation::synthesize_default_destructor(new_type_id, program.structs[new_struct_id].member_variables, program);
-			program.structs[new_struct_id].destructor = add_function(program, std::move(destructor));
-		}
-
-		return {new_type_id, new_struct_id};
-	}
-
-	auto add_struct_type_without_destructor(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>
-	{
 		int const new_struct_id = static_cast<int>(program.structs.size());
 		new_type.extra_data = Type::Struct{ new_struct_id };
 		program.structs.push_back(std::move(new_struct));
@@ -927,12 +914,6 @@ namespace complete
 				instantiation_in_source, 
 				join("Struct template parameter does not satisfy concept \"", struct_template.incomplete_struct.template_parameters[failed_concept].concept, "\"."));
 
-		Type new_type;
-		new_type.size = 0;
-		new_type.alignment = 1;
-		new_type.ABI_name = struct_template.ABI_name;
-		Struct new_struct;
-
 		std::vector<ResolvedTemplateParameter> all_template_parameters;
 		all_template_parameters.reserve(struct_template.scope_template_parameters.size() + parameters.size());
 		for (ResolvedTemplateParameter const id : struct_template.scope_template_parameters)
@@ -943,25 +924,23 @@ namespace complete
 
 		instantiation::ScopeStack scope_stack = struct_template.scope_stack;
 
-		for (incomplete::MemberVariable const & var_template : struct_template.incomplete_struct.member_variables)
-		{
-			try_call_decl(TypeId const var_type, instantiation::resolve_dependent_type(var_template.type, all_template_parameters, scope_stack, out(program)));
+		try_call_decl(instantiation::InstantiatedStruct new_struct,
+			instantiate_incomplete_struct_variables(struct_template.incomplete_struct, all_template_parameters, scope_stack, out(program)));
 
-			add_variable_to_scope(new_struct.member_variables, new_type.size, new_type.alignment, var_template.name, var_type, 0, program);
-			if (var_template.initializer_expression)
-			{
-				try_call(assign_to(new_struct.member_variables.back().initializer_expression), instantiation::instantiate_expression(
-					*var_template.initializer_expression, all_template_parameters, scope_stack, out(program), nullptr));
-			}
-		}
+		Type new_type;
+		new_type.size = new_struct.size;
+		new_type.alignment = new_struct.alignment;
+		new_type.ABI_name = struct_template.ABI_name;
 
 		Type::TemplateInstantiation template_instantiation;
 		template_instantiation.template_id = template_id;
 		template_instantiation.parameters.assign(parameters.begin(), parameters.end());
 		new_type.template_instantiation = std::move(template_instantiation);
 
-		auto const[new_type_id, new_struct_id] = add_struct_type(program, std::move(new_type), std::move(new_struct));
+		auto const[new_type_id, new_struct_id] = add_struct_type(program, std::move(new_type), std::move(new_struct.complete_struct));
 		struct_template.cached_instantiations.emplace(std::vector<TypeId>(parameters.begin(), parameters.end()), new_type_id);
+
+		try_call_void(instantiation::instantiate_incomplete_struct_functions(struct_template.incomplete_struct, new_type_id, new_struct_id, all_template_parameters, scope_stack, out(program)));
 
 		return new_type_id;
 	}

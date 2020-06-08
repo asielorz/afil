@@ -3045,6 +3045,56 @@ TEST_CASE("A type that cannot be destroyed at compile time cannot be a constant"
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("struct template that defines a destructor")
+{
+	auto const src = R"(
+		let mut global = 0;
+
+		struct<T> DestructorTest
+		{
+			destructor(DestructorTest<T> mut & this)
+			{
+				global = 1;
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			{
+				let mut x = DestructorTest<int32>();
+			} // x is destroyed
+			
+			return global;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
+//TEST_CASE("User may define custom constructors for a type.")
+//{
+//	auto const src = R"(
+//		struct CustomConstructorTest
+//		{
+//			int32 value;
+//
+//			constructor(int32 a, int32 b)
+//			{
+//				return CustomConstructorTest(.value = a + b);
+//			}
+//		}
+//
+//		let main = fn() -> int32
+//		{
+//			let x = CustomConstructorTest(3, 4);
+//			
+//			return x.value;
+//		};
+//	)"sv;
+//
+//	REQUIRE(tests::parse_and_run(src) == 7);
+//}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

@@ -121,4 +121,25 @@ namespace instantiation
 	auto synthesize_array_default_destructor(complete::TypeId destroyed_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function;
 	auto add_member_destructors(out<complete::Function> destructor, complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> void;
 
+	struct InstantiatedStruct
+	{
+		complete::Struct complete_struct;
+		int size = 0;
+		int alignment = 1;
+	};
+	[[nodiscard]] auto instantiate_incomplete_struct_variables(
+		incomplete::Struct const & incomplete_struct,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program
+	) -> expected<InstantiatedStruct, PartialSyntaxError>;
+
+	[[nodiscard]] auto instantiate_incomplete_struct_functions(
+		incomplete::Struct const & incomplete_struct,
+		complete::TypeId new_type_id, int new_struct_id,
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
+		ScopeStack & scope_stack,
+		out<complete::Program> program
+	) -> expected<void, PartialSyntaxError>;
+
 } // namespace instantiation

@@ -44,6 +44,7 @@ namespace parser
 		"namespace",
 		"conversion",
 		"implicit",
+		"constructor",
 		"destructor",
 
 		// Operators
@@ -1335,7 +1336,16 @@ namespace parser
 		// Parse member variables.
 		while (tokens[index].type != TokenType::close_brace)
 		{
-			if (tokens[index].source == "destructor")
+			if (tokens[index].source == "constructor")
+			{
+				index++;
+				incomplete::Function constructor;
+				std::string_view const first_param_source = tokens[index + 1].source;
+				try_call_void(parse_function_prototype(tokens, index, type_names, out(constructor)));
+				try_call_void(parse_function_body(tokens, index, type_names, out(constructor)));
+				declared_struct.constructors.push_back(std::move(constructor));
+			}
+			else if (tokens[index].source == "destructor")
 			{
 				if (declared_struct.destructor.has_value())
 					return make_syntax_error(tokens[index].source, "Cannot declare more than one destructor for a struct.");

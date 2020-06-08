@@ -111,7 +111,7 @@ namespace interpreter
 	template <typename ExecutionContext>
 	auto destroy_all_variables_in_scope(complete::Scope const & scope, ProgramStack & stack, ExecutionContext context) -> void
 	{
-		destroy_variables_in_scope_up_to(scope, scope.stack_frame_size, stack, context);
+		destroy_variables_in_scope_up_to(scope, scope.stack_frame_size + 1, stack, context);
 	}
 
 	template <typename ExecutionContext>
