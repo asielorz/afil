@@ -201,6 +201,8 @@ namespace complete
 	auto is_trivially_destructible(Program const & program, TypeId id) noexcept -> bool;
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId;
 
+	auto add_struct_type(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>;
+	auto add_struct_type_without_destructor(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>;
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId;
 	auto is_struct(Type const & type) noexcept -> bool;
 	auto struct_for_type(Program const & program, Type const & type) noexcept -> Struct const *;

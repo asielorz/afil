@@ -1920,13 +1920,11 @@ namespace instantiation
 				if (does_name_collide(scope_stack, incomplete_statement.declared_struct.name)) 
 					return make_syntax_error(incomplete_statement.declared_struct.name, "Struct name collides with another name.");
 
-				new_type.extra_data = complete::Type::Struct{ static_cast<int>(program->structs.size()) };
-				complete::TypeId const new_type_id = add_type(*program, std::move(new_type));
-				complete::Struct & new_struct_in_program = program->structs.emplace_back(std::move(new_struct));
-				bind_type_name(incomplete_statement.declared_struct.name, new_type_id, *program, scope_stack);
-
 				if (incomplete_statement.declared_struct.destructor.has_value())
 				{
+					auto const[new_type_id, new_struct_id] = add_struct_type_without_destructor(*program, std::move(new_type), std::move(new_struct));
+					bind_type_name(incomplete_statement.declared_struct.name, new_type_id, *program, scope_stack);
+
 					try_call_decl(complete::Function destructor,
 						instantiate_function_template(*incomplete_statement.declared_struct.destructor, template_parameters, scope_stack, program));
 
@@ -1935,15 +1933,14 @@ namespace instantiation
 					if (decay(destructor.variables[0].type) != new_type_id)
 						return make_syntax_error(incomplete_statement.declared_struct.destructor->parameters[0].name, "Parameter type of destructor must be type of struct.");
 
-					add_member_destructors(out(destructor), new_type_id, new_struct_in_program.member_variables, *program);
+					add_member_destructors(out(destructor), new_type_id, program->structs[new_struct_id].member_variables, *program);
 
-					new_struct_in_program.destructor = add_function(*program, std::move(destructor));
+					program->structs[new_struct_id].destructor = add_function(*program, std::move(destructor));
 				}
-				// Default destructor that calls destructors of members
-				else if (std::any_of(new_struct_in_program.member_variables, [&](complete::MemberVariable const & var) { return !is_trivially_destructible(*program, var.type); }))
+				else
 				{
-					complete::Function destructor = synthesize_default_destructor(new_type_id, new_struct_in_program.member_variables, *program);
-					new_struct_in_program.destructor = add_function(*program, std::move(destructor));
+					auto const[new_type_id, new_struct_id] = add_struct_type(*program, std::move(new_type), std::move(new_struct));
+					bind_type_name(incomplete_statement.declared_struct.name, new_type_id, *program, scope_stack);
 				}
 
 				return std::nullopt;

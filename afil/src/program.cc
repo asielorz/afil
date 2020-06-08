@@ -467,6 +467,30 @@ namespace complete
 			return invalid_function_id;
 	}
 
+	auto add_struct_type(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>
+	{
+		auto const [new_type_id, new_struct_id] = add_struct_type_without_destructor(program, std::move(new_type), std::move(new_struct));
+
+		if (std::any_of(program.structs[new_struct_id].member_variables, [&](complete::MemberVariable const & var) { return !is_trivially_destructible(program, var.type); }))
+		{
+			complete::Function destructor = instantiation::synthesize_default_destructor(new_type_id, program.structs[new_struct_id].member_variables, program);
+			program.structs[new_struct_id].destructor = add_function(program, std::move(destructor));
+		}
+
+		return {new_type_id, new_struct_id};
+	}
+
+	auto add_struct_type_without_destructor(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>
+	{
+		int const new_struct_id = static_cast<int>(program.structs.size());
+		new_type.extra_data = Type::Struct{ new_struct_id };
+		program.structs.push_back(std::move(new_struct));
+
+		TypeId const new_type_id = add_type(program, std::move(new_type));
+
+		return {new_type_id, new_struct_id};
+	}
+
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId
 	{
 		StructTemplateId const template_id = StructTemplateId{static_cast<unsigned>(program.struct_templates.size())};
@@ -889,6 +913,7 @@ namespace complete
 		Type new_type;
 		new_type.size = 0;
 		new_type.alignment = 1;
+		new_type.ABI_name = struct_template.ABI_name;
 		Struct new_struct;
 
 		std::vector<ResolvedTemplateParameter> all_template_parameters;
@@ -913,17 +938,12 @@ namespace complete
 			}
 		}
 
-		new_type.extra_data = Type::Struct{static_cast<int>(program.structs.size())};
-		new_type.ABI_name = struct_template.ABI_name;
-		program.structs.push_back(std::move(new_struct));
-
 		Type::TemplateInstantiation template_instantiation;
 		template_instantiation.template_id = template_id;
 		template_instantiation.parameters.assign(parameters.begin(), parameters.end());
 		new_type.template_instantiation = std::move(template_instantiation);
 
-		TypeId const new_type_id = TypeId::with_index(static_cast<unsigned>(program.types.size()));
-		program.types.push_back(std::move(new_type));
+		auto const[new_type_id, new_struct_id] = add_struct_type(program, std::move(new_type), std::move(new_struct));
 		struct_template.cached_instantiations.emplace(std::vector<TypeId>(parameters.begin(), parameters.end()), new_type_id);
 
 		return new_type_id;

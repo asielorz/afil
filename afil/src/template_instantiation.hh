@@ -117,4 +117,7 @@ namespace instantiation
 	auto push_block_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>;
 	auto next_block_scope_offset(ScopeStackView scope_stack) -> int;
 
+	auto synthesize_default_destructor(complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> complete::Function;
+	auto add_member_destructors(out<complete::Function> destructor, complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> void;
+
 } // namespace instantiation

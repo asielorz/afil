@@ -2951,6 +2951,39 @@ TEST_CASE("A type that defines no destructor of its own will still recursively c
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("Default destructors for struct templates")
+{
+	auto const src = R"(
+		let mut global = 0;
+
+		struct DestructorTest
+		{
+			int32 value;
+
+			destructor(DestructorTest mut & this)
+			{
+				global = this.value;
+			}
+		}
+		
+		struct<T> Wrapper
+		{
+			T wrapped;
+		}
+
+		let main = fn() -> int32
+		{
+			{
+				let mut x = Wrapper<DestructorTest>(DestructorTest(5));
+			} // x is destroyed
+			
+			return global;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation
