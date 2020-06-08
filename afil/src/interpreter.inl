@@ -92,6 +92,21 @@ namespace interpreter
 			stack.top_pointer = prev_esp;
 			stack.base_pointer = prev_ebp;
 		}
+		if (!(type.is_reference || type.is_function))
+		{
+			complete::Type const & destroyed_type = type_with_id(context.program, type);
+			if (is_array(destroyed_type))
+			{
+				complete::TypeId const value_type = array_value_type(destroyed_type);
+				if (!is_trivially_destructible(context.program, array_value_type(destroyed_type)))
+				{
+					int const value_type_size = type_size(context.program, value_type);
+					int const size = array_size(destroyed_type);
+					for (int i = 0; i < size; ++i)
+						destroy_variable(address + value_type_size * i, value_type, stack, context);
+				}
+			}
+		}
 
 		return success;
 	}

@@ -2984,6 +2984,39 @@ TEST_CASE("Default destructors for struct templates")
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("Destructors for arrays")
+{
+	auto const src = R"(
+		let mut global = 0;
+
+		struct DestructorTest
+		{
+			int32 value;
+
+			destructor(DestructorTest mut & this)
+			{
+				global = global + this.value;
+			}
+		}
+		
+		let main = fn() -> int32
+		{
+			{
+				let mut x = DestructorTest[](
+					DestructorTest(1),
+					DestructorTest(2),
+					DestructorTest(4),
+					DestructorTest(8)
+				);
+			} // x is destroyed
+			
+			return global;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 15);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation
