@@ -965,6 +965,19 @@ namespace instantiation
 		destructor->is_callable_at_runtime = can_be_run_at_runtime(*destructor, program);
 	}
 
+	auto synthesize_default_destructor(complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> complete::Function
+	{
+		complete::Function destructor;
+		destructor.return_type = complete::TypeId::void_;
+		destructor.parameter_size = sizeof(void *);
+		destructor.parameter_count = 1;
+		add_variable_to_scope(destructor, "this", make_mutable(make_reference(destroyed_type)), 0, program);
+	
+		add_member_destructors(out(destructor), destroyed_type, member_variables, program);
+
+		return destructor;
+	}
+
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
@@ -1929,14 +1942,7 @@ namespace instantiation
 				// Default destructor that calls destructors of members
 				else if (std::any_of(new_struct_in_program.member_variables, [&](complete::MemberVariable const & var) { return !is_trivially_destructible(*program, var.type); }))
 				{
-					complete::Function destructor;
-					destructor.return_type = complete::TypeId::void_;
-					destructor.parameter_size = sizeof(void *);
-					destructor.parameter_count = 1;
-					add_variable_to_scope(destructor, "this", make_mutable(make_reference(new_type_id)), 0, *program);
-
-					add_member_destructors(out(destructor), new_type_id, new_struct_in_program.member_variables, *program);
-				
+					complete::Function destructor = synthesize_default_destructor(new_type_id, new_struct_in_program.member_variables, *program);
 					new_struct_in_program.destructor = add_function(*program, std::move(destructor));
 				}
 
