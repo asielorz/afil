@@ -199,6 +199,7 @@ namespace complete
 	auto ABI_name(Program & program, TypeId id) noexcept -> std::string &;
 	auto ABI_name(Program const & program, TypeId id) noexcept -> std::string_view;
 	auto is_trivially_destructible(Program const & program, TypeId id) noexcept -> bool;
+	auto is_destructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool;
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId;
 
 	auto add_struct_type(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>;

@@ -455,6 +455,12 @@ namespace complete
 		return destructor_for(program, id) == invalid_function_id;
 	}
 
+	auto is_destructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool
+	{
+		FunctionId const destructor = destructor_for(program, id);
+		return destructor == invalid_function_id || is_callable_at_compile_time(program, destructor);
+	}
+
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId
 	{
 		if (id.is_reference || id.is_function)

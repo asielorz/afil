@@ -1684,7 +1684,7 @@ namespace instantiation
 
 					return std::nullopt;
 				}
-				else if (!var_type.is_mutable && is_constant_expression(expression, *program, next_block_scope_offset(scope_stack)))
+				else if (!var_type.is_mutable && is_constant_expression(expression, *program, next_block_scope_offset(scope_stack)) && is_destructible_at_compile_time(*program, var_type))
 				{
 					complete::Constant constant;
 					constant.type = var_type;

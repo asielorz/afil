@@ -3017,6 +3017,34 @@ TEST_CASE("Destructors for arrays")
 	REQUIRE(tests::parse_and_run(src) == 15);
 }
 
+TEST_CASE("A type that cannot be destroyed at compile time cannot be a constant")
+{
+	auto const src = R"(
+		let mut global = 0;
+
+		struct DestructorTest
+		{
+			int32 value;
+
+			destructor(DestructorTest mut & this)
+			{
+				global = this.value;
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			{
+				let x = DestructorTest(5);
+			} // x is destroyed
+			
+			return global;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation
