@@ -450,6 +450,11 @@ namespace complete
 		return type_with_id(program, id).ABI_name;
 	}
 
+	auto is_trivially_destructible(Program const & program, TypeId id) noexcept -> bool
+	{
+		return destructor_for(program, id) == invalid_function_id;
+	}
+
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId
 	{
 		if (id.is_reference || id.is_function)

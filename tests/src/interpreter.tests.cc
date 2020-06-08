@@ -2918,6 +2918,39 @@ TEST_CASE("Destructor is called on temporaries after their subexpression is eval
 	REQUIRE(tests::parse_and_run(src) == 5);
 }
 
+TEST_CASE("A type that defines no destructor of its own will still recursively call the destructor of its members on destruction")
+{
+	auto const src = R"(
+		let mut global = 0;
+
+		struct DestructorTest
+		{
+			int32 value;
+
+			destructor(DestructorTest mut & this)
+			{
+				global = this.value;
+			}
+		}
+		
+		struct DestructorTestWrapper
+		{
+			DestructorTest wrapped;
+		}
+
+		let main = fn() -> int32
+		{
+			{
+				let mut x = DestructorTestWrapper(DestructorTest(5));
+			} // x is destroyed
+			
+			return global;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

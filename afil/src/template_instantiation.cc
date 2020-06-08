@@ -934,9 +934,9 @@ namespace instantiation
 		return success;
 	}
 
-	auto add_member_destructors(out<complete::Function> destructor, complete::TypeId destroyed_type, complete::Struct const & new_struct, complete::Program const & program) -> void
+	auto add_member_destructors(out<complete::Function> destructor, complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> void
 	{
-		for (complete::MemberVariable const & member : new_struct.member_variables)
+		for (complete::MemberVariable const & member : member_variables)
 		{
 			FunctionId const member_destructor = destructor_for(program, member.type);
 			if (member_destructor != invalid_function_id)
@@ -959,6 +959,10 @@ namespace instantiation
 				destructor->statements.push_back(std::move(destructor_call_statement));
 			}
 		}
+
+		// Recheck if the function can be called at compile time and run time now that new statements have been added.
+		destructor->is_callable_at_compile_time = can_be_run_in_a_constant_expression(*destructor, program);
+		destructor->is_callable_at_runtime = can_be_run_at_runtime(*destructor, program);
 	}
 
 	auto instantiate_function_template(
@@ -1918,8 +1922,21 @@ namespace instantiation
 					if (decay(destructor.variables[0].type) != new_type_id)
 						return make_syntax_error(incomplete_statement.declared_struct.destructor->parameters[0].name, "Parameter type of destructor must be type of struct.");
 
-					add_member_destructors(out(destructor), new_type_id, new_struct, *program);
+					add_member_destructors(out(destructor), new_type_id, new_struct_in_program.member_variables, *program);
 
+					new_struct_in_program.destructor = add_function(*program, std::move(destructor));
+				}
+				// Default destructor that calls destructors of members
+				else if (std::any_of(new_struct_in_program.member_variables, [&](complete::MemberVariable const & var) { return !is_trivially_destructible(*program, var.type); }))
+				{
+					complete::Function destructor;
+					destructor.return_type = complete::TypeId::void_;
+					destructor.parameter_size = sizeof(void *);
+					destructor.parameter_count = 1;
+					add_variable_to_scope(destructor, "this", make_mutable(make_reference(new_type_id)), 0, *program);
+
+					add_member_destructors(out(destructor), new_type_id, new_struct_in_program.member_variables, *program);
+				
 					new_struct_in_program.destructor = add_function(*program, std::move(destructor));
 				}
 

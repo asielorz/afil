@@ -198,6 +198,7 @@ namespace complete
 	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expression::Constructor;
 	auto ABI_name(Program & program, TypeId id) noexcept -> std::string &;
 	auto ABI_name(Program const & program, TypeId id) noexcept -> std::string_view;
+	auto is_trivially_destructible(Program const & program, TypeId id) noexcept -> bool;
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId;
 
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId;
