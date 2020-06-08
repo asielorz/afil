@@ -25,6 +25,7 @@ namespace complete
 		{
 			TypeId value_type;
 			int size;
+			FunctionId destructor;
 		};
 		struct ArrayPointer
 		{

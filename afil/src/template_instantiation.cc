@@ -934,31 +934,34 @@ namespace instantiation
 		return success;
 	}
 
+	auto add_member_destructor(out<complete::Function> destructor, complete::TypeId destroyed_type, complete::TypeId member_type, int member_offset, complete::Program const & program) -> void
+	{
+		FunctionId const member_destructor = destructor_for(program, member_type);
+		if (member_destructor != invalid_function_id)
+		{
+			complete::expression::LocalVariable parameter_access;
+			parameter_access.variable_offset = 0;
+			parameter_access.variable_type = make_mutable(make_reference(destroyed_type));
+
+			complete::expression::MemberVariable member_access;
+			member_access.variable_offset = member_offset;
+			member_access.variable_type = make_mutable(make_reference(member_type));
+			member_access.owner = allocate(complete::Expression(parameter_access));
+
+			complete::statement::ExpressionStatement destructor_call_statement;
+			complete::expression::FunctionCall destructor_call;
+			destructor_call.function_id = member_destructor;
+			destructor_call.parameters.push_back(std::move(member_access));
+			destructor_call_statement.expression = std::move(destructor_call);
+
+			destructor->statements.push_back(std::move(destructor_call_statement));
+		}
+	}
+
 	auto add_member_destructors(out<complete::Function> destructor, complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> void
 	{
 		for (complete::MemberVariable const & member : member_variables)
-		{
-			FunctionId const member_destructor = destructor_for(program, member.type);
-			if (member_destructor != invalid_function_id)
-			{
-				complete::expression::LocalVariable parameter_access;
-				parameter_access.variable_offset = 0;
-				parameter_access.variable_type = make_mutable(make_reference(destroyed_type));
-				
-				complete::expression::MemberVariable member_access;
-				member_access.variable_offset = member.offset;
-				member_access.variable_type = make_mutable(make_reference(member.type));
-				member_access.owner = allocate(complete::Expression(parameter_access));
-
-				complete::statement::ExpressionStatement destructor_call_statement;
-				complete::expression::FunctionCall destructor_call;
-				destructor_call.function_id = member_destructor;
-				destructor_call.parameters.push_back(std::move(member_access));
-				destructor_call_statement.expression = std::move(destructor_call);
-
-				destructor->statements.push_back(std::move(destructor_call_statement));
-			}
-		}
+			add_member_destructor(destructor, destroyed_type, member.type, member.offset, program);
 
 		// Recheck if the function can be called at compile time and run time now that new statements have been added.
 		destructor->is_callable_at_compile_time = can_be_run_in_a_constant_expression(*destructor, program);
@@ -974,6 +977,24 @@ namespace instantiation
 		add_variable_to_scope(destructor, "this", make_mutable(make_reference(destroyed_type)), 0, program);
 	
 		add_member_destructors(out(destructor), destroyed_type, member_variables, program);
+
+		return destructor;
+	}
+
+	auto synthesize_array_default_destructor(complete::TypeId destroyed_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function
+	{
+		complete::Function destructor;
+		destructor.return_type = complete::TypeId::void_;
+		destructor.parameter_size = sizeof(void *);
+		destructor.parameter_count = 1;
+		add_variable_to_scope(destructor, "this", make_mutable(make_reference(destroyed_type)), 0, program);
+
+		int const value_type_size = type_size(program, value_type);
+		for (int i = 0; i < size; ++i)
+			add_member_destructor(out(destructor), destroyed_type, value_type, i * value_type_size, program);
+
+		destructor.is_callable_at_compile_time = can_be_run_in_a_constant_expression(destructor, program);
+		destructor.is_callable_at_runtime = can_be_run_at_runtime(destructor, program);
 
 		return destructor;
 	}

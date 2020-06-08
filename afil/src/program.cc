@@ -469,6 +469,8 @@ namespace complete
 		Type const & type = type_with_id(program, id);
 		if (Type::Struct const * const struct_data = try_get<Type::Struct>(type.extra_data))
 			return program.structs[struct_data->struct_index].destructor;
+		else if (Type::Array const * const array_data = try_get<Type::Array>(type.extra_data))
+			return array_data->destructor;
 		else
 			return invalid_function_id;
 	}
@@ -591,8 +593,17 @@ namespace complete
 		Type new_type;
 		new_type.size = value_type_data.size * size;
 		new_type.alignment = value_type_data.alignment;
-		new_type.extra_data = Type::Array{value_type, size};
-		return add_type(program, std::move(new_type));
+		new_type.extra_data = Type::Array{value_type, size, invalid_function_id };
+		complete::TypeId new_type_id = add_type(program, std::move(new_type));
+
+		if (!is_trivially_destructible(program, value_type))
+		{
+			complete::Function destructor = instantiation::synthesize_array_default_destructor(new_type_id, value_type, size, program);
+			FunctionId const destructor_id = add_function(program, std::move(destructor));
+			try_get<Type::Array>(program.types[new_type_id.index].extra_data)->destructor = destructor_id;
+		}
+
+		return new_type_id;
 	}
 
 	auto array_size(Type const & array_type) noexcept -> int
