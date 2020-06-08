@@ -440,9 +440,10 @@ namespace interpreter
 		int const parameters_start = alloc(stack, param_size, param_alignment);
 
 		// Evaluate the expressions that yield the parameters of the function.
+		int const parameters_size = static_cast<int>(parameters.size());
 		for (
 			int i = 0, next_parameter_address = parameters_start, next_temporary_address = temporaries_start;
-			i < parameters.size();
+			i < parameters_size;
 			++i
 			)
 		{
@@ -468,7 +469,7 @@ namespace interpreter
 		try_call_void(call_function_with_parameters_already_set(function_id, stack, context, return_address));
 
 		// Destroy temporaries.
-		for (int i = 0, next_temporary_address = temporaries_start; i < parameters.size(); ++i)
+		for (int i = 0, next_temporary_address = temporaries_start; i < parameters_size; ++i)
 		{
 			complete::TypeId const param_type = expression_type_id(parameters[i], context.program);
 			if (!param_type.is_reference && parameter_types[i].is_reference)
@@ -489,9 +490,19 @@ namespace interpreter
 	auto eval_expression(complete::Expression const & tree, ProgramStack & stack, ExecutionContext context) noexcept -> expected<int, UnmetPrecondition>
 	{
 		complete::TypeId const & expr_type = expression_type_id(tree, context.program);
-		int const address = alloc(stack, type_size(context.program, expr_type));
+		int const address = alloc(stack, type_size(context.program, expr_type), type_alignment(context.program, expr_type));
 		try_call_void(eval_expression(tree, stack, context, address));
 		return address;
+	}
+
+	template <typename ExecutionContext>
+	auto eval_expression_and_discard_result(complete::Expression const & tree, ProgramStack & stack, ExecutionContext context) noexcept -> expected<void, UnmetPrecondition>
+	{
+		StackGuard const stack_guard(stack);
+		try_call_decl(int const discarded_variable_address, eval_expression(tree, stack, context));
+		complete::TypeId const & discarded_variable_type = expression_type_id(tree, context.program);
+		destroy_variable(discarded_variable_address, discarded_variable_type, stack, context);
+		return success;
 	}
 
 	namespace detail
@@ -547,7 +558,8 @@ namespace interpreter
 			{
 				// If the owner is an lvalue, return a reference to the member.
 				try_call_decl(int const owner_address, eval_expression(*var_node.owner, stack, context));
-				if (expression_type_id(*var_node.owner, context.program).is_reference)
+				complete::TypeId const owner_type = expression_type_id(*var_node.owner, context.program);
+				if (owner_type.is_reference)
 				{
 					char * const owner_ptr = read<char *>(stack, owner_address);
 					write(stack, return_address, owner_ptr + var_node.variable_offset);
@@ -557,6 +569,7 @@ namespace interpreter
 				{
 					int const variable_size = type_size(context.program, var_node.variable_type);
 					memcpy(pointer_at_address(stack, return_address), pointer_at_address(stack, owner_address + var_node.variable_offset), variable_size);
+					destroy_variable(owner_address, owner_type, stack, context);
 				}
 				return success;
 			},
@@ -601,6 +614,7 @@ namespace interpreter
 					int const index = read<int>(stack, index_address);
 					int const value_type_size = type_size(context.program, remove_reference(subscript_node.return_type));
 					memcpy(pointer_at_address(stack, return_address), array + index * value_type_size, value_type_size);
+					destroy_variable(array_address, array_type_id, stack, context);
 				}
 				return success;
 			},
@@ -645,6 +659,7 @@ namespace interpreter
 				try_call_decl(const int dest_address, eval_expression(*assign_node.destination, stack, context));
 				try_call_decl(const int source_address, eval_expression(*assign_node.source, stack, context));
 				memcpy(read<void *>(stack, dest_address), pointer_at_address(stack, source_address), expression_type_size(*assign_node.source, context.program));
+				destroy_variable(source_address, expression_type_id(*assign_node.source, context.program), stack, context);
 				free_up_to(stack, dest_address);
 				return success;
 			},
@@ -693,8 +708,9 @@ namespace interpreter
 					// Fill constructor
 					if (ctor_node.parameters.size() == 1)
 					{
-						for (int i = 0; i < array.size; ++i)
-							try_call_void(eval_expression(ctor_node.parameters[0], stack, context, return_address + value_type_size * i));
+						try_call_void(eval_expression(ctor_node.parameters[0], stack, context, return_address));
+						for (int i = 1; i < array.size; ++i)
+							memcpy(pointer_at_address(stack, return_address), pointer_at_address(stack, return_address + value_type_size * i), value_type_size);
 					}
 					// Regular constructor
 					else
@@ -729,7 +745,7 @@ namespace interpreter
 			},
 			[&](statement::ExpressionStatement const & expr_node) -> expected<ControlFlow, UnmetPrecondition>
 			{
-				try_call_void(eval_expression(expr_node.expression, stack, context, stack.top_pointer));
+				try_call_void(eval_expression_and_discard_result(expr_node.expression, stack, context));
 				return ControlFlow_Nothing;
 			},
 			[&](statement::Return const & return_node) -> expected<ControlFlow, UnmetPrecondition>
@@ -822,7 +838,7 @@ namespace interpreter
 						}
 
 						// Run end expression.
-						try_call_void(eval_expression(for_node.end_expression, stack, context, stack.top_pointer));
+						try_call_void(eval_expression_and_discard_result(for_node.end_expression, stack, context));
 					}
 					else
 					{

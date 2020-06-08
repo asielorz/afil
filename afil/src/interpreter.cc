@@ -24,7 +24,7 @@ namespace interpreter
 	auto alloc(ProgramStack & stack, int size, int alignment) noexcept -> int
 	{
 		int const address = align(stack.top_pointer, alignment);
-		stack.top_pointer += size;
+		stack.top_pointer = address + size;
 		return address;
 	}
 

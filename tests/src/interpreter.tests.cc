@@ -1301,6 +1301,28 @@ TEST_CASE("Default constructed array")
 	REQUIRE(tests::parse_and_run(src) == 0);
 }
 
+TEST_CASE("Single parameter constructor of array evaluates its parameter expression only once")
+{
+	auto const src = R"(
+		let mut global_counter = 0;
+
+		let get_next = fn() -> int32
+		{
+			let next = global_counter;
+			global_counter = global_counter + 1;
+			return next;
+		};
+
+		let main = fn() -> int32
+		{
+			let a = int32[4](get_next());
+			return global_counter;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1); // Not 4
+}
+
 TEST_CASE("User can overload subscript operator for their type")
 {
 	auto const src = R"(
@@ -2766,13 +2788,13 @@ TEST_CASE("Pointer comparisons")
 				result = result + 1;
 			
 			if (&i != &j)
-				result = result + 1;
+				result = result + 2;
 	
 			return result;
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src) == 2);
+	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
 TEST_CASE("Pointer comparisons with types that convert implicitly to pointer")
@@ -2796,13 +2818,13 @@ TEST_CASE("Pointer comparisons with types that convert implicitly to pointer")
 				result = result + 1;
 
 			if (j == nullptr)
-				result = result + 1;
+				result = result + 2;
 	
 			return result;
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src) == 2);
+	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
 TEST_CASE("The null type that automatically converts to a null pointer of all pointer types")
@@ -2863,6 +2885,32 @@ TEST_CASE("User may define destructors for types which are called when an object
 				let mut x = DestructorTest(5);
 			} // x is destroyed
 			
+			return global;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
+TEST_CASE("Destructor is called on temporaries after their subexpression is evaluated")
+{
+	auto const src = R"(
+		let mut global = 0;
+
+		struct DestructorTest
+		{
+			int32 value;
+
+			destructor(DestructorTest mut & this)
+			{
+				global = this.value;
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			let mut x = DestructorTest(5).value;
+			// temporary is destroyed -> global = 5
 			return global;
 		};
 	)"sv;
