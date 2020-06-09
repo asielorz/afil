@@ -657,7 +657,7 @@ namespace complete
 		Type new_type;
 		new_type.size = value_type_data.size * size;
 		new_type.alignment = value_type_data.alignment;
-		new_type.extra_data = Type::Array{value_type, size, invalid_function_id };
+		new_type.extra_data = Type::Array{value_type, size, invalid_function_id, invalid_function_id, invalid_function_id};
 		complete::TypeId new_type_id = add_type(program, std::move(new_type));
 
 		if (!is_trivially_destructible(program, value_type))
@@ -665,6 +665,30 @@ namespace complete
 			complete::Function destructor = instantiation::synthesize_array_default_destructor(new_type_id, value_type, size, program);
 			FunctionId const destructor_id = add_function(program, std::move(destructor));
 			try_get<Type::Array>(program.types[new_type_id.index].extra_data)->destructor = destructor_id;
+		}
+		if (!is_trivially_copy_constructible(program, value_type))
+		{
+			Type::Array & array_data = *try_get<Type::Array>(program.types[new_type_id.index].extra_data);
+			if (is_copy_constructible(program, value_type))
+			{
+				complete::Function copy_constructor = instantiation::synthesize_array_default_copy_constructor(new_type_id, value_type, size, program);
+				FunctionId const copy_constructor_id = add_function(program, std::move(copy_constructor));
+				array_data.copy_constructor = copy_constructor_id;
+			}
+			else
+			{
+				array_data.copy_constructor = deleted_function_id;
+			}
+			if (is_move_constructible(program, value_type))
+			{
+				complete::Function move_constructor = instantiation::synthesize_array_default_move_constructor(new_type_id, value_type, size, program);
+				FunctionId const move_constructor_id = add_function(program, std::move(move_constructor));
+				array_data.move_constructor = move_constructor_id;
+			}
+			else
+			{
+				array_data.move_constructor = deleted_function_id;
+			}
 		}
 
 		return new_type_id;

@@ -967,11 +967,8 @@ namespace instantiation
 	auto are_all_trivially_destructible(span<complete::MemberVariable const> member_variables, complete::Program const & program) -> bool
 	{
 		for (complete::MemberVariable const & member : member_variables)
-		{
-			FunctionId const member_destructor = destructor_for(program, member.type);
-			if (member_destructor != invalid_function_id)
+			if (!is_trivially_destructible(program, member.type))
 				return false;
-		}
 		return true;
 	}
 
@@ -996,6 +993,220 @@ namespace instantiation
 		add_member_destructors(out(destructor), destroyed_type, member_variables, program);
 
 		return destructor;
+	}
+
+	auto synthesize_array_default_destructor(complete::TypeId destroyed_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function
+	{
+		complete::Function destructor;
+		destructor.return_type = complete::TypeId::void_;
+		destructor.parameter_size = sizeof(void *);
+		destructor.parameter_count = 1;
+		add_variable_to_scope(destructor, "this", make_mutable(make_reference(destroyed_type)), 0, program);
+
+		int const value_type_size = type_size(program, value_type);
+		for (int i = 0; i < size; ++i)
+			add_member_destructor(out(destructor), destroyed_type, value_type, i * value_type_size, program);
+
+		destructor.is_callable_at_compile_time = can_be_run_in_a_constant_expression(destructor, program);
+		destructor.is_callable_at_runtime = can_be_run_at_runtime(destructor, program);
+
+		return destructor;
+	}
+
+	auto are_all_trivially_copyable(span<complete::MemberVariable const> member_variables, complete::Program const & program) -> bool
+	{
+		for (complete::MemberVariable const & member : member_variables)
+			if (!is_trivially_copy_constructible(program, member.type))
+				return false;
+		return true;
+	}
+
+	auto are_all_copy_constructible(span<complete::MemberVariable const> member_variables, complete::Program const & program) -> bool
+	{
+		for (complete::MemberVariable const & member : member_variables)
+			if (!is_copy_constructible(program, member.type))
+				return false;
+		return true;
+	}
+
+	auto are_all_move_constructible(span<complete::MemberVariable const> member_variables, complete::Program const & program) -> bool
+	{
+		for (complete::MemberVariable const & member : member_variables)
+			if (!is_move_constructible(program, member.type))
+				return false;
+		return true;
+	}
+
+	auto add_member_copy_constructor(
+		out<complete::expression::Constructor> constructor_expression, 
+		complete::TypeId owner_type, complete::TypeId member_type, int member_offset, 
+		complete::Program const & program) -> void
+	{
+		complete::expression::LocalVariable parameter_access;
+		parameter_access.variable_offset = 0;
+		parameter_access.variable_type = make_reference(owner_type);
+
+		complete::expression::MemberVariable member_access;
+		member_access.variable_offset = member_offset;
+		member_access.variable_type = make_reference(member_type);
+		member_access.owner = allocate(complete::Expression(parameter_access));
+
+		FunctionId const member_copy_constructor = copy_constructor_for(program, member_type);
+		if (member_copy_constructor == invalid_function_id) // Trivially copyable member
+		{
+			complete::expression::Dereference member_dereference;
+			member_dereference.expression = allocate(complete::Expression(std::move(member_access)));
+			member_dereference.return_type = member_type;
+
+			constructor_expression->parameters.push_back(std::move(member_dereference));
+		}
+		else // Member with copy constructor function
+		{
+			complete::expression::FunctionCall member_copy_call;
+			member_copy_call.function_id = member_copy_constructor;
+			member_copy_call.parameters.push_back(std::move(member_access));
+
+			constructor_expression->parameters.push_back(std::move(member_copy_call));
+		}
+	}
+
+	auto synthesize_default_copy_constructor(complete::TypeId owner_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> complete::Function
+	{
+		complete::Function copy_constructor;
+		copy_constructor.return_type = owner_type;
+		copy_constructor.parameter_size = sizeof(void *);
+		copy_constructor.parameter_count = 1;
+		add_variable_to_scope(copy_constructor, "other", make_reference(owner_type), 0, program);
+
+		complete::expression::Constructor constructor_expression;
+		constructor_expression.constructed_type = owner_type;
+		constructor_expression.parameters.reserve(member_variables.size());
+
+		for (complete::MemberVariable const & member : member_variables)
+			add_member_copy_constructor(out(constructor_expression), owner_type, member.type, member.offset, program);
+
+		complete::statement::Return return_statement;
+		return_statement.destroyed_stack_frame_size = 8;
+		return_statement.returned_expression = std::move(constructor_expression);
+		copy_constructor.statements.push_back(std::move(return_statement));
+
+		copy_constructor.is_callable_at_compile_time = can_be_run_in_a_constant_expression(copy_constructor, program);
+		copy_constructor.is_callable_at_runtime = can_be_run_at_runtime(copy_constructor, program);
+
+		return copy_constructor;
+	}
+
+	auto synthesize_array_default_copy_constructor(complete::TypeId owner_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function
+	{
+		complete::Function copy_constructor;
+		copy_constructor.return_type = owner_type;
+		copy_constructor.parameter_size = sizeof(void *);
+		copy_constructor.parameter_count = 1;
+		add_variable_to_scope(copy_constructor, "other", make_reference(owner_type), 0, program);
+
+		complete::expression::Constructor constructor_expression;
+		constructor_expression.constructed_type = owner_type;
+		constructor_expression.parameters.reserve(size);
+
+		int const value_type_size = type_size(program, value_type);
+		for (int i = 0; i < size; ++i)
+			add_member_copy_constructor(out(constructor_expression), owner_type, value_type, i * value_type_size, program);
+
+		complete::statement::Return return_statement;
+		return_statement.destroyed_stack_frame_size = 8;
+		return_statement.returned_expression = std::move(constructor_expression);
+		copy_constructor.statements.push_back(std::move(return_statement));
+
+		copy_constructor.is_callable_at_compile_time = can_be_run_in_a_constant_expression(copy_constructor, program);
+		copy_constructor.is_callable_at_runtime = can_be_run_at_runtime(copy_constructor, program);
+
+		return copy_constructor;
+	}
+
+	auto add_member_move_constructor(
+		out<complete::expression::Constructor> constructor_expression,
+		complete::TypeId owner_type, complete::TypeId member_type, int member_offset,
+		complete::Program const & program) -> void
+	{
+		complete::expression::LocalVariable parameter_access;
+		parameter_access.variable_offset = 0;
+		parameter_access.variable_type = make_reference(owner_type);
+
+		complete::expression::MemberVariable member_access;
+		member_access.variable_offset = member_offset;
+		member_access.variable_type = make_reference(member_type);
+		member_access.owner = allocate(complete::Expression(parameter_access));
+
+		FunctionId const member_move_constructor = move_constructor_for(program, member_type);
+		if (member_move_constructor == invalid_function_id) // Trivially movable member
+		{
+			complete::expression::Dereference member_dereference;
+			member_dereference.expression = allocate(complete::Expression(std::move(member_access)));
+			member_dereference.return_type = member_type;
+
+			constructor_expression->parameters.push_back(std::move(member_dereference));
+		}
+		else // Member with move constructor function
+		{
+			complete::expression::FunctionCall member_move_call;
+			member_move_call.function_id = member_move_constructor;
+			member_move_call.parameters.push_back(std::move(member_access));
+
+			constructor_expression->parameters.push_back(std::move(member_move_call));
+		}
+	}
+
+	auto synthesize_default_move_constructor(complete::TypeId owner_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> complete::Function
+	{
+		complete::Function move_constructor;
+		move_constructor.return_type = owner_type;
+		move_constructor.parameter_size = sizeof(void *);
+		move_constructor.parameter_count = 1;
+		add_variable_to_scope(move_constructor, "other", make_mutable(make_reference(owner_type)), 0, program);
+
+		complete::expression::Constructor constructor_expression;
+		constructor_expression.constructed_type = owner_type;
+		constructor_expression.parameters.reserve(member_variables.size());
+
+		for (complete::MemberVariable const & member : member_variables)
+			add_member_move_constructor(out(constructor_expression), owner_type, member.type, member.offset, program);
+
+		complete::statement::Return return_statement;
+		return_statement.destroyed_stack_frame_size = 8;
+		return_statement.returned_expression = std::move(constructor_expression);
+		move_constructor.statements.push_back(std::move(return_statement));
+
+		move_constructor.is_callable_at_compile_time = can_be_run_in_a_constant_expression(move_constructor, program);
+		move_constructor.is_callable_at_runtime = can_be_run_at_runtime(move_constructor, program);
+
+		return move_constructor;
+	}
+
+	auto synthesize_array_default_move_constructor(complete::TypeId owner_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function
+	{
+		complete::Function move_constructor;
+		move_constructor.return_type = owner_type;
+		move_constructor.parameter_size = sizeof(void *);
+		move_constructor.parameter_count = 1;
+		add_variable_to_scope(move_constructor, "other", make_mutable(make_reference(owner_type)), 0, program);
+
+		complete::expression::Constructor constructor_expression;
+		constructor_expression.constructed_type = owner_type;
+		constructor_expression.parameters.reserve(size);
+
+		int const value_type_size = type_size(program, value_type);
+		for (int i = 0; i < size; ++i)
+			add_member_move_constructor(out(constructor_expression), owner_type, value_type, i * value_type_size, program);
+
+		complete::statement::Return return_statement;
+		return_statement.destroyed_stack_frame_size = 8;
+		return_statement.returned_expression = std::move(constructor_expression);
+		move_constructor.statements.push_back(std::move(return_statement));
+
+		move_constructor.is_callable_at_compile_time = can_be_run_in_a_constant_expression(move_constructor, program);
+		move_constructor.is_callable_at_runtime = can_be_run_at_runtime(move_constructor, program);
+
+		return move_constructor;
 	}
 
 	auto instantiate_incomplete_struct_variables(
@@ -1128,6 +1339,40 @@ namespace instantiation
 			constructors.push_back(std::move(constructor));
 		}
 
+		complete::Struct & new_struct = program->structs[new_struct_id];
+
+		// Synthesize default copy and move constructors if not provided by the user.
+		if (copy_constructor == invalid_function_id)
+		{
+			if (are_all_copy_constructible(new_struct.member_variables, *program))
+			{
+				if (!are_all_trivially_copyable(new_struct.member_variables, *program))
+				{
+					complete::Function copy_constructor_function = instantiation::synthesize_default_copy_constructor(new_type_id, new_struct.member_variables, *program);
+					copy_constructor = add_function(*program, std::move(copy_constructor_function));
+				}
+			}
+			else
+			{
+				copy_constructor = deleted_function_id;
+			}
+		}
+		if (move_constructor == invalid_function_id)
+		{
+			if (are_all_move_constructible(new_struct.member_variables, *program))
+			{
+				if (!are_all_trivially_copyable(new_struct.member_variables, *program))
+				{
+					complete::Function move_constructor_function = instantiation::synthesize_default_move_constructor(new_type_id, new_struct.member_variables, *program);
+					move_constructor = add_function(*program, std::move(move_constructor_function));
+				}
+			}
+			else
+			{
+				move_constructor = deleted_function_id;
+			}
+		}
+
 #if 0 // Activate when constructors are advanced enough that I can correct the tests.
 		// There are 4 type categories. Rule of 0, only destructor, destructor + move and destructor, copy and move
 		// Ensure that this type falls into one of them.
@@ -1151,31 +1396,12 @@ namespace instantiation
 		}
 #endif
 
-		complete::Struct & new_struct = program->structs[new_struct_id];
 		new_struct.constructors = std::move(constructors);
 		new_struct.copy_constructor = copy_constructor;
 		new_struct.move_constructor = move_constructor;
 		new_struct.default_constructor = default_constructor;
 
 		return success;
-	}
-
-	auto synthesize_array_default_destructor(complete::TypeId destroyed_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function
-	{
-		complete::Function destructor;
-		destructor.return_type = complete::TypeId::void_;
-		destructor.parameter_size = sizeof(void *);
-		destructor.parameter_count = 1;
-		add_variable_to_scope(destructor, "this", make_mutable(make_reference(destroyed_type)), 0, program);
-
-		int const value_type_size = type_size(program, value_type);
-		for (int i = 0; i < size; ++i)
-			add_member_destructor(out(destructor), destroyed_type, value_type, i * value_type_size, program);
-
-		destructor.is_callable_at_compile_time = can_be_run_in_a_constant_expression(destructor, program);
-		destructor.is_callable_at_runtime = can_be_run_at_runtime(destructor, program);
-
-		return destructor;
 	}
 
 	auto instantiate_function_template(

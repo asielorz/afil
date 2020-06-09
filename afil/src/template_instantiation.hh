@@ -120,6 +120,8 @@ namespace instantiation
 	auto synthesize_default_destructor(complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> complete::Function;
 	auto synthesize_array_default_destructor(complete::TypeId destroyed_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function;
 	auto add_member_destructors(out<complete::Function> destructor, complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> void;
+	auto synthesize_array_default_copy_constructor(complete::TypeId owner_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function;
+	auto synthesize_array_default_move_constructor(complete::TypeId owner_type, complete::TypeId value_type, int size, complete::Program const & program) -> complete::Function;
 
 	struct InstantiatedStruct
 	{
