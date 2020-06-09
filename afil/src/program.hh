@@ -26,6 +26,8 @@ namespace complete
 			TypeId value_type;
 			int size;
 			FunctionId destructor;
+			FunctionId copy_constructor;
+			FunctionId move_constructor;
 		};
 		struct ArrayPointer
 		{
@@ -212,6 +214,14 @@ namespace complete
 	auto is_trivially_destructible(Program const & program, TypeId id) noexcept -> bool;
 	auto is_destructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool;
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId;
+	auto is_copy_constructible(Program const & program, TypeId id) noexcept -> bool;
+	auto is_trivially_copy_constructible(Program const & program, TypeId id) noexcept -> bool;
+	auto is_copy_constructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool;
+	auto copy_constructor_for(Program const & program, TypeId id) noexcept->FunctionId;
+	auto is_move_constructible(Program const & program, TypeId id) noexcept -> bool;
+	auto is_trivially_move_constructible(Program const & program, TypeId id) noexcept -> bool;
+	auto is_move_constructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool;
+	auto move_constructor_for(Program const & program, TypeId id) noexcept -> FunctionId;
 
 	auto add_struct_type(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>;
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId;

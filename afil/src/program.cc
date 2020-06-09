@@ -492,6 +492,66 @@ namespace complete
 			return invalid_function_id;
 	}
 
+	auto is_copy_constructible(Program const & program, TypeId id) noexcept -> bool
+	{
+		return copy_constructor_for(program, id) != deleted_function_id;
+	}
+
+	auto is_trivially_copy_constructible(Program const & program, TypeId id) noexcept -> bool
+	{
+		return copy_constructor_for(program, id) == invalid_function_id;
+	}
+
+	auto is_copy_constructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool
+	{
+		FunctionId const copy_constructor = copy_constructor_for(program, id);
+		return copy_constructor == invalid_function_id || is_callable_at_compile_time(program, copy_constructor);
+	}
+
+	auto copy_constructor_for(Program const & program, TypeId id) noexcept->FunctionId
+	{
+		if (id.is_reference || id.is_function)
+			return invalid_function_id;
+
+		Type const & type = type_with_id(program, id);
+		if (Type::Struct const * const struct_data = try_get<Type::Struct>(type.extra_data))
+			return program.structs[struct_data->struct_index].copy_constructor;
+		else if (Type::Array const * const array_data = try_get<Type::Array>(type.extra_data))
+			return array_data->copy_constructor;
+		else
+			return invalid_function_id;
+	}
+
+	auto is_move_constructible(Program const & program, TypeId id) noexcept -> bool
+	{
+		return move_constructor_for(program, id) != deleted_function_id;
+	}
+
+	auto is_trivially_move_constructible(Program const & program, TypeId id) noexcept -> bool
+	{
+		return move_constructor_for(program, id) == invalid_function_id;
+	}
+
+	auto is_move_constructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool
+	{
+		FunctionId const move_constructor = move_constructor_for(program, id);
+		return move_constructor == invalid_function_id || is_callable_at_compile_time(program, move_constructor);
+	}
+
+	auto move_constructor_for(Program const & program, TypeId id) noexcept -> FunctionId
+	{
+		if (id.is_reference || id.is_function)
+			return invalid_function_id;
+
+		Type const & type = type_with_id(program, id);
+		if (Type::Struct const * const struct_data = try_get<Type::Struct>(type.extra_data))
+			return program.structs[struct_data->struct_index].move_constructor;
+		else if (Type::Array const * const array_data = try_get<Type::Array>(type.extra_data))
+			return array_data->move_constructor;
+		else
+			return invalid_function_id;
+	}
+
 	auto add_struct_type(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>
 	{
 		int const new_struct_id = static_cast<int>(program.structs.size());
