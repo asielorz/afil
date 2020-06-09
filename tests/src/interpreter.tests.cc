@@ -3071,29 +3071,62 @@ TEST_CASE("struct template that defines a destructor")
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
-//TEST_CASE("User may define custom constructors for a type.")
-//{
-//	auto const src = R"(
-//		struct CustomConstructorTest
-//		{
-//			int32 value;
-//
-//			constructor(int32 a, int32 b)
-//			{
-//				return CustomConstructorTest(.value = a + b);
-//			}
-//		}
-//
-//		let main = fn() -> int32
-//		{
-//			let x = CustomConstructorTest(3, 4);
-//			
-//			return x.value;
-//		};
-//	)"sv;
-//
-//	REQUIRE(tests::parse_and_run(src) == 7);
-//}
+TEST_CASE("User may define custom constructors for a type.")
+{
+	auto const src = R"(
+		struct CustomConstructorTest
+		{
+			int32 value;
+
+			constructor(int32 a, int32 b)
+			{
+				return CustomConstructorTest(.value = a + b);
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			let x = CustomConstructorTest(3, 4);
+			
+			return x.value;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
+TEST_CASE("Defining a user defined constructor disables the compiler generated constructors")
+{
+	auto const src = R"(
+		struct CustomConstructorTest
+		{
+			int32 value = 0;
+
+			constructor(int32 a, int32 b)
+			{
+				return CustomConstructorTest(.value = a + b);
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			let mut result = 0;
+
+			if (not compiles{CustomConstructorTest()}) // Default constructor
+				result = result + 1;
+
+			if (not compiles{CustomConstructorTest(5)}) // Member list constructor
+				result = result + 2;
+
+			if (not compiles{CustomConstructorTest(.value = 5)}) // Designated initializer constructor
+				result = result + 4;
+
+			return result;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
 
 /*****************************************************************
 Backlog

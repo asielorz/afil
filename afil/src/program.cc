@@ -388,9 +388,12 @@ namespace complete
 			return type_with_id(program, id).alignment;
 	}
 
-	auto is_default_constructible(Struct const & type) noexcept -> bool
+	auto is_default_constructible(Struct const & type, Program const & program) noexcept -> bool
 	{
-		return std::all_of(type.member_variables, [](MemberVariable const & var) { return var.initializer_expression.has_value(); });
+		if (type.constructors.empty())
+			return std::all_of(type.member_variables, [](MemberVariable const & var) { return var.initializer_expression.has_value(); });
+		else
+			return std::any_of(type.constructors, [&](FunctionId const & ctor) { return parameter_types_of(program, ctor).size() == 0; });
 	}
 
 	auto is_default_constructible(TypeId type_id, Program const & program) noexcept -> bool
@@ -401,7 +404,7 @@ namespace complete
 		Type const & type = type_with_id(program, type_id);
 
 		if (Struct const * const struct_data = struct_for_type(program, type))
-			return is_default_constructible(*struct_data);
+			return is_default_constructible(*struct_data, program);
 		else if (Type::Array const * array = try_get<Type::Array>(type.extra_data))
 			return is_default_constructible(array->value_type, program);
 		else

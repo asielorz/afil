@@ -150,6 +150,7 @@ namespace complete
 	{
 		std::vector<MemberVariable> member_variables;
 		FunctionId destructor = invalid_function_id;
+		std::vector<FunctionId> constructors;
 	};
 
 	struct StructTemplate

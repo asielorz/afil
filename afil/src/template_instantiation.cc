@@ -8,6 +8,7 @@
 #include "constexpr.hh"
 #include "utils/algorithm.hh"
 #include "utils/load_dll.hh"
+#include "utils/map.hh"
 #include "utils/out.hh"
 #include "utils/overload.hh"
 #include "utils/string.hh"
@@ -814,15 +815,37 @@ namespace instantiation
 		{
 			complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
 
-			if (constructed_struct.member_variables.size() != parameters.size())
-				return make_syntax_error(expression_source, "Incorrect number of arguments for struct constructor.");
-
-			size_t const n = parameters.size();
-			complete_expression.parameters.reserve(n);
-			for (size_t i = 0; i < n; ++i)
+			if (constructed_struct.constructors.empty())
 			{
-				try_call(complete_expression.parameters.push_back, 
-					insert_implicit_conversion_node(std::move(parameters[i]), constructed_struct.member_variables[i].type, scope_stack, *program, expression_source));
+				if (constructed_struct.member_variables.size() != parameters.size())
+					return make_syntax_error(expression_source, "Incorrect number of arguments for struct constructor.");
+
+				size_t const n = parameters.size();
+				complete_expression.parameters.reserve(n);
+				for (size_t i = 0; i < n; ++i)
+				{
+					try_call(complete_expression.parameters.push_back, 
+						insert_implicit_conversion_node(std::move(parameters[i]), constructed_struct.member_variables[i].type, scope_stack, *program, expression_source));
+				}
+			}
+			else
+			{
+				complete::OverloadSetView overload_set;
+				overload_set.function_ids = constructed_struct.constructors;
+				
+				FunctionId constructor_function = resolve_function_overloading_and_insert_conversions(
+					overload_set, 
+					parameters, 
+					map(parameters, [&](complete::Expression const & expr) { return expression_type_id(expr, *program); }), 
+					*program);
+
+				if (constructor_function == invalid_function_id)
+					return make_syntax_error(expression_source, "Constructor overload not found.");
+
+				complete::expression::FunctionCall constructor_call;
+				constructor_call.function_id = constructor_function;
+				constructor_call.parameters = std::vector<complete::Expression>(parameters.begin(), parameters.end());
+				return std::move(constructor_call);
 			}
 		}
 		else if (is_array(constructed_type))
@@ -1049,6 +1072,22 @@ namespace instantiation
 			program->structs[new_struct_id].destructor = add_function(*program, std::move(destructor));
 		}
 
+		std::vector<FunctionId> constructors;
+		constructors.reserve(incomplete_struct.constructors.size());
+
+		for (incomplete::Function const & incomplete_constructor : incomplete_struct.constructors)
+		{
+			try_call_decl(complete::Function constructor,
+				instantiate_function_template(incomplete_constructor, template_parameters, scope_stack, program));
+
+			if (constructor.return_type != new_type_id)
+				return make_syntax_error(incomplete_constructor.parameters[0].name, "Return type of constructor must be constructed type.");
+
+			constructors.push_back(add_function(*program, std::move(constructor)));
+		}
+
+		program->structs[new_struct_id].constructors = std::move(constructors);
+
 		return success;
 	}
 
@@ -1224,7 +1263,7 @@ namespace instantiation
 				else
 				{
 					FunctionId const function = resolve_function_overloading_and_insert_conversions(
-						operator_overload_set(Operator::dereference, scope_stack), { &operand, 1 }, { &operand_type_id, 1 }, *program);
+						operator_overload_set(Operator::dereference, scope_stack), {&operand, 1}, {&operand_type_id, 1}, *program);
 
 					if (function == invalid_function_id) 
 						return make_syntax_error(incomplete_expression_.source, "Overload not found for dereference operator.");
@@ -1576,6 +1615,9 @@ namespace instantiation
 					return make_syntax_error(incomplete_expression_.source, "Designated initializers cannot be used to initialize a reference.");
 
 				complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
+
+				if (!constructed_struct.constructors.empty())
+					return make_syntax_error(incomplete_expression_.source, "Designated initializers cannot be used on structs with user defined constructors.");
 
 				size_t const member_count = constructed_struct.member_variables.size();
 				auto complete_parameters = std::vector<complete::Expression>(member_count);
