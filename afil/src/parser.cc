@@ -1339,8 +1339,16 @@ namespace parser
 			if (tokens[index].source == "constructor")
 			{
 				index++;
-				incomplete::Function constructor;
-				std::string_view const first_param_source = tokens[index + 1].source;
+				incomplete::Constructor constructor;
+				
+				if (tokens[index].type != TokenType::identifier)
+					return make_syntax_error(tokens[index].source, "Expected identifier after keyword \"constructor\".");
+				if (is_keyword(tokens[index].source))
+					return make_syntax_error(tokens[index].source, "Cannot use a keyword as constructor name.");
+
+				constructor.name = tokens[index].source;
+				index++;
+
 				try_call_void(parse_function_prototype(tokens, index, type_names, out(constructor)));
 				try_call_void(parse_function_body(tokens, index, type_names, out(constructor)));
 				declared_struct.constructors.push_back(std::move(constructor));

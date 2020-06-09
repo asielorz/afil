@@ -815,7 +815,7 @@ namespace instantiation
 		{
 			complete::Struct const & constructed_struct = *struct_for_type(*program, constructed_type);
 
-			if (constructed_struct.constructors.empty())
+			if (has_compiler_generated_constructors(constructed_struct))
 			{
 				if (constructed_struct.member_variables.size() != parameters.size())
 					return make_syntax_error(expression_source, "Incorrect number of arguments for struct constructor.");
@@ -824,29 +824,12 @@ namespace instantiation
 				complete_expression.parameters.reserve(n);
 				for (size_t i = 0; i < n; ++i)
 				{
-					try_call(complete_expression.parameters.push_back, 
+					try_call(complete_expression.parameters.push_back,
 						insert_implicit_conversion_node(std::move(parameters[i]), constructed_struct.member_variables[i].type, scope_stack, *program, expression_source));
 				}
 			}
 			else
-			{
-				complete::OverloadSetView overload_set;
-				overload_set.function_ids = constructed_struct.constructors;
-				
-				FunctionId constructor_function = resolve_function_overloading_and_insert_conversions(
-					overload_set, 
-					parameters, 
-					map(parameters, [&](complete::Expression const & expr) { return expression_type_id(expr, *program); }), 
-					*program);
-
-				if (constructor_function == invalid_function_id)
-					return make_syntax_error(expression_source, "Constructor overload not found.");
-
-				complete::expression::FunctionCall constructor_call;
-				constructor_call.function_id = constructor_function;
-				constructor_call.parameters = std::vector<complete::Expression>(parameters.begin(), parameters.end());
-				return std::move(constructor_call);
-			}
+				return make_syntax_error(expression_source, "Compiler generated constructors are disabled for this type because it has user defined constructors.");
 		}
 		else if (is_array(constructed_type))
 		{
@@ -1072,18 +1055,59 @@ namespace instantiation
 			program->structs[new_struct_id].destructor = add_function(*program, std::move(destructor));
 		}
 
-		std::vector<FunctionId> constructors;
+		std::vector<complete::Constructor> constructors;
 		constructors.reserve(incomplete_struct.constructors.size());
 
-		for (incomplete::Function const & incomplete_constructor : incomplete_struct.constructors)
+		for (incomplete::Constructor const & incomplete_constructor : incomplete_struct.constructors)
 		{
-			try_call_decl(complete::Function constructor,
+			try_call_decl(complete::Function constructor_function,
 				instantiate_function_template(incomplete_constructor, template_parameters, scope_stack, program));
 
-			if (constructor.return_type != new_type_id)
-				return make_syntax_error(incomplete_constructor.parameters[0].name, "Return type of constructor must be constructed type.");
+			if (constructor_function.return_type != new_type_id)
+				return make_syntax_error(incomplete_constructor.name, "Return type of constructor must be constructed type.");
 
-			constructors.push_back(add_function(*program, std::move(constructor)));
+			FunctionId const constructor_function_id = add_function(*program, std::move(constructor_function));
+
+			if (incomplete_constructor.name == "default")
+			{
+				if (constructor_function.parameter_count != 0)
+					return make_syntax_error(incomplete_constructor.name, "Default constructor must take no parameters.");
+
+				if (program->structs[new_struct_id].default_constructor != invalid_function_id)
+					return make_syntax_error(incomplete_constructor.name, "Default constructor redefinition.");
+
+				program->structs[new_struct_id].default_constructor = constructor_function_id;
+			}
+			else if (incomplete_constructor.name == "copy")
+			{
+				if (constructor_function.parameter_count != 1)
+					return make_syntax_error(incomplete_constructor.name, "Copy constructor must take exactly one parameter.");
+
+				if (constructor_function.variables[0].type != make_reference(new_type_id))
+					return make_syntax_error(incomplete_constructor.name, "Parameter of copy constructor must be of type T &.");
+
+				if (program->structs[new_struct_id].copy_constructor != invalid_function_id)
+					return make_syntax_error(incomplete_constructor.name, "Copy constructor redefinition.");
+
+				program->structs[new_struct_id].copy_constructor = constructor_function_id;
+			}
+			else if (incomplete_constructor.name == "move")
+			{
+				if (constructor_function.parameter_count != 1)
+					return make_syntax_error(incomplete_constructor.name, "Move constructor must take exactly one parameter.");
+
+				if (constructor_function.variables[0].type != make_mutable(make_reference(new_type_id)))
+					return make_syntax_error(incomplete_constructor.name, "Parameter of move constructor must be of type T mut &.");
+
+				if (program->structs[new_struct_id].move_constructor != invalid_function_id)
+					return make_syntax_error(incomplete_constructor.name, "Move constructor redefinition.");
+
+				program->structs[new_struct_id].move_constructor = constructor_function_id;
+			}
+			complete::Constructor constructor;
+			constructor.function = constructor_function_id;
+			constructor.name = incomplete_constructor.name;
+			constructors.push_back(std::move(constructor));
 		}
 
 		program->structs[new_struct_id].constructors = std::move(constructors);

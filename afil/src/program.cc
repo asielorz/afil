@@ -388,12 +388,12 @@ namespace complete
 			return type_with_id(program, id).alignment;
 	}
 
-	auto is_default_constructible(Struct const & type, Program const & program) noexcept -> bool
+	auto is_default_constructible(Struct const & type) noexcept -> bool
 	{
-		if (type.constructors.empty())
-			return std::all_of(type.member_variables, [](MemberVariable const & var) { return var.initializer_expression.has_value(); });
+		if (type.default_constructor != invalid_function_id)
+			return true;
 		else
-			return std::any_of(type.constructors, [&](FunctionId const & ctor) { return parameter_types_of(program, ctor).size() == 0; });
+			return has_compiler_generated_constructors(type) && std::all_of(type.member_variables, [](MemberVariable const & var) { return var.initializer_expression.has_value(); });
 	}
 
 	auto is_default_constructible(TypeId type_id, Program const & program) noexcept -> bool
@@ -404,21 +404,35 @@ namespace complete
 		Type const & type = type_with_id(program, type_id);
 
 		if (Struct const * const struct_data = struct_for_type(program, type))
-			return is_default_constructible(*struct_data, program);
+			return is_default_constructible(*struct_data);
 		else if (Type::Array const * array = try_get<Type::Array>(type.extra_data))
 			return is_default_constructible(array->value_type, program);
 		else
 			return false;
 	}
 
-	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> expression::Constructor
+	auto has_compiler_generated_constructors(Struct const & type) noexcept -> bool
 	{
-		expression::Constructor default_constructor_node;
-		default_constructor_node.constructed_type = type_id;
-		default_constructor_node.parameters.reserve(struct_data.member_variables.size());
-		for (MemberVariable const & var : struct_data.member_variables)
-			default_constructor_node.parameters.push_back(*var.initializer_expression);
-		return default_constructor_node;
+		return (type.default_constructor == invalid_function_id) && (type.copy_constructor == invalid_function_id) && (type.move_constructor == invalid_function_id);
+	}
+
+	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> Expression
+	{
+		if (struct_data.default_constructor == invalid_function_id)
+		{
+			expression::Constructor default_constructor_node;
+			default_constructor_node.constructed_type = type_id;
+			default_constructor_node.parameters.reserve(struct_data.member_variables.size());
+			for (MemberVariable const & var : struct_data.member_variables)
+				default_constructor_node.parameters.push_back(*var.initializer_expression);
+			return default_constructor_node;
+		}
+		else
+		{
+			expression::FunctionCall default_constructor_call_node;
+			default_constructor_call_node.function_id = struct_data.default_constructor;
+			return default_constructor_call_node;
+		}
 	}
 
 	auto synthesize_default_constructor(TypeId type_id, Type::Array array_data, Program const & program) noexcept -> expression::Constructor
@@ -432,7 +446,7 @@ namespace complete
 		return default_constructor_node;
 	}
 
-	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expression::Constructor
+	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> Expression
 	{
 		Type const & type = type_with_id(program, type_id);
 		if (is_struct(type))

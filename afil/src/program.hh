@@ -146,11 +146,19 @@ namespace complete
 	{
 		std::optional<Expression> initializer_expression;
 	};
+	struct Constructor
+	{
+		FunctionId function;
+		std::string name;
+	};
 	struct Struct
 	{
 		std::vector<MemberVariable> member_variables;
 		FunctionId destructor = invalid_function_id;
-		std::vector<FunctionId> constructors;
+		std::vector<Constructor> constructors;
+		FunctionId default_constructor = invalid_function_id;
+		FunctionId copy_constructor = invalid_function_id;
+		FunctionId move_constructor = invalid_function_id;
 	};
 
 	struct StructTemplate
@@ -195,9 +203,10 @@ namespace complete
 	auto type_alignment(Program const & program, TypeId id) noexcept -> int;
 	auto is_default_constructible(Struct const & type) noexcept -> bool;
 	auto is_default_constructible(TypeId type, Program const & program) noexcept -> bool;
-	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> expression::Constructor;
+	auto has_compiler_generated_constructors(Struct const & type) noexcept -> bool;
+	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> Expression;
 	auto synthesize_default_constructor(TypeId type_id, Type::Array array_data, Program const & program) noexcept -> expression::Constructor;
-	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> expression::Constructor;
+	auto synthesize_default_constructor(TypeId type_id, Program const & program) noexcept -> Expression;
 	auto ABI_name(Program & program, TypeId id) noexcept -> std::string &;
 	auto ABI_name(Program const & program, TypeId id) noexcept -> std::string_view;
 	auto is_trivially_destructible(Program const & program, TypeId id) noexcept -> bool;

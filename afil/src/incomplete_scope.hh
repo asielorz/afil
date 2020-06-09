@@ -85,6 +85,10 @@ namespace incomplete
 	{
 		std::vector<TemplateParameter> template_parameters;
 	};
+	struct Constructor : Function 
+	{
+		std::string_view name;
+	};
 
 	struct ExternFunction
 	{

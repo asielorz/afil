@@ -159,7 +159,7 @@ namespace incomplete
 	{
 		std::string_view name;
 		std::vector<MemberVariable> member_variables;
-		std::vector<Function> constructors;
+		std::vector<Constructor> constructors;
 		std::optional<Function> destructor;
 	};
 
