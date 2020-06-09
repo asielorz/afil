@@ -964,6 +964,17 @@ namespace instantiation
 		}
 	}
 
+	auto are_all_trivially_destructible(span<complete::MemberVariable const> member_variables, complete::Program const & program) -> bool
+	{
+		for (complete::MemberVariable const & member : member_variables)
+		{
+			FunctionId const member_destructor = destructor_for(program, member.type);
+			if (member_destructor != invalid_function_id)
+				return false;
+		}
+		return true;
+	}
+
 	auto add_member_destructors(out<complete::Function> destructor, complete::TypeId destroyed_type, span<complete::MemberVariable const> member_variables, complete::Program const & program) -> void
 	{
 		for (complete::MemberVariable const & member : member_variables)
@@ -1035,7 +1046,8 @@ namespace instantiation
 		out<complete::Program> program
 	) -> expected<void, PartialSyntaxError>
 	{
-		if (incomplete_struct.destructor.has_value())
+		bool const custom_destructor_declared = incomplete_struct.destructor.has_value();
+		if (custom_destructor_declared)
 		{
 			try_call_decl(complete::Function destructor,
 				instantiate_function_template(*incomplete_struct.destructor, template_parameters, scope_stack, program));
@@ -1051,12 +1063,18 @@ namespace instantiation
 		}
 		else
 		{
-			complete::Function destructor = instantiation::synthesize_default_destructor(new_type_id, program->structs[new_struct_id].member_variables, *program);
-			program->structs[new_struct_id].destructor = add_function(*program, std::move(destructor));
+			if (!are_all_trivially_destructible(program->structs[new_struct_id].member_variables, *program))
+			{
+				complete::Function destructor = instantiation::synthesize_default_destructor(new_type_id, program->structs[new_struct_id].member_variables, *program);
+				program->structs[new_struct_id].destructor = add_function(*program, std::move(destructor));
+			}
 		}
 
 		std::vector<complete::Constructor> constructors;
 		constructors.reserve(incomplete_struct.constructors.size());
+		FunctionId default_constructor = invalid_function_id;
+		FunctionId copy_constructor = invalid_function_id;
+		FunctionId move_constructor = invalid_function_id;
 
 		for (incomplete::Constructor const & incomplete_constructor : incomplete_struct.constructors)
 		{
@@ -1073,10 +1091,10 @@ namespace instantiation
 				if (constructor_function.parameter_count != 0)
 					return make_syntax_error(incomplete_constructor.name, "Default constructor must take no parameters.");
 
-				if (program->structs[new_struct_id].default_constructor != invalid_function_id)
+				if (default_constructor != invalid_function_id)
 					return make_syntax_error(incomplete_constructor.name, "Default constructor redefinition.");
 
-				program->structs[new_struct_id].default_constructor = constructor_function_id;
+				default_constructor = constructor_function_id;
 			}
 			else if (incomplete_constructor.name == "copy")
 			{
@@ -1086,10 +1104,10 @@ namespace instantiation
 				if (constructor_function.variables[0].type != make_reference(new_type_id))
 					return make_syntax_error(incomplete_constructor.name, "Parameter of copy constructor must be of type T &.");
 
-				if (program->structs[new_struct_id].copy_constructor != invalid_function_id)
+				if (copy_constructor != invalid_function_id)
 					return make_syntax_error(incomplete_constructor.name, "Copy constructor redefinition.");
 
-				program->structs[new_struct_id].copy_constructor = constructor_function_id;
+				copy_constructor = constructor_function_id;
 			}
 			else if (incomplete_constructor.name == "move")
 			{
@@ -1099,10 +1117,10 @@ namespace instantiation
 				if (constructor_function.variables[0].type != make_mutable(make_reference(new_type_id)))
 					return make_syntax_error(incomplete_constructor.name, "Parameter of move constructor must be of type T mut &.");
 
-				if (program->structs[new_struct_id].move_constructor != invalid_function_id)
+				if (move_constructor != invalid_function_id)
 					return make_syntax_error(incomplete_constructor.name, "Move constructor redefinition.");
 
-				program->structs[new_struct_id].move_constructor = constructor_function_id;
+				move_constructor = constructor_function_id;
 			}
 			complete::Constructor constructor;
 			constructor.function = constructor_function_id;
@@ -1110,7 +1128,34 @@ namespace instantiation
 			constructors.push_back(std::move(constructor));
 		}
 
-		program->structs[new_struct_id].constructors = std::move(constructors);
+#if 0 // Activate when constructors are advanced enough that I can correct the tests.
+		// There are 4 type categories. Rule of 0, only destructor, destructor + move and destructor, copy and move
+		// Ensure that this type falls into one of them.
+		if (!(!custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor == invalid_function_id))
+		{
+			if (custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor == invalid_function_id)
+			{
+				copy_constructor = deleted_function_id;
+				move_constructor = deleted_function_id;
+			}
+			else if (custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor != invalid_function_id)
+			{
+				copy_constructor = deleted_function_id;
+			}
+			else if (!(custom_destructor_declared && copy_constructor != invalid_function_id && move_constructor != invalid_function_id))
+			{
+				return make_syntax_error(incomplete_struct.name, 
+					"A type must define either none of destructor, copy constructor and move constructor, only destructor, "
+					"destructor and move constructor or the three of them. Any other combination is wrong.");
+			}
+		}
+#endif
+
+		complete::Struct & new_struct = program->structs[new_struct_id];
+		new_struct.constructors = std::move(constructors);
+		new_struct.copy_constructor = copy_constructor;
+		new_struct.move_constructor = move_constructor;
+		new_struct.default_constructor = default_constructor;
 
 		return success;
 	}
