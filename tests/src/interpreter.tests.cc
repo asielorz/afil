@@ -3158,6 +3158,37 @@ TEST_CASE("User may define custom copy and move constructors")
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
+TEST_CASE("Single argument array constructor constructs the first from the expression, then constructs the rest as copies of the first")
+{
+	auto const src = R"(
+		struct CustomCopyTest
+		{
+			int32 value = 0;
+
+			constructor default() { return CustomCopyTest(); }
+
+			constructor copy(CustomCopyTest & other)
+			{
+				return CustomCopyTest(other.value + 1);
+			}
+
+			constructor move(CustomCopyTest mut & other)
+			{
+				return CustomCopyTest(other.value + 1);
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			let a = CustomCopyTest[2](CustomCopyTest());
+
+			return a[1].value;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

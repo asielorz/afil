@@ -111,11 +111,13 @@ namespace interpreter
 		}
 		else
 		{
-			try_call_void(call_function(copy_constructor, stack, context, 0, [from](int parameters_start, ProgramStack & stack)
+			try_call_void(call_function(copy_constructor, stack, context, to, [from](int parameters_start, ProgramStack & stack)
 			{
 				write(stack, parameters_start, pointer_at_address(stack, from));
 			}));
 		}
+
+		return success;
 	}
 
 	template <typename ExecutionContext>
@@ -741,7 +743,7 @@ namespace interpreter
 					{
 						try_call_void(eval_expression(ctor_node.parameters[0], stack, context, return_address));
 						for (int i = 1; i < array.size; ++i)
-							memcpy(pointer_at_address(stack, return_address), pointer_at_address(stack, return_address + value_type_size * i), value_type_size);
+							copy_variable(return_address, return_address + value_type_size * i, array.value_type, stack, context);
 					}
 					// Regular constructor
 					else

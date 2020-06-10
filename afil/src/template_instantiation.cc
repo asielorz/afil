@@ -841,6 +841,12 @@ namespace instantiation
 			if (parameters.size() != 1 && param_count != array_size)
 				return make_syntax_error(expression_source, "Incorrect number of arguments for array constructor.");
 
+			if (parameters.size() == 1 && array_size != 1 && !is_copy_constructible(*program, array_type))
+				return make_syntax_error(expression_source, 
+					"Single parameter array fill constructor cannot be used with types that cannot be copied. "
+					"This is because the first element of the array is constructed from the given expression,"
+					"then the rest are constructed as copies of the first.");
+
 			complete_expression.parameters.reserve(param_count);
 			for (int i = 0; i < param_count; ++i)
 			{
