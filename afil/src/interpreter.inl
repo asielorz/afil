@@ -121,6 +121,27 @@ namespace interpreter
 	}
 
 	template <typename ExecutionContext>
+	auto move_variable(int from, int to, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
+		-> expected<void, UnmetPrecondition>
+	{
+		FunctionId const move_constructor = move_constructor_for(context.program, type);
+		assert(move_constructor != deleted_function_id);
+		if (move_constructor == invalid_function_id)
+		{
+			memcpy(pointer_at_address(stack, to), pointer_at_address(stack, from), type_size(context.program, type));
+		}
+		else
+		{
+			try_call_void(call_function(move_constructor, stack, context, to, [from](int parameters_start, ProgramStack & stack)
+			{
+				write(stack, parameters_start, pointer_at_address(stack, from));
+			}));
+		}
+
+		return success;
+	}
+
+	template <typename ExecutionContext>
 	auto call_function_with_parameters_already_set(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
 		-> expected<void, UnmetPrecondition>
 	{
@@ -601,7 +622,7 @@ namespace interpreter
 				else
 				{
 					int const variable_size = type_size(context.program, var_node.variable_type);
-					memcpy(pointer_at_address(stack, return_address), pointer_at_address(stack, owner_address + var_node.variable_offset), variable_size);
+					move_variable(owner_address + var_node.variable_offset, return_address, var_node.variable_type, stack, context);
 					destroy_variable(owner_address, owner_type, stack, context);
 				}
 				return success;
@@ -643,10 +664,9 @@ namespace interpreter
 				{
 					try_call_decl(int const array_address, eval_expression(*subscript_node.array, stack, context));
 					try_call_decl(int const index_address, eval_expression(*subscript_node.index, stack, context));
-					char const * const array = pointer_at_address(stack, array_address);
 					int const index = read<int>(stack, index_address);
-					int const value_type_size = type_size(context.program, remove_reference(subscript_node.return_type));
-					memcpy(pointer_at_address(stack, return_address), array + index * value_type_size, value_type_size);
+					int const value_type_size = type_size(context.program, subscript_node.return_type);
+					move_variable(array_address + index * value_type_size, return_address, subscript_node.return_type, stack, context);
 					destroy_variable(array_address, array_type_id, stack, context);
 				}
 				return success;

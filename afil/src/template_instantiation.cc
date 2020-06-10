@@ -1791,12 +1791,13 @@ namespace instantiation
 				FunctionId function = resolve_function_overloading_and_insert_conversions(operator_overload_set(op, scope_stack), operands, operand_types, *program);
 
 				// Special case for built in assignment.
-				if (function == invalid_function_id && op == Operator::assign)
+				if (function == invalid_function_id && op == Operator::assign && is_trivially_copy_constructible(*program, decay(operand_types[0])))
 				{
 					if (!operand_types[0].is_reference)
 						return make_syntax_error(incomplete_expression.left->source, "Cannot assign to a temporary.");
 					if (!operand_types[0].is_mutable) 
 						return make_syntax_error(incomplete_expression.left->source, "Cannot assign to a constant.");
+
 					complete::expression::Assignment complete_expression;
 					complete_expression.destination = allocate(std::move(operands[0]));
 					try_call(assign_to(complete_expression.source), 
