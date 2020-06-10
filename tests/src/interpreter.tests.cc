@@ -3224,7 +3224,6 @@ TEST_CASE("Non trivially copyable types do not get compiler generated assignment
 /*****************************************************************
 Backlog
 - dynamic memory allocation
-- destructor and copy operations
 - reflection
 - argument dependent lookup (depends on namespaces, sort of)
 - synthesizing arithmetic operators
