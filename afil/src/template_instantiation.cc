@@ -1295,6 +1295,7 @@ namespace instantiation
 			if (constructor_function.return_type != new_type_id)
 				return make_syntax_error(incomplete_constructor.name, "Return type of constructor must be constructed type.");
 
+			span<complete::Variable> const constructor_parameters = constructor_function.variables;
 			FunctionId const constructor_function_id = add_function(*program, std::move(constructor_function));
 
 			if (incomplete_constructor.name == "default")
@@ -1312,7 +1313,7 @@ namespace instantiation
 				if (constructor_function.parameter_count != 1)
 					return make_syntax_error(incomplete_constructor.name, "Copy constructor must take exactly one parameter.");
 
-				if (constructor_function.variables[0].type != make_reference(new_type_id))
+				if (constructor_parameters[0].type != make_reference(new_type_id))
 					return make_syntax_error(incomplete_constructor.name, "Parameter of copy constructor must be of type T &.");
 
 				if (copy_constructor != invalid_function_id)
@@ -1325,7 +1326,7 @@ namespace instantiation
 				if (constructor_function.parameter_count != 1)
 					return make_syntax_error(incomplete_constructor.name, "Move constructor must take exactly one parameter.");
 
-				if (constructor_function.variables[0].type != make_mutable(make_reference(new_type_id)))
+				if (constructor_parameters[0].type != make_mutable(make_reference(new_type_id)))
 					return make_syntax_error(incomplete_constructor.name, "Parameter of move constructor must be of type T mut &.");
 
 				if (move_constructor != invalid_function_id)

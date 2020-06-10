@@ -72,25 +72,10 @@ namespace interpreter
 		FunctionId const destructor = destructor_for(context.program, type);
 		if (destructor != invalid_function_id)
 		{
-			// Save previous stack frame bounds.
-			int const prev_ebp = stack.base_pointer;
-			int const prev_esp = stack.top_pointer;
-
-			int const destructor_stack_frame_size = stack_frame_size(context.program, destructor);
-			int const destructor_stack_frame_alignment = parameter_alignment(context.program, destructor);
-
-			int const parameters_start = alloc(stack, destructor_stack_frame_size, destructor_stack_frame_alignment);
-			write(stack, parameters_start, pointer_at_address(stack, address));
-
-			// Move the stack pointers.
-			stack.base_pointer = parameters_start;
-			stack.top_pointer = parameters_start + destructor_stack_frame_size;
-
-			try_call_void(call_function_with_parameters_already_set(destructor, stack, context, stack.top_pointer));
-
-			// Restore previous stack frame.
-			stack.top_pointer = prev_esp;
-			stack.base_pointer = prev_ebp;
+			try_call_void(call_function(destructor, stack, context, 0, [address](int parameters_start, ProgramStack & stack)
+			{
+				write(stack, parameters_start, pointer_at_address(stack, address));
+			}));
 		}
 
 		return success;
@@ -112,6 +97,25 @@ namespace interpreter
 	auto destroy_all_variables_in_scope(complete::Scope const & scope, ProgramStack & stack, ExecutionContext context) -> void
 	{
 		destroy_variables_in_scope_up_to(scope, scope.stack_frame_size + 1, stack, context);
+	}
+
+	template <typename ExecutionContext>
+	auto copy_variable(int from, int to, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
+		-> expected<void, UnmetPrecondition>
+	{
+		FunctionId const copy_constructor = copy_constructor_for(context.program, type);
+		assert(copy_constructor != deleted_function_id);
+		if (copy_constructor == invalid_function_id)
+		{
+			memcpy(pointer_at_address(stack, to), pointer_at_address(stack, from), type_size(context.program, type));
+		}
+		else
+		{
+			try_call_void(call_function(copy_constructor, stack, context, 0, [from](int parameters_start, ProgramStack & stack)
+			{
+				write(stack, parameters_start, pointer_at_address(stack, from));
+			}));
+		}
 	}
 
 	template <typename ExecutionContext>
@@ -405,6 +409,33 @@ namespace interpreter
 			complete::ExternFunction const & func = context.program.extern_functions[function_id.index];
 			return call_extern_function(func, stack, context, return_address);
 		}
+
+		return success;
+	}
+
+	template <typename ExecutionContext, typename SetParameters>
+	auto call_function(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address, SetParameters set_parameters) noexcept
+		-> expected<void, UnmetPrecondition>
+	{
+		// Save previous stack frame bounds.
+		int const prev_ebp = stack.base_pointer;
+		int const prev_esp = stack.top_pointer;
+
+		int const destructor_stack_frame_size = stack_frame_size(context.program, function_id);
+		int const destructor_stack_frame_alignment = parameter_alignment(context.program, function_id);
+
+		int const parameters_start = alloc(stack, destructor_stack_frame_size, destructor_stack_frame_alignment);
+		set_parameters(parameters_start, stack);
+
+		// Move the stack pointers.
+		stack.base_pointer = parameters_start;
+		stack.top_pointer = parameters_start + destructor_stack_frame_size;
+
+		try_call_void(call_function_with_parameters_already_set(function_id, stack, context, return_address));
+
+		// Restore previous stack frame.
+		stack.top_pointer = prev_esp;
+		stack.base_pointer = prev_ebp;
 
 		return success;
 	}

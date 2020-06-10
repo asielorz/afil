@@ -1056,10 +1056,21 @@ namespace complete
 
 			if (from.is_reference && !to.is_reference)
 			{
-				expression::Dereference deref_node;
-				deref_node.expression = allocate(std::move(expr));
-				deref_node.return_type = to;
-				return std::move(deref_node);
+				FunctionId const copy_constructor = copy_constructor_for(program, decay(to));
+				if (copy_constructor == invalid_function_id) // Trivially copyable member
+				{
+					expression::Dereference deref_node;
+					deref_node.expression = allocate(std::move(expr));
+					deref_node.return_type = to;
+					return std::move(deref_node);
+				}
+				else // Member with copy constructor function
+				{
+					complete::expression::FunctionCall copy_constructor_call;
+					copy_constructor_call.function_id = copy_constructor;
+					copy_constructor_call.parameters.push_back(std::move(expr));
+					return std::move(copy_constructor_call);
+				}
 			}
 			else
 			{

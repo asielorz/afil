@@ -3095,7 +3095,8 @@ TEST_CASE("User may define custom default constructor for a type.")
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
-TEST_CASE("Defining a user defined constructor disables the compiler generated constructors")
+TODO("Decide if this is desirable or only copy/move/dtor should disable compiler generated constructors")
+TEST_CASE("Defining a user defined special constructor disables the compiler generated constructors")
 {
 	auto const src = R"(
 		struct CustomConstructorTest
@@ -3123,6 +3124,38 @@ TEST_CASE("Defining a user defined constructor disables the compiler generated c
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("User may define custom copy and move constructors")
+{
+	auto const src = R"(
+		struct CustomCopyTest
+		{
+			int32 value = 0;
+
+			constructor default() { return CustomCopyTest(); }
+
+			constructor copy(CustomCopyTest & other)
+			{
+				return CustomCopyTest(other.value + 1);
+			}
+
+			constructor move(CustomCopyTest mut & other)
+			{
+				return CustomCopyTest(other.value + 1);
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			let mut a = CustomCopyTest();
+			let mut b = a; // Copy
+
+			return b.value;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
 /*****************************************************************

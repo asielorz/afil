@@ -68,6 +68,10 @@ namespace interpreter
 	[[nodiscard]] auto call_function_with_parameters_already_set(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
 		->expected<void, UnmetPrecondition>;
 
+	template <typename ExecutionContext, typename SetParameters>
+	[[nodiscard]] auto call_function(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address, SetParameters set_parameters) noexcept
+		-> expected<void, UnmetPrecondition>;
+
 	template <typename ExecutionContext>
 	[[nodiscard]] auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
 		->expected<void, UnmetPrecondition>;
