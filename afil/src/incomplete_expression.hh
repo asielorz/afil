@@ -160,7 +160,7 @@ namespace incomplete
 		std::string_view name;
 		std::vector<MemberVariable> member_variables;
 		std::vector<Constructor> constructors;
-		std::optional<Function> destructor;
+		std::variant<nothing_t, Function, defaulted_t> destructor;
 	};
 
 	struct StructTemplate : Struct

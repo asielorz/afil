@@ -3127,8 +3127,10 @@ TEST_CASE("User may define custom copy and move constructors")
 			{
 				return CustomCopyTest(other.value + 1);
 			}
-		}
 
+			destructor = default;
+		}
+		
 		let main = fn() -> int32
 		{
 			let mut a = CustomCopyTest();
@@ -3159,6 +3161,8 @@ TEST_CASE("Single argument array constructor constructs the first from the expre
 			{
 				return CustomCopyTest(other.value + 1);
 			}
+		
+			destructor = default;
 		}
 
 		let main = fn() -> int32
@@ -3190,6 +3194,8 @@ TEST_CASE("Non trivially copyable types do not get compiler generated assignment
 			{
 				return CustomCopyTest(other.value + 1);
 			}
+
+			destructor = default;
 		}
 
 		let main = fn() -> int32
@@ -3220,6 +3226,8 @@ TEST_CASE("A user defined copy or move constructor disables the compiler generat
 			{
 				return CustomCopyTest(other.value + 1);
 			}
+
+			destructor = default;
 		}
 
 		let main = fn() -> int32

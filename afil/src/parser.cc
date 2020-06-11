@@ -1355,22 +1355,39 @@ namespace parser
 			}
 			else if (tokens[index].source == "destructor")
 			{
-				if (declared_struct.destructor.has_value())
+				if (!has_type<nothing_t>(declared_struct.destructor))
 					return make_syntax_error(tokens[index].source, "Cannot declare more than one destructor for a struct.");
 
 				index++;
-				incomplete::Function destructor;
-				std::string_view const first_param_source = tokens[index + 1].source;
-				try_call_void(parse_function_prototype(tokens, index, type_names, out(destructor)));
-				if (destructor.parameters.size() != 1)
-					return make_syntax_error(first_param_source, "Destructor must have exactly one parameter");
-				if (!destructor.parameters[0].type.is_mutable)
-					return make_syntax_error(first_param_source, "Type of destructor must be mutable");
-				if (!destructor.parameters[0].type.is_reference)
-					return make_syntax_error(first_param_source, "Type of destructor must be a reference");
-				try_call_void(parse_function_body(tokens, index, type_names, out(destructor)));
 
-				declared_struct.destructor = std::move(destructor);
+				if (tokens[index].source == "=")
+				{
+					index++;
+					if (tokens[index].source != "default")
+						return make_syntax_error(tokens[index].source, "Expected keyword \"default\" after '='.");
+					index++;
+
+					if (tokens[index].type != TokenType::semicolon)
+						return make_syntax_error(tokens[index].source, "Expected ';' after keyword \"default\".");
+					index++;
+
+					declared_struct.destructor = defaulted;
+				}
+				else
+				{
+					incomplete::Function destructor;
+					std::string_view const first_param_source = tokens[index + 1].source;
+					try_call_void(parse_function_prototype(tokens, index, type_names, out(destructor)));
+					if (destructor.parameters.size() != 1)
+						return make_syntax_error(first_param_source, "Destructor must have exactly one parameter");
+					if (!destructor.parameters[0].type.is_mutable)
+						return make_syntax_error(first_param_source, "Type of destructor must be mutable");
+					if (!destructor.parameters[0].type.is_reference)
+						return make_syntax_error(first_param_source, "Type of destructor must be a reference");
+					try_call_void(parse_function_body(tokens, index, type_names, out(destructor)));
+
+					declared_struct.destructor = std::move(destructor);
+				}
 			}
 			else
 			{

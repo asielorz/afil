@@ -1263,16 +1263,16 @@ namespace instantiation
 		out<complete::Program> program
 	) -> expected<void, PartialSyntaxError>
 	{
-		bool const custom_destructor_declared = incomplete_struct.destructor.has_value();
-		if (custom_destructor_declared)
+		bool const custom_destructor_declared = !has_type<nothing_t>(incomplete_struct.destructor);
+		if (incomplete::Function const * incomplete_destructor = try_get<incomplete::Function>(incomplete_struct.destructor))
 		{
 			try_call_decl(complete::Function destructor,
-				instantiate_function_template(*incomplete_struct.destructor, template_parameters, scope_stack, program));
+				instantiate_function_template(*incomplete_destructor, template_parameters, scope_stack, program));
 
 			if (destructor.return_type != complete::TypeId::void_)
-				return make_syntax_error(incomplete_struct.destructor->parameters[0].name, "Return type of destructor must be void.");
+				return make_syntax_error(incomplete_destructor->parameters[0].name, "Return type of destructor must be void.");
 			if (decay(destructor.variables[0].type) != new_type_id)
-				return make_syntax_error(incomplete_struct.destructor->parameters[0].name, "Parameter type of destructor must be type of struct.");
+				return make_syntax_error(incomplete_destructor->parameters[0].name, "Parameter type of destructor must be type of struct.");
 
 			add_member_destructors(out(destructor), new_type_id, program->structs[new_struct_id].member_variables, *program);
 
@@ -1350,6 +1350,29 @@ namespace instantiation
 
 		new_struct.has_compiler_generated_constructors = (copy_constructor == invalid_function_id && move_constructor == invalid_function_id && !custom_destructor_declared);
 
+#if 1 // Activate when constructors are advanced enough that I can correct the tests.
+		// There are 4 type categories. Rule of 0, only destructor, destructor + move and destructor, copy and move
+		// Ensure that this type falls into one of them.
+		if (!(!custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor == invalid_function_id))
+		{
+			if (custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor == invalid_function_id)
+			{
+				copy_constructor = deleted_function_id;
+				move_constructor = deleted_function_id;
+			}
+			else if (custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor != invalid_function_id)
+			{
+				copy_constructor = deleted_function_id;
+			}
+			else if (!(custom_destructor_declared && copy_constructor != invalid_function_id && move_constructor != invalid_function_id))
+			{
+				return make_syntax_error(incomplete_struct.name,
+					"A type must define either none of destructor, copy constructor and move constructor, only destructor, "
+					"destructor and move constructor or the three of them. Any other combination is wrong.");
+			}
+		}
+#endif
+
 		// Synthesize default copy and move constructors if not provided by the user.
 		if (copy_constructor == invalid_function_id)
 		{
@@ -1381,29 +1404,6 @@ namespace instantiation
 				move_constructor = deleted_function_id;
 			}
 		}
-
-#if 0 // Activate when constructors are advanced enough that I can correct the tests.
-		// There are 4 type categories. Rule of 0, only destructor, destructor + move and destructor, copy and move
-		// Ensure that this type falls into one of them.
-		if (!(!custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor == invalid_function_id))
-		{
-			if (custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor == invalid_function_id)
-			{
-				copy_constructor = deleted_function_id;
-				move_constructor = deleted_function_id;
-			}
-			else if (custom_destructor_declared && copy_constructor == invalid_function_id && move_constructor != invalid_function_id)
-			{
-				copy_constructor = deleted_function_id;
-			}
-			else if (!(custom_destructor_declared && copy_constructor != invalid_function_id && move_constructor != invalid_function_id))
-			{
-				return make_syntax_error(incomplete_struct.name, 
-					"A type must define either none of destructor, copy constructor and move constructor, only destructor, "
-					"destructor and move constructor or the three of them. Any other combination is wrong.");
-			}
-		}
-#endif
 
 		new_struct.constructors = std::move(constructors);
 		new_struct.copy_constructor = copy_constructor;
