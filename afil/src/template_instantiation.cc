@@ -1359,7 +1359,6 @@ namespace instantiation
 		if (!new_struct.has_compiler_generated_constructors && !custom_default_constructor_declared)
 			default_constructor = deleted_function_id;
 
-#if 1 // Activate when constructors are advanced enough that I can correct the tests.
 		// There are 4 type categories. Rule of 0, only destructor, destructor + move and destructor, copy and move
 		// Ensure that this type falls into one of them.
 		if (!(!custom_destructor_declared && !custom_copy_constructor_declared && !custom_move_constructor_declared))
@@ -1380,7 +1379,6 @@ namespace instantiation
 					"destructor and move constructor or the three of them. Any other combination is wrong.");
 			}
 		}
-#endif
 
 		// Synthesize default copy and move constructors if not provided by the user.
 		if (copy_constructor == invalid_function_id)
