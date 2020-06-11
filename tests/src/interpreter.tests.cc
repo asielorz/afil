@@ -2873,6 +2873,8 @@ TEST_CASE("User may define destructors for types which are called when an object
 		{
 			int32 value;
 
+			constructor default () { return DestructorTest(5); }
+
 			destructor(DestructorTest mut & this)
 			{
 				global = this.value;
@@ -2882,7 +2884,7 @@ TEST_CASE("User may define destructors for types which are called when an object
 		let main = fn() -> int32
 		{
 			{
-				let mut x = DestructorTest(5);
+				let mut x = DestructorTest();
 			} // x is destroyed
 			
 			return global;
@@ -2901,6 +2903,8 @@ TEST_CASE("Destructor is called on temporaries after their subexpression is eval
 		{
 			int32 value;
 
+			constructor default () { return DestructorTest(5); }
+
 			destructor(DestructorTest mut & this)
 			{
 				global = this.value;
@@ -2909,7 +2913,7 @@ TEST_CASE("Destructor is called on temporaries after their subexpression is eval
 
 		let main = fn() -> int32
 		{
-			let mut x = DestructorTest(5).value;
+			let mut x = DestructorTest().value;
 			// temporary is destroyed -> global = 5
 			return global;
 		};
@@ -2927,6 +2931,8 @@ TEST_CASE("A type that defines no destructor of its own will still recursively c
 		{
 			int32 value;
 
+			constructor default () { return DestructorTest(5); }
+
 			destructor(DestructorTest mut & this)
 			{
 				global = this.value;
@@ -2941,7 +2947,7 @@ TEST_CASE("A type that defines no destructor of its own will still recursively c
 		let main = fn() -> int32
 		{
 			{
-				let mut x = DestructorTestWrapper(DestructorTest(5));
+				let mut x = DestructorTestWrapper(DestructorTest());
 			} // x is destroyed
 			
 			return global;
@@ -2960,6 +2966,8 @@ TEST_CASE("Default destructors for struct templates")
 		{
 			int32 value;
 
+			constructor default () { return DestructorTest(5); }
+
 			destructor(DestructorTest mut & this)
 			{
 				global = this.value;
@@ -2974,7 +2982,7 @@ TEST_CASE("Default destructors for struct templates")
 		let main = fn() -> int32
 		{
 			{
-				let mut x = Wrapper<DestructorTest>(DestructorTest(5));
+				let mut x = Wrapper<DestructorTest>(DestructorTest());
 			} // x is destroyed
 			
 			return global;
@@ -2993,6 +3001,8 @@ TEST_CASE("Destructors for arrays")
 		{
 			int32 value;
 
+			constructor default () { return DestructorTest(5); }
+
 			destructor(DestructorTest mut & this)
 			{
 				global = global + this.value;
@@ -3003,10 +3013,10 @@ TEST_CASE("Destructors for arrays")
 		{
 			{
 				let mut x = DestructorTest[](
-					DestructorTest(1),
-					DestructorTest(2),
-					DestructorTest(4),
-					DestructorTest(8)
+					DestructorTest(),
+					DestructorTest(),
+					DestructorTest(),
+					DestructorTest()
 				);
 			} // x is destroyed
 			
@@ -3014,7 +3024,7 @@ TEST_CASE("Destructors for arrays")
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src) == 15);
+	REQUIRE(tests::parse_and_run(src) == 20);
 }
 
 TEST_CASE("A type that cannot be destroyed at compile time cannot be a constant")
@@ -3026,6 +3036,8 @@ TEST_CASE("A type that cannot be destroyed at compile time cannot be a constant"
 		{
 			int32 value;
 
+			constructor default () { return DestructorTest(5); }
+
 			destructor(DestructorTest mut & this)
 			{
 				global = this.value;
@@ -3035,7 +3047,7 @@ TEST_CASE("A type that cannot be destroyed at compile time cannot be a constant"
 		let main = fn() -> int32
 		{
 			{
-				let x = DestructorTest(5);
+				let x = DestructorTest();
 			} // x is destroyed
 			
 			return global;
@@ -3052,6 +3064,8 @@ TEST_CASE("struct template that defines a destructor")
 
 		struct<T> DestructorTest
 		{
+			constructor default() { return DestructorTest<T>(); }
+
 			destructor(DestructorTest<T> mut & this)
 			{
 				global = 1;
@@ -3093,37 +3107,6 @@ TEST_CASE("User may define custom default constructor for a type.")
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 7);
-}
-
-TODO("Decide if this is desirable or only copy/move/dtor should disable compiler generated constructors")
-TEST_CASE("Defining a user defined special constructor disables the compiler generated constructors")
-{
-	auto const src = R"(
-		struct CustomConstructorTest
-		{
-			int32 value;
-
-			constructor default()
-			{
-				return CustomConstructorTest(.value = 0);
-			}
-		}
-
-		let main = fn() -> int32
-		{
-			let mut result = 0;
-
-			if (not compiles{CustomConstructorTest(5)}) // Member list constructor
-				result = result + 1;
-
-			if (not compiles{CustomConstructorTest(.value = 5)}) // Designated initializer constructor
-				result = result + 2;
-
-			return result;
-		};
-	)"sv;
-
-	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
 TEST_CASE("User may define custom copy and move constructors")
@@ -3219,6 +3202,44 @@ TEST_CASE("Non trivially copyable types do not get compiler generated assignment
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
+TEST_CASE("A user defined copy or move constructor disables the compiler generated constructors")
+{
+	auto const src = R"(
+		struct CustomCopyTest
+		{
+			int32 value = 0;
+
+			constructor copy(CustomCopyTest & other)
+			{
+				return CustomCopyTest(other.value + 1);
+			}
+
+			constructor move(CustomCopyTest mut & other)
+			{
+				return CustomCopyTest(other.value + 1);
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			let mut result = 0;
+
+			if (not compiles{CustomCopyTest()}) // Default list constructor
+				result = result + 1;
+
+			if (not compiles{CustomCopyTest(5)}) // Member list constructor
+				result = result + 2;
+
+			if (not compiles{CustomCopyTest(.value = 5)}) // Designated initializer constructor
+				result = result + 4;
+
+			return result;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
 /*****************************************************************

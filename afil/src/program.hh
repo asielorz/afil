@@ -161,6 +161,7 @@ namespace complete
 		FunctionId default_constructor = invalid_function_id;
 		FunctionId copy_constructor = invalid_function_id;
 		FunctionId move_constructor = invalid_function_id;
+		bool has_compiler_generated_constructors;
 	};
 
 	struct StructTemplate

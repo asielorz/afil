@@ -1348,6 +1348,8 @@ namespace instantiation
 
 		complete::Struct & new_struct = program->structs[new_struct_id];
 
+		new_struct.has_compiler_generated_constructors = (copy_constructor == invalid_function_id && move_constructor == invalid_function_id && !custom_destructor_declared);
+
 		// Synthesize default copy and move constructors if not provided by the user.
 		if (copy_constructor == invalid_function_id)
 		{

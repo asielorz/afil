@@ -413,7 +413,7 @@ namespace complete
 
 	auto has_compiler_generated_constructors(Struct const & type) noexcept -> bool
 	{
-		return (type.default_constructor == invalid_function_id) && (type.copy_constructor == invalid_function_id) && (type.move_constructor == invalid_function_id);
+		return type.has_compiler_generated_constructors;
 	}
 
 	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> Expression
