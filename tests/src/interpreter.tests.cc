@@ -3116,19 +3116,14 @@ TEST_CASE("User may define custom copy and move constructors")
 		{
 			int32 value = 0;
 
-			constructor default() { return CustomCopyTest(); }
+			constructor default = default;
+			constructor move = default;
+			destructor = default;
 
 			constructor copy(CustomCopyTest & other)
 			{
 				return CustomCopyTest(other.value + 1);
 			}
-
-			constructor move(CustomCopyTest mut & other)
-			{
-				return CustomCopyTest(other.value + 1);
-			}
-
-			destructor = default;
 		}
 		
 		let main = fn() -> int32
@@ -3150,19 +3145,14 @@ TEST_CASE("Single argument array constructor constructs the first from the expre
 		{
 			int32 value = 0;
 
-			constructor default() { return CustomCopyTest(); }
+			constructor default = default;
+			constructor move = default;
+			destructor = default;
 
 			constructor copy(CustomCopyTest & other)
 			{
 				return CustomCopyTest(other.value + 1);
 			}
-
-			constructor move(CustomCopyTest mut & other)
-			{
-				return CustomCopyTest(other.value + 1);
-			}
-		
-			destructor = default;
 		}
 
 		let main = fn() -> int32
@@ -3183,19 +3173,14 @@ TEST_CASE("Non trivially copyable types do not get compiler generated assignment
 		{
 			int32 value = 0;
 
-			constructor default() { return CustomCopyTest(); }
+			constructor default = default;
+			constructor move = default;
+			destructor = default;
 
 			constructor copy(CustomCopyTest & other)
 			{
 				return CustomCopyTest(other.value + 1);
 			}
-
-			constructor move(CustomCopyTest mut & other)
-			{
-				return CustomCopyTest(other.value + 1);
-			}
-
-			destructor = default;
 		}
 
 		let main = fn() -> int32

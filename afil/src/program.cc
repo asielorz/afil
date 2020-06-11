@@ -390,10 +390,7 @@ namespace complete
 
 	auto is_default_constructible(Struct const & type) noexcept -> bool
 	{
-		if (type.default_constructor != invalid_function_id)
-			return true;
-		else
-			return has_compiler_generated_constructors(type) && std::all_of(type.member_variables, [](MemberVariable const & var) { return var.initializer_expression.has_value(); });
+		return type.default_constructor != deleted_function_id;
 	}
 
 	auto is_default_constructible(TypeId type_id, Program const & program) noexcept -> bool

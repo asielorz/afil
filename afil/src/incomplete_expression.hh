@@ -161,6 +161,9 @@ namespace incomplete
 		std::vector<MemberVariable> member_variables;
 		std::vector<Constructor> constructors;
 		std::variant<nothing_t, Function, defaulted_t> destructor;
+		std::variant<nothing_t, Function, defaulted_t> default_constructor;
+		std::variant<nothing_t, Function, defaulted_t> copy_constructor;
+		std::variant<nothing_t, Function, defaulted_t> move_constructor;
 	};
 
 	struct StructTemplate : Struct

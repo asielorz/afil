@@ -1317,6 +1317,33 @@ namespace parser
 		return Stmt();
 	}
 
+	auto parse_maybe_defaulted_function(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
+		-> expected<std::optional<incomplete::Function>, PartialSyntaxError>
+	{
+		if (tokens[index].source == "=")
+		{
+			index++;
+			if (tokens[index].source != "default")
+				return make_syntax_error(tokens[index].source, "Expected keyword \"default\" after '='.");
+			index++;
+
+			if (tokens[index].type != TokenType::semicolon)
+				return make_syntax_error(tokens[index].source, "Expected ';' after keyword \"default\".");
+			index++;
+
+			return std::nullopt;
+		}
+		else
+		{
+			incomplete::Function destructor;
+			std::string_view const first_param_source = tokens[index + 1].source;
+			try_call_void(parse_function_prototype(tokens, index, type_names, out(destructor)));
+			try_call_void(parse_function_body(tokens, index, type_names, out(destructor)));
+
+			return std::move(destructor);
+		}
+	}
+
 	auto parse_struct(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Struct, PartialSyntaxError>
 	{
 		incomplete::Struct declared_struct;
@@ -1339,54 +1366,110 @@ namespace parser
 			if (tokens[index].source == "constructor")
 			{
 				index++;
-				incomplete::Constructor constructor;
 				
 				if (tokens[index].type != TokenType::identifier)
 					return make_syntax_error(tokens[index].source, "Expected identifier after keyword \"constructor\".");
 				if (is_keyword(tokens[index].source))
 					return make_syntax_error(tokens[index].source, "Cannot use a keyword as constructor name.");
 
-				constructor.name = tokens[index].source;
+				std::string_view const constructor_name = tokens[index].source;
 				index++;
+				
+				if (constructor_name == "default")
+				{
+					if (!has_type<nothing_t>(declared_struct.default_constructor))
+						return make_syntax_error(tokens[index].source, "Cannot declare more than one default constructor for a struct.");
 
-				try_call_void(parse_function_prototype(tokens, index, type_names, out(constructor)));
-				try_call_void(parse_function_body(tokens, index, type_names, out(constructor)));
-				declared_struct.constructors.push_back(std::move(constructor));
+					try_call_decl(auto constructor, parse_maybe_defaulted_function(tokens, index, type_names));
+					if (!constructor)
+					{
+						declared_struct.default_constructor = defaulted;
+					}
+					else
+					{
+						if (constructor->parameters.size() != 0)
+							return make_syntax_error(constructor_name, "Default constructor must take no parameters.");
+
+						declared_struct.default_constructor = std::move(*constructor);
+					}
+				}
+				else if (constructor_name == "copy")
+				{
+					if (!has_type<nothing_t>(declared_struct.copy_constructor))
+						return make_syntax_error(tokens[index].source, "Cannot declare more than one copy constructor for a struct.");
+
+					try_call_decl(auto constructor, parse_maybe_defaulted_function(tokens, index, type_names));
+					if (!constructor)
+					{
+						declared_struct.copy_constructor = defaulted;
+					}
+					else
+					{
+						if (constructor->parameters.size() != 1)
+							return make_syntax_error(constructor_name, "Copy constructor must have exactly one parameter");
+						if (constructor->parameters[0].type.is_mutable)
+							return make_syntax_error(constructor_name, "Type of copy constructor parameter cannot be mutable");
+						if (!constructor->parameters[0].type.is_reference)
+							return make_syntax_error(constructor_name, "Type of copy constructor parameter must be a reference");
+
+						declared_struct.copy_constructor = std::move(*constructor);
+					}
+				}
+				else if (constructor_name == "move")
+				{
+					if (!has_type<nothing_t>(declared_struct.move_constructor))
+						return make_syntax_error(tokens[index].source, "Cannot declare more than one move constructor for a struct.");
+
+					try_call_decl(auto constructor, parse_maybe_defaulted_function(tokens, index, type_names));
+					if (!constructor)
+					{
+						declared_struct.move_constructor = defaulted;
+					}
+					else
+					{
+						if (constructor->parameters.size() != 1)
+							return make_syntax_error(constructor_name, "Copy constructor must have exactly one parameter");
+						if (!constructor->parameters[0].type.is_mutable)
+							return make_syntax_error(constructor_name, "Type of copy constructor parameter must be mutable");
+						if (!constructor->parameters[0].type.is_reference)
+							return make_syntax_error(constructor_name, "Type of copy constructor parameter must be a reference");
+
+						declared_struct.move_constructor = std::move(*constructor);
+					}
+				}
+				else
+				{
+					incomplete::Constructor constructor;
+					constructor.name = constructor_name;
+
+					try_call_void(parse_function_prototype(tokens, index, type_names, out(constructor)));
+					try_call_void(parse_function_body(tokens, index, type_names, out(constructor)));
+					declared_struct.constructors.push_back(std::move(constructor));
+				}
 			}
 			else if (tokens[index].source == "destructor")
 			{
 				if (!has_type<nothing_t>(declared_struct.destructor))
 					return make_syntax_error(tokens[index].source, "Cannot declare more than one destructor for a struct.");
 
+				std::string_view const error_source = tokens[index].source;
+
 				index++;
-
-				if (tokens[index].source == "=")
+				try_call_decl(auto destructor, parse_maybe_defaulted_function(tokens, index, type_names));
+				if (!destructor)
 				{
-					index++;
-					if (tokens[index].source != "default")
-						return make_syntax_error(tokens[index].source, "Expected keyword \"default\" after '='.");
-					index++;
-
-					if (tokens[index].type != TokenType::semicolon)
-						return make_syntax_error(tokens[index].source, "Expected ';' after keyword \"default\".");
-					index++;
-
 					declared_struct.destructor = defaulted;
 				}
 				else
 				{
-					incomplete::Function destructor;
-					std::string_view const first_param_source = tokens[index + 1].source;
-					try_call_void(parse_function_prototype(tokens, index, type_names, out(destructor)));
-					if (destructor.parameters.size() != 1)
-						return make_syntax_error(first_param_source, "Destructor must have exactly one parameter");
-					if (!destructor.parameters[0].type.is_mutable)
-						return make_syntax_error(first_param_source, "Type of destructor must be mutable");
-					if (!destructor.parameters[0].type.is_reference)
-						return make_syntax_error(first_param_source, "Type of destructor must be a reference");
-					try_call_void(parse_function_body(tokens, index, type_names, out(destructor)));
+					if (destructor->parameters.size() != 1)
+						return make_syntax_error(error_source, "Destructor must have exactly one parameter");
+					if (!destructor->parameters[0].type.is_mutable)
+						return make_syntax_error(error_source, "Type of destructor parameter must be mutable");
+					if (!destructor->parameters[0].type.is_reference)
+						return make_syntax_error(error_source, "Type of destructor parameter must be a reference");
 
-					declared_struct.destructor = std::move(destructor);
+					declared_struct.destructor = std::move(*destructor);
 				}
 			}
 			else
