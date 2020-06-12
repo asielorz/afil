@@ -549,6 +549,30 @@ namespace complete
 			return invalid_function_id;
 	}
 
+	auto add_if_actual_function(std::vector<FunctionId> constructors, FunctionId function_id) noexcept -> void
+	{
+		if (function_id != invalid_function_id && function_id != deleted_function_id)
+			constructors.push_back(function_id);
+	}
+
+	auto constructor_overload_set(Struct const & struct_data, std::string_view constructor_name) noexcept -> std::vector<FunctionId>
+	{
+		std::vector<FunctionId> constructors;
+		if (constructor_name == "default")
+			add_if_actual_function(constructors, struct_data.default_constructor);
+		else if (constructor_name == "copy")
+			add_if_actual_function(constructors, struct_data.copy_constructor);
+		else if (constructor_name == "move")
+			add_if_actual_function(constructors, struct_data.move_constructor);
+		else
+		{
+			for (Constructor const & ctor : struct_data.constructors)
+				if (ctor.name == constructor_name)
+					constructors.push_back(ctor.function);
+		}
+		return constructors;
+	}
+
 	auto add_struct_type(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>
 	{
 		int const new_struct_id = static_cast<int>(program.structs.size());

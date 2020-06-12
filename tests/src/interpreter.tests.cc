@@ -3235,6 +3235,29 @@ TEST_CASE("A user defined copy or move constructor disables the compiler generat
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
+TEST_CASE("A struct may define named constructors, which are invoked with struct_name::constructor_name")
+{
+	auto const src = R"(
+		struct Color
+		{
+			float32 r;
+			float32 g;
+			float32 b;
+
+			constructor red() { return Color(1.0, 0.0, 0.0); }
+		}
+
+		let main = fn() -> int32
+		{
+			let c = Color::red();
+
+			return int32(c.r);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

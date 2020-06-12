@@ -223,6 +223,7 @@ namespace complete
 	auto is_trivially_move_constructible(Program const & program, TypeId id) noexcept -> bool;
 	auto is_move_constructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool;
 	auto move_constructor_for(Program const & program, TypeId id) noexcept -> FunctionId;
+	auto constructor_overload_set(Struct const & struct_data, std::string_view constructor_name) noexcept -> std::vector<FunctionId>;
 
 	auto add_struct_type(Program & program, Type new_type, Struct new_struct) -> std::pair<TypeId, int>;
 	auto add_struct_template(Program & program, StructTemplate new_template) noexcept -> StructTemplateId;
