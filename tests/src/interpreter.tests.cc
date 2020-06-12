@@ -3258,6 +3258,76 @@ TEST_CASE("A struct may define named constructors, which are invoked with struct
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
+TEST_CASE("Move constructor of a type can be explicitly called")
+{
+	auto const src = R"(
+		let exchange = fn<T>(T mut & variable, T new_value)
+		{
+			let old_value = variable;
+			variable = new_value;
+			return old_value;
+		};
+
+		struct MoveConstructorTest
+		{
+			int32 value;
+
+			constructor with_value(int32 x) { return MoveConstructorTest(x); }
+			destructor = default;
+			
+			constructor move(MoveConstructorTest mut & other) { return MoveConstructorTest(exchange(other.value, 0)); }
+		}
+
+		let main = fn() -> int32
+		{
+			let mut a = MoveConstructorTest::with_value(5);
+			let b = MoveConstructorTest::move(a);
+
+			let mut result = 0;
+			if (a.value == 0)
+				result = result + 1;
+			if (b.value == 5)
+				result = result + 2;
+
+			return result;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("Copy constructor of a type can be explicitly called")
+{
+	auto const src = R"(
+		struct MoveConstructorTest
+		{
+			int32 value;
+
+			constructor with_value(int32 x) { return MoveConstructorTest(x); }
+			destructor = default;
+			constructor move = default;
+			
+			constructor copy(MoveConstructorTest & other) { return MoveConstructorTest(other.value + 1); }
+		}
+
+		let main = fn() -> int32
+		{
+			let a = MoveConstructorTest::with_value(5);
+			let b = MoveConstructorTest::copy(a);
+
+			let mut result = 0;
+			if (a.value == 5)
+				result = result + 1;
+			if (b.value == 6)
+				result = result + 2;
+
+			return result;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

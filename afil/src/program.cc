@@ -549,7 +549,7 @@ namespace complete
 			return invalid_function_id;
 	}
 
-	auto add_if_actual_function(std::vector<FunctionId> constructors, FunctionId function_id) noexcept -> void
+	auto add_if_actual_function(std::vector<FunctionId> & constructors, FunctionId function_id) noexcept -> void
 	{
 		if (function_id != invalid_function_id && function_id != deleted_function_id)
 			constructors.push_back(function_id);
