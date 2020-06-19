@@ -3393,6 +3393,7 @@ TEST_CASE("Subtracting two pointers returns the number of elements between them"
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
+#if 0
 TEST_CASE("Any pointer type may be converted to byte array pointer")
 {
 	auto const src = R"(
@@ -3412,6 +3413,29 @@ TEST_CASE("Any pointer type may be converted to byte array pointer")
 
 	REQUIRE(tests::parse_and_run(src) == 1249703);
 }
+
+TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
+{
+	auto const src = R"(
+		let do_twice = fn(fn(int32) -> int32 f, int32 x) -> int32
+		{
+			return f(f(x));
+		};
+
+		let add_one = fn(int32 x) -> int32 { return x + 1; };
+		let times_two = fn(int32 x) -> int32 { return x * 2; };
+	
+		let main = fn() -> int32
+		{
+			let a = do_twice(add_one, 5);
+			let b = do_twice(times_two, a);
+			return b;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == (5 + 2) * 4);
+}
+#endif
 
 /*****************************************************************
 Backlog
