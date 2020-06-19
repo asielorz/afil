@@ -1073,6 +1073,14 @@ namespace complete
 		return new_type_id;
 	}
 
+	auto is_mutability_conversion_legal(bool from_is_mutable, bool to_is_mutable) noexcept -> bool
+	{
+		if (to_is_mutable)
+			return from_is_mutable;
+		else
+			return true;
+	}
+
 	auto insert_mutref_conversion_node_impl(Expression && expr, TypeId from, TypeId to, Program const & program, bool allow_address_of_temporary) noexcept -> expected<Expression, ConversionNotFound>
 	{
 		if (from.index == to.index)

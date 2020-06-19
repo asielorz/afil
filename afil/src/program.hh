@@ -280,6 +280,7 @@ namespace complete
 		TypeId to;
 		std::string_view why;
 	};
+	auto is_mutability_conversion_legal(bool from_is_mutable, bool to_is_mutable) noexcept -> bool;
 	auto insert_mutref_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
 	auto insert_mutref_conversion_node(Expression && expr, TypeId to, Program const & program) noexcept -> expected<Expression, ConversionNotFound>;
 	auto insert_mutref_conversion_node(Expression && expr, TypeId from, TypeId to, Program const & program, std::string_view source) noexcept -> expected<Expression, PartialSyntaxError>;

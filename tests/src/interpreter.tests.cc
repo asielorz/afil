@@ -3393,7 +3393,6 @@ TEST_CASE("Subtracting two pointers returns the number of elements between them"
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
-#if 0
 TEST_CASE("Any pointer type may be converted to byte array pointer")
 {
 	auto const src = R"(
@@ -3414,6 +3413,7 @@ TEST_CASE("Any pointer type may be converted to byte array pointer")
 	REQUIRE(tests::parse_and_run(src) == 1249703);
 }
 
+#if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {
 	auto const src = R"(

@@ -782,17 +782,17 @@ namespace instantiation
 		// Check if this can be a conversion.
 		if (parameters.size() == 1)
 		{
-			complete::TypeId const param_type = expression_type_id(parameters[0], *program);
+			complete::TypeId const param_type_id = expression_type_id(parameters[0], *program);
 
 			// Implicit conversion
-			auto const implicit_conversion = insert_implicit_conversion_node(std::move(parameters[0]), param_type, constructed_type_id, scope_stack, *program);
+			auto const implicit_conversion = insert_implicit_conversion_node(std::move(parameters[0]), param_type_id, constructed_type_id, scope_stack, *program);
 			if (implicit_conversion.has_value())
 				return std::move(*implicit_conversion);
 
 			if (auto const explicit_conversion_functions = named_overload_set("conversion", scope_stack))
 			{
 				FunctionId const conversion_function = resolve_function_overloading_for_conversions(
-					*explicit_conversion_functions, param_type, constructed_type_id, *program);
+					*explicit_conversion_functions, param_type_id, constructed_type_id, *program);
 
 				if (conversion_function != invalid_function_id)
 				{
@@ -804,6 +804,19 @@ namespace instantiation
 					try_call(conversion_call.parameters.push_back, insert_implicit_conversion_node(std::move(parameters[0]), expected_type, scope_stack, *program, expression_source));
 					return std::move(conversion_call);
 				}
+			}
+
+			// Conversion to byte array pointer from any pointer type or from any pointer type to byte array pointer.
+			complete::Type const & constructed_type = type_with_id(*program, constructed_type_id);
+			complete::Type const & param_type = type_with_id(*program, param_type_id);
+			if (((is_array_pointer(constructed_type) && decay(pointee_type(constructed_type)) == complete::TypeId::byte && is_pointer_or_array_pointer(param_type)) ||
+				(is_array_pointer(param_type) && decay(pointee_type(param_type)) == complete::TypeId::byte && is_pointer_or_array_pointer(constructed_type))) &&
+				complete::is_mutability_conversion_legal(pointee_type(param_type).is_mutable, pointee_type(constructed_type).is_mutable))
+			{
+				complete::expression::ReinterpretCast reinterpret_cast_node;
+				try_call(assign_to(reinterpret_cast_node.operand), insert_implicit_conversion_node(std::move(parameters[0]), decay(param_type_id), scope_stack, *program, expression_source));
+				reinterpret_cast_node.return_type = constructed_type_id;
+				return std::move(reinterpret_cast_node);
 			}
 		}
 
