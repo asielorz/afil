@@ -77,13 +77,31 @@ namespace complete
 				return std::all_of(ctor_node.parameters,
 					[&](Expression const & param) { return is_constant_expression(param, program, constant_base_index); });
 			},
-				[&](expression::Dereference const & deref_node) { return is_constant_expression(*deref_node.expression, program, constant_base_index); },
-				[&](expression::ReinterpretCast const & cast_node) { return is_constant_expression(*cast_node.operand, program, constant_base_index); },
-				[&](expression::Subscript const & subscript_node)
+			[&](expression::Dereference const & deref_node) { return is_constant_expression(*deref_node.expression, program, constant_base_index); },
+			[&](expression::ReinterpretCast const & cast_node) { return is_constant_expression(*cast_node.operand, program, constant_base_index); },
+			[&](expression::Subscript const & subscript_node)
 			{
 				return
 					is_constant_expression(*subscript_node.array, program, constant_base_index) &&
 					is_constant_expression(*subscript_node.index, program, constant_base_index);
+			},
+			[&](expression::PointerPlusInt const & ptr_arithmetic_node)
+			{
+				return
+					is_constant_expression(*ptr_arithmetic_node.pointer, program, constant_base_index) &&
+					is_constant_expression(*ptr_arithmetic_node.index, program, constant_base_index);
+			},
+			[&](expression::PointerMinusInt const & ptr_arithmetic_node)
+			{
+				return
+					is_constant_expression(*ptr_arithmetic_node.pointer, program, constant_base_index) &&
+					is_constant_expression(*ptr_arithmetic_node.index, program, constant_base_index);
+			},
+			[&](expression::PointerMinusPointer const & ptr_arithmetic_node)
+			{
+				return
+					is_constant_expression(*ptr_arithmetic_node.left, program, constant_base_index) &&
+					is_constant_expression(*ptr_arithmetic_node.right, program, constant_base_index);
 			},
 			[&](expression::If const & if_node)
 			{
@@ -191,6 +209,24 @@ namespace complete
 				return
 					can_be_run_at_runtime(*subscript_node.array, program) &&
 					can_be_run_at_runtime(*subscript_node.index, program);
+			},
+			[&](expression::PointerPlusInt const & ptr_arithmetic_node)
+			{
+				return
+					can_be_run_at_runtime(*ptr_arithmetic_node.pointer, program) &&
+					can_be_run_at_runtime(*ptr_arithmetic_node.index, program);
+			},
+			[&](expression::PointerMinusInt const & ptr_arithmetic_node)
+			{
+				return
+					can_be_run_at_runtime(*ptr_arithmetic_node.pointer, program) &&
+					can_be_run_at_runtime(*ptr_arithmetic_node.index, program);
+			},
+			[&](expression::PointerMinusPointer const & ptr_arithmetic_node)
+			{
+				return
+					can_be_run_at_runtime(*ptr_arithmetic_node.left, program) &&
+					can_be_run_at_runtime(*ptr_arithmetic_node.right, program);
 			},
 			[&](expression::If const & if_node)
 			{

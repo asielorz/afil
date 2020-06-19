@@ -1839,7 +1839,7 @@ namespace instantiation
 				// Special case for pointer comparison
 				if (function == invalid_function_id && is_comparison_operator(op))
 				{
-					if (is_pointer(type_with_id(*program, operand_types[0])))
+					if (is_pointer_or_array_pointer(type_with_id(*program, operand_types[0])))
 					{
 						auto conversion = insert_implicit_conversion_node(std::move(operands[1]), decay(operand_types[0]), scope_stack, *program);
 						if (conversion.has_value())
@@ -1850,7 +1850,7 @@ namespace instantiation
 							operands[1] = std::move(*conversion);
 						}
 					}
-					if (function == invalid_function_id && is_pointer(type_with_id(*program, operand_types[1])))
+					if (function == invalid_function_id && is_pointer_or_array_pointer(type_with_id(*program, operand_types[1])))
 					{
 						auto conversion = insert_implicit_conversion_node(std::move(operands[0]), decay(operand_types[1]), scope_stack, *program);
 						if (conversion.has_value())
@@ -1859,6 +1859,73 @@ namespace instantiation
 							operands[0] = std::move(*conversion);
 							try_call(assign_to(operands[1]), insert_implicit_conversion_node(
 								std::move(operands[1]), operand_types[1], decay(operand_types[1]), scope_stack, *program, incomplete_expression.right->source));
+						}
+					}
+				}
+
+				// Special case for pointer arithmetic
+				if (function == invalid_function_id && op == Operator::add)
+				{
+					if (is_array_pointer(type_with_id(*program, operand_types[0])))
+					{
+						auto conversion = insert_implicit_conversion_node(std::move(operands[1]), complete::TypeId::int32, scope_stack, *program);
+						if (conversion.has_value())
+						{
+							complete::TypeId const pointer_type = decay(operand_types[0]);
+							try_call(assign_to(operands[0]), insert_implicit_conversion_node(
+								std::move(operands[0]), operand_types[0], pointer_type, scope_stack, *program, incomplete_expression.left->source));
+
+							complete::expression::PointerPlusInt complete_expression;
+							complete_expression.pointer = allocate(std::move(operands[0]));
+							complete_expression.index = allocate(std::move(*conversion));
+							complete_expression.return_type = pointer_type;
+							return std::move(complete_expression);
+						}
+					}
+					else if (is_array_pointer(type_with_id(*program, operand_types[1])))
+					{
+						auto conversion = insert_implicit_conversion_node(std::move(operands[0]), complete::TypeId::int32, scope_stack, *program);
+						{
+							complete::TypeId const pointer_type = decay(operand_types[1]);
+							try_call(assign_to(operands[1]), insert_implicit_conversion_node(
+								std::move(operands[1]), operand_types[1], pointer_type, scope_stack, *program, incomplete_expression.left->source));
+
+							complete::expression::PointerPlusInt complete_expression;
+							complete_expression.pointer = allocate(std::move(operands[1]));
+							complete_expression.index = allocate(std::move(*conversion));
+							complete_expression.return_type = pointer_type;
+							return std::move(complete_expression);
+						}
+					}
+				}
+
+				if (function == invalid_function_id && op == Operator::subtract && is_array_pointer(type_with_id(*program, operand_types[0])))
+				{
+					// Pointer minus pointer
+					complete::TypeId const pointer_type = decay(operand_types[0]);
+					auto conversion = insert_implicit_conversion_node(std::move(operands[1]), pointer_type, scope_stack, *program);
+					if (conversion.has_value())
+					{
+						complete::expression::PointerMinusPointer complete_expression;
+						try_call(assign_to(complete_expression.left), insert_implicit_conversion_node(
+							std::move(operands[0]), operand_types[0], pointer_type, scope_stack, *program, incomplete_expression.left->source));
+						complete_expression.right = allocate(std::move(*conversion));
+						return std::move(complete_expression);
+					}
+					// Pointer minus int
+					else
+					{
+						conversion = insert_implicit_conversion_node(std::move(operands[1]), complete::TypeId::int32, scope_stack, *program);
+						if (conversion.has_value())
+						{
+							try_call(assign_to(operands[0]), insert_implicit_conversion_node(
+								std::move(operands[0]), operand_types[0], pointer_type, scope_stack, *program, incomplete_expression.left->source));
+
+							complete::expression::PointerMinusInt complete_expression;
+							complete_expression.pointer = allocate(std::move(operands[0]));
+							complete_expression.index = allocate(std::move(*conversion));
+							complete_expression.return_type = pointer_type;
+							return std::move(complete_expression);
 						}
 					}
 				}

@@ -206,6 +206,27 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 				pretty_print(*subscript_expr.index, program, scope_stack, indentation_level + 1)
 			);
 		},
+		[&](expression::PointerPlusInt const & pointer_arithmetic_expr)
+		{
+			return join("pointer + int\n",
+				pretty_print(*pointer_arithmetic_expr.pointer, program, scope_stack, indentation_level + 1),
+				pretty_print(*pointer_arithmetic_expr.index, program, scope_stack, indentation_level + 1)
+			);
+		},
+		[&](expression::PointerMinusInt const & pointer_arithmetic_expr)
+		{
+			return join("pointer - int\n",
+				pretty_print(*pointer_arithmetic_expr.pointer, program, scope_stack, indentation_level + 1),
+				pretty_print(*pointer_arithmetic_expr.index, program, scope_stack, indentation_level + 1)
+			);
+		},
+		[&](expression::PointerMinusPointer const & pointer_arithmetic_expr)
+		{
+			return join("pointer - pointer\n",
+				pretty_print(*pointer_arithmetic_expr.left, program, scope_stack, indentation_level + 1),
+				pretty_print(*pointer_arithmetic_expr.right, program, scope_stack, indentation_level + 1)
+			);
+		},
 		[&](expression::If const & if_expr) 
 		{
 			return join("if\n",

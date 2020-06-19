@@ -68,6 +68,7 @@ namespace parser
 		"float64",
 		"bool",
 		"char",
+		"byte",
 		"type",
 		"null_t"
 	};

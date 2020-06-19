@@ -342,6 +342,7 @@ namespace complete
 			types.back().ABI_name = type.first;
 		}
 		global_scope.types.push_back({"char", {false, false, false, 5}}); // Add char as typedef for uint8
+		global_scope.types.push_back({"byte", {false, false, false, 5}}); // Add byte as typedef for uint8
 
 		//*******************************************************************
 
@@ -736,6 +737,11 @@ namespace complete
 	{
 		return has_type<Type::ArrayPointer>(type.extra_data);
 	}
+
+	auto is_pointer_or_array_pointer(Type const & type) noexcept -> bool
+	{
+		return is_pointer(type) || is_array_pointer(type);
+ 	}
 
 	auto array_pointer_type_for(TypeId pointee_type, Program & program) noexcept -> TypeId
 	{

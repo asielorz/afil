@@ -18,7 +18,8 @@ namespace complete
 	TypeId const TypeId::float32 = {false, false, false, 9 };
 	TypeId const TypeId::float64 = {false, false, false, 10 };
 	TypeId const TypeId::bool_ = {false, false, false, 11};
-	TypeId const TypeId::char_ = {false, false, false, 5};
+	TypeId const TypeId::char_ = TypeId::uint8;
+	TypeId const TypeId::byte = TypeId::uint8;
 	TypeId const TypeId::type = {false, false, false, 12};
 	TypeId const TypeId::null_t = {false, false, false, 13};
 

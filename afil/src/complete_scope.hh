@@ -42,6 +42,7 @@ namespace complete
 		static TypeId const float64;
 		static TypeId const bool_;
 		static TypeId const char_;
+		static TypeId const byte;
 		static TypeId const type;
 		static TypeId const null_t;
 

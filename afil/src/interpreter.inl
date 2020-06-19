@@ -671,6 +671,39 @@ namespace interpreter
 				}
 				return success;
 			},
+			[&](expression::PointerPlusInt const & pointer_add_node) -> expected<void, UnmetPrecondition>
+			{
+				try_call_decl(int const pointer_address, eval_expression(*pointer_add_node.pointer, stack, context));
+				try_call_decl(int const index_address, eval_expression(*pointer_add_node.index, stack, context));
+				size_t pointer = read<size_t>(stack, pointer_address);
+				int const index = read<int>(stack, index_address);
+				pointer += index * type_size(context.program, pointee_type(pointer_add_node.return_type, context.program));
+				write(stack, return_address, pointer);
+				return success;
+			},
+			[&](expression::PointerMinusInt const & pointer_subtract_node) -> expected<void, UnmetPrecondition>
+			{
+				try_call_decl(int const pointer_address, eval_expression(*pointer_subtract_node.pointer, stack, context));
+				try_call_decl(int const index_address, eval_expression(*pointer_subtract_node.index, stack, context));
+				size_t pointer = read<size_t>(stack, pointer_address);
+				int const index = read<int>(stack, index_address);
+				pointer -= index * type_size(context.program, pointee_type(pointer_subtract_node.return_type, context.program));
+				write(stack, return_address, pointer);
+				return success;
+			},
+			[&](expression::PointerMinusPointer const & pointer_subtract_node) -> expected<void, UnmetPrecondition>
+			{
+				try_call_decl(int const left_address, eval_expression(*pointer_subtract_node.left, stack, context));
+				try_call_decl(int const right_address, eval_expression(*pointer_subtract_node.right, stack, context));
+				ptrdiff_t const left = read<ptrdiff_t>(stack, left_address);
+				ptrdiff_t const right = read<ptrdiff_t>(stack, right_address);
+				ptrdiff_t difference = left - right;
+				int const value_type_size = type_size(context.program, pointee_type(expression_type_id(*pointer_subtract_node.left, context.program), context.program));
+				assert(is_divisible(static_cast<int>(difference), value_type_size));
+				difference /= value_type_size;
+				write(stack, return_address, static_cast<int>(difference));
+				return success;
+			},
 			[&](expression::FunctionCall const & func_call_node)
 			{
 				return call_function(func_call_node.function_id, func_call_node.parameters, stack, context, return_address);

@@ -11,3 +11,6 @@ constexpr auto align(T * address, size_t alignment) noexcept -> T *
 		reinterpret_cast<size_t &>(address) += alignment - excedent;
 	return address;
 }
+
+auto is_divisible(int dividend, int divisor) noexcept -> bool;
+auto is_aligned(int address, int alignment) noexcept -> bool;

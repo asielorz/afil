@@ -3328,6 +3328,91 @@ TEST_CASE("Copy constructor of a type can be explicitly called")
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
+TEST_CASE("Adding one to an array pointer makes it point to the next element in the array")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let array = int32[](1, 2);
+			let first = data(array);
+			let second = first + 1;
+
+			return second[0];
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 2);
+}
+
+TEST_CASE("Adding N to an array pointer makes it point to the next nth element in the array")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let array = int32[](1, 2, 3, 4, 5);
+			let first = data(array);
+			let fourth = first + 3;
+
+			return fourth[0];
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
+}
+
+TEST_CASE("Subtracting N to an array pointer makes it point to the previous nth element in the array")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let array = int32[](1, 2, 3, 4, 5);
+			let first = data(array);
+			let fourth = first + 3;
+			let second = fourth - 2;
+
+			return second[0];
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 2);
+}
+
+TEST_CASE("Subtracting two pointers returns the number of elements between them")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let array = int32[](1, 2, 3, 4, 5);
+			let first = data(array);
+			let fourth = first + 3;
+
+			return fourth - first;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("Any pointer type may be converted to byte array pointer")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let a = 1249703;
+			let mut b = 0;
+			let a_bytes = byte[](&a);
+			let b_bytes = byte mut[](&b);
+			
+			for (let mut i = 0; i < 4; i = i + 1)
+				b_bytes[i] = a_bytes[i];
+
+			return b;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1249703);
+}
+
 /*****************************************************************
 Backlog
 - dynamic memory allocation

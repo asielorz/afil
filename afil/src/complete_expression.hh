@@ -94,6 +94,26 @@ namespace complete
 			TypeId return_type;
 		};
 
+		struct PointerPlusInt
+		{
+			value_ptr<Expression> pointer;
+			value_ptr<Expression> index;
+			TypeId return_type;
+		};
+
+		struct PointerMinusInt
+		{
+			value_ptr<Expression> pointer;
+			value_ptr<Expression> index;
+			TypeId return_type;
+		};
+
+		struct PointerMinusPointer
+		{
+			value_ptr<Expression> left;
+			value_ptr<Expression> right;
+		};
+
 		struct If
 		{
 			value_ptr<Expression> condition;
@@ -128,6 +148,7 @@ namespace complete
 				FunctionCall, RelationalOperatorCall, Assignment,
 				Constructor,
 				Dereference, ReinterpretCast, Subscript,
+				PointerPlusInt, PointerMinusInt, PointerMinusPointer,
 				If, StatementBlock,
 				Compiles
 			>;

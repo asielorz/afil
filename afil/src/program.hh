@@ -244,6 +244,7 @@ namespace complete
 	auto array_value_type(TypeId array_type_id, Program const & program) noexcept -> TypeId;
 
 	auto is_array_pointer(Type const & type) noexcept -> bool;
+	auto is_pointer_or_array_pointer(Type const & type) noexcept -> bool;
 	auto array_pointer_type_for(TypeId value_type, Program & program) noexcept -> TypeId;
 
 	auto add_function(Program & program, Function new_function) noexcept -> FunctionId;
