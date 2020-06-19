@@ -3432,6 +3432,33 @@ TEST_CASE("A byte array pointer may be converted to any pointer type")
 	REQUIRE(tests::parse_and_run(src) == 1249703);
 }
 
+TEST_CASE("Calling malloc to see if it works")
+{
+	auto const src = R"(
+		let malloc = fn(uint64 size) -> byte mut[]
+			extern_symbol("malloc");
+
+		let free = fn<T>(T mut * memory)
+		{
+			let free_impl = fn(byte mut[] memory) -> void
+				extern_symbol("free");
+			
+			free_impl(byte mut[](memory));
+		};
+
+		let main = fn() -> int32
+		{
+			let pi = int32 mut*(malloc(uint64(4)));
+			*pi = 1073741824;
+			let x = *pi;
+			free(pi);
+			return x;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1073741824);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {
