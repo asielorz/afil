@@ -3399,18 +3399,21 @@ TEST_CASE("Any pointer type may be converted to byte array pointer")
 		let main = fn() -> int32
 		{
 			let a = 1249703;
-			let mut b = 0;
 			let a_bytes = byte[](&a);
-			let b_bytes = byte mut[](&b);
+			uninit byte[4] b_bytes;
 			
 			for (let mut i = 0; i < 4; i = i + 1)
 				b_bytes[i] = a_bytes[i];
 
-			return b;
+			return *int32*(data(b_bytes));
 		};
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 1249703);
+}
+
+TEST_CASE("A byte array pointer may be converted to any pointer type")
+{
 }
 
 #if 0

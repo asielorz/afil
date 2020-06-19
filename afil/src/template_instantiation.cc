@@ -1630,6 +1630,7 @@ namespace instantiation
 				{
 					complete::TypeId value_type = try_get<complete::Type::Array>(array_type.extra_data)->value_type;
 					value_type.is_reference = array_type_id.is_reference;
+					value_type.is_mutable = array_type_id.is_mutable;
 
 					try_call_decl(complete::Expression index, instantiate_expression(*incomplete_expression.index, template_parameters, scope_stack, program, current_scope_return_type));
 
