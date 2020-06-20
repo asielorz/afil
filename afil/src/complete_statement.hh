@@ -15,6 +15,12 @@ namespace complete
 			Expression assigned_expression;
 		};
 
+		struct PlacementLet
+		{
+			Expression address_expression;
+			Expression assigned_expression;
+		};
+
 		struct ExpressionStatement
 		{
 			Expression expression;
@@ -67,7 +73,7 @@ namespace complete
 		namespace detail
 		{
 			using StatementBase = std::variant<
-				VariableDeclaration, ExpressionStatement,
+				VariableDeclaration, PlacementLet, ExpressionStatement,
 				If, StatementBlock, While, For,
 				Return, Break, Continue
 			>;

@@ -8,6 +8,7 @@
 #include "utils/unreachable.hh"
 #include "utils/utils.hh"
 #include "utils/variant.hh"
+#include "utils/warning_macro.hh"
 #include <string_view>
 #include <variant>
 #include <vector>

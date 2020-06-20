@@ -3459,6 +3459,31 @@ TEST_CASE("Calling malloc to see if it works")
 	REQUIRE(tests::parse_and_run(src) == 1073741824);
 }
 
+TEST_CASE("Placement let allows constructing an object in a preallocated memory block")
+{
+	auto const src = R"(
+		struct Color
+		{
+			float32 r;
+			float32 g;
+			float32 b;
+
+			constructor red() { return Color(1.0, 0.0, 0.0); }
+		}
+
+		let main = fn() -> int32
+		{
+			uninit byte[12] bytes;
+			let (data(bytes)) = Color::red();
+			let c = *Color*(data(bytes));
+			
+			return int32(c.r);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {

@@ -5,8 +5,9 @@
 #include "utils/overload.hh"
 #include "utils/string.hh"
 #include "utils/unreachable.hh"
-#include <set>
+#include "utils/variant.hh"
 #include "utils/warning_macro.hh"
+#include <set>
 
 using namespace complete;
 using namespace std::literals;
@@ -259,7 +260,7 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 		}
 	);
 
-	return indent(indentation_level) + std::visit(visitor, expression.as_variant());
+	return indent(indentation_level) + my::visit(expression.as_variant(), visitor);
 }
 
 auto pretty_print(Statement const & statement, Program const & program, ScopeStack & scope_stack, int indentation_level) noexcept -> std::string
@@ -271,6 +272,13 @@ auto pretty_print(Statement const & statement, Program const & program, ScopeSta
 
 			return join("variable decalaration<", type_name(var.type, program), ">: ", var.name, "\n",
 				pretty_print(var_decl_stmt.assigned_expression, program, scope_stack, indentation_level + 1)
+			);
+		},
+		[&](statement::PlacementLet const & placement_stmt)
+		{
+			return join("placement<", type_name(decay(expression_type_id(placement_stmt.assigned_expression, program)), program), ">\n",
+				pretty_print(placement_stmt.address_expression, program, scope_stack, indentation_level + 1),
+				pretty_print(placement_stmt.assigned_expression, program, scope_stack, indentation_level + 1)
 			);
 		},
 		[&](statement::ExpressionStatement const & expr_stmt)
@@ -335,7 +343,7 @@ auto pretty_print(Statement const & statement, Program const & program, ScopeSta
 		}
 	);
 
-	return indent(indentation_level) + std::visit(visitor, statement.as_variant());
+	return indent(indentation_level) + my::visit(statement.as_variant(), visitor);
 
 }
 

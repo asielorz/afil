@@ -46,3 +46,19 @@ auto upcast(std::variant<Ts...> v) noexcept -> SupersetVariant
 
 	return std::visit(visitor, v);
 }
+
+// Versions of visit that sfinae correctly, to make error messages more readable when adding a new type to the variants.
+namespace my
+{
+	template <typename ... Ts, typename Visitor, typename = std::void_t<decltype(std::declval<Visitor>()(std::declval<Ts>()))...>>
+	auto visit(std::variant<Ts...> & v, Visitor && f)
+	{
+		return std::visit(std::forward<Visitor>(f), v);
+	}
+
+	template <typename ... Ts, typename Visitor, typename = std::void_t<decltype(std::declval<Visitor>()(std::declval<Ts const>()))...>>
+	auto visit(std::variant<Ts...> const & v, Visitor && f)
+	{
+		return std::visit(std::forward<Visitor>(f), v);
+	}
+}

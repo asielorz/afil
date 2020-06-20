@@ -1,3 +1,4 @@
+#if 0
 #include "c_transpiler.hh"
 #include "complete_expression.hh"
 #include "complete_statement.hh"
@@ -894,3 +895,4 @@ namespace c_transpiler
 	}
 
 } // namespace c_transpiler
+#endif

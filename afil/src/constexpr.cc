@@ -4,6 +4,7 @@
 #include "program.hh"
 #include "utils/algorithm.hh"
 #include "utils/overload.hh"
+#include "utils/variant.hh"
 
 namespace complete
 {
@@ -12,6 +13,11 @@ namespace complete
 	{
 		auto const visitor = overload(
 			[&](statement::VariableDeclaration const & var_node) { return is_constant_expression(var_node.assigned_expression, program, constant_base_index); },
+			[&](statement::PlacementLet const & placement_node) 
+			{
+				return is_constant_expression(placement_node.address_expression, program, constant_base_index) &&
+					is_constant_expression(placement_node.assigned_expression, program, constant_base_index);
+			},
 			[&](statement::ExpressionStatement const & expr_node) { return is_constant_expression(expr_node.expression, program, constant_base_index); },
 			[&](statement::Return const & return_node) { return is_constant_expression(return_node.returned_expression, program, constant_base_index); },
 			[&](statement::If const & if_node)
@@ -43,7 +49,7 @@ namespace complete
 			[](statement::Break) { return true; },
 			[](statement::Continue) { return true; }
 		);
-		return std::visit(visitor, stmt.as_variant());
+		return my::visit(stmt.as_variant(), visitor);
 	}
 
 	auto is_constant_expression(Expression const & expr, Program const & program, int constant_base_index) noexcept -> bool
@@ -123,7 +129,7 @@ namespace complete
 			},
 			[](expression::Compiles const &) { return true; }
 		);
-		return std::visit(visitor, expr.as_variant());
+		return my::visit(expr.as_variant(), visitor);
 	}
 
 	auto can_be_run_in_a_constant_expression(Function const & function, Program const & program) noexcept -> bool
@@ -137,6 +143,10 @@ namespace complete
 	{
 		auto const visitor = overload(
 			[&](statement::VariableDeclaration const & var_node) { return can_be_run_at_runtime(var_node.assigned_expression, program); },
+			[&](statement::PlacementLet const & placement_node) 
+			{ 
+				return can_be_run_at_runtime(placement_node.address_expression, program) && can_be_run_at_runtime(placement_node.assigned_expression, program);
+			},
 			[&](statement::ExpressionStatement const & expr_node) { return can_be_run_at_runtime(expr_node.expression, program); },
 			[&](statement::Return const & return_node) { return can_be_run_at_runtime(return_node.returned_expression, program); },
 			[&](statement::If const & if_node)
@@ -168,7 +178,7 @@ namespace complete
 			[](statement::Break) { return true; },
 			[](statement::Continue) { return true; }
 		);
-		return std::visit(visitor, stmt.as_variant());
+		return my::visit(stmt.as_variant(), visitor);
 	}
 
 	auto can_be_run_at_runtime(Expression const & expr, Program const & program) noexcept -> bool
@@ -248,7 +258,7 @@ namespace complete
 			},
 			[](expression::Compiles const &) { return false; }
 		);
-		return std::visit(visitor, expr.as_variant());
+		return my::visit(expr.as_variant(), visitor);
 	}
 
 	auto can_be_run_at_runtime(Function const & function, Program const & program) noexcept -> bool

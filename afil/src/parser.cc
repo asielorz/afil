@@ -1097,10 +1097,36 @@ namespace parser
 	//******************************************************************************************************************************************************************
 	//******************************************************************************************************************************************************************
 
-	auto parse_let_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::statement::LetDeclaration, PartialSyntaxError>
+	auto parse_placement_let_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept
+		-> expected<incomplete::statement::PlacementLet, PartialSyntaxError>
+	{
+		// Skip opening parenthesis.
+		index++;
+
+		incomplete::statement::PlacementLet placement_let_statement;
+		try_call(assign_to(placement_let_statement.address_expression), parse_expression(tokens, index, type_names));
+
+		if (tokens[index].type != TokenType::close_parenthesis)
+			return make_syntax_error(tokens[index].source, "Expected ')' after address expression in placement let statement.");
+		index++;
+
+		if (tokens[index].source != "=") 
+			return make_syntax_error(tokens[index], "Expected '=' after ')' in placement let statement.");
+		index++;
+
+		try_call(assign_to(placement_let_statement.assigned_expression), parse_expression(tokens, index, type_names));
+
+		return std::move(placement_let_statement);
+	}
+
+	auto parse_let_statement(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
+		-> expected<incomplete::statement::Variant, PartialSyntaxError>
 	{
 		// Skip let token.
 		index++;
+
+		if (tokens[index].type == TokenType::open_parenthesis)
+			return parse_placement_let_statement(tokens, index, type_names);
 
 		bool is_mutable = false;
 		bool is_reference = false;

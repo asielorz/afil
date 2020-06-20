@@ -813,7 +813,7 @@ namespace interpreter
 			},
 			detail::eval_compiles_expression(stack, context, return_address)
 		);
-		return std::visit(visitor, expr.as_variant());
+		return my::visit(expr.as_variant(), visitor);
 	}
 
 	template <typename ExecutionContext>
@@ -827,6 +827,20 @@ namespace interpreter
 			{
 				int const address = stack.base_pointer + node.variable_offset;
 				try_call_void(eval_expression(node.assigned_expression, stack, context, address));
+				return ControlFlow_Nothing;
+			},
+			[&](statement::PlacementLet const & node) -> expected<ControlFlow, UnmetPrecondition>
+			{
+				auto const g = StackGuard(stack);
+				int const address_address = alloc(stack, sizeof(void *), alignof(void *));
+				try_call_void(eval_expression(node.address_expression, stack, context, address_address));
+				
+				char * const placement_pointer = read<char *>(stack, address_address);
+				TODO("CHANGE HOW RETURN ADDRESS WORKS SO THAT IT CAN ASSIGN TO ANY ARBITRARY ADDRESS, NOT JUST THE STACK!!!");
+				int const placement_address = static_cast<int>(placement_pointer - stack.memory.data());
+				assert(placement_address >= 0 && placement_address < stack.memory.size());
+
+				try_call_void(eval_expression(node.assigned_expression, stack, context, placement_address));
 				return ControlFlow_Nothing;
 			},
 			[&](statement::ExpressionStatement const & expr_node) -> expected<ControlFlow, UnmetPrecondition>
@@ -942,7 +956,7 @@ namespace interpreter
 				return ControlFlow{ControlFlowType::Continue, continue_node.destroyed_stack_frame_size};
 			}
 		);
-		return std::visit(visitor, tree.as_variant());
+		return my::visit(tree.as_variant(), visitor);
 	}
 
 	template <typename T>

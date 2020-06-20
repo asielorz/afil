@@ -2150,7 +2150,7 @@ namespace instantiation
 			}
 		);
 
-		return std::visit(visitor, incomplete_expression_.variant);
+		return my::visit(incomplete_expression_.variant, visitor);
 	}
 
 	auto instantiate_statement(
@@ -2269,6 +2269,30 @@ namespace instantiation
 						insert_implicit_conversion_node(std::move(expression), assigned_expression_type, var_type, scope_stack, *program, incomplete_statement.assigned_expression.source));
 					return std::move(complete_statement);
 				}
+			},
+			[&](incomplete::statement::PlacementLet const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
+			{
+				try_call_decl(complete::Expression address_expression, instantiate_expression(
+					incomplete_statement.address_expression, template_parameters, scope_stack, program, current_scope_return_type));
+
+				try_call_decl(complete::Expression assigned_expression, instantiate_expression(
+					incomplete_statement.assigned_expression, template_parameters, scope_stack, program, current_scope_return_type));
+
+				complete::TypeId const assigned_expression_type_id = expression_type_id(assigned_expression, *program);
+				if (assigned_expression_type_id.is_function || assigned_expression_type_id == complete::TypeId::void_)
+					return make_syntax_error(incomplete_statement.assigned_expression.source, "Assigned expression in placement let statement cannot be a function or void.");
+
+				complete::TypeId const address_expression_type_id = expression_type_id(address_expression, *program);
+				complete::Type const & address_expression_type = type_with_id(*program, address_expression_type_id);
+
+				if (!((is_array_pointer(address_expression_type) && pointee_type(address_expression_type) == make_mutable(complete::TypeId::byte)) ||
+					(is_pointer(address_expression_type) && pointee_type(address_expression_type) == make_mutable(decay(assigned_expression_type_id)))))
+					return make_syntax_error(incomplete_statement.address_expression.source, "Address of placement let statement must be of type byte[] or pointer to assigned type.");
+
+				complete::statement::PlacementLet complete_placement_let;
+				complete_placement_let.address_expression = std::move(address_expression);
+				complete_placement_let.assigned_expression = std::move(assigned_expression);
+				return std::move(complete_placement_let);
 			},
 			[&](incomplete::statement::UninitDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
 			{
@@ -2548,7 +2572,7 @@ namespace instantiation
 			}
 		);
 
-		return std::visit(visitor, incomplete_statement_.variant);
+		return my::visit(incomplete_statement_.variant, visitor);
 	}
 
 	[[nodiscard]] auto semantic_analysis(
