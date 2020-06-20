@@ -3,23 +3,44 @@ namespace interpreter
 
 	template <typename T> auto read(ProgramStack const & stack, int address) noexcept -> T const &
 	{
+		static_assert(std::is_trivially_copyable_v<T>);
 		return reinterpret_cast<T const &>(stack.memory[address]);
 	}
 
 	template <typename T> auto write(ProgramStack & stack, int address, T const & value) noexcept -> void
 	{
+		static_assert(std::is_trivially_copyable_v<T>);
 		reinterpret_cast<T &>(stack.memory[address]) = value;
+	}
+
+	template <typename T> auto write(ProgramStack & stack, int address, T const array[], int size) noexcept -> void
+	{
+		static_assert(std::is_trivially_copyable_v<T>);
+		memcpy(pointer_at_address(stack, address), array, size * sizeof(T));
+	}
+
+	template <typename T> auto read(void * address) noexcept -> T const &
+	{
+		static_assert(std::is_trivially_copyable_v<T>);
+		return *reinterpret_cast<T const *>(address);
+	}
+
+	template <typename T> auto write(void * address, T const & value) noexcept -> void
+	{
+		static_assert(std::is_trivially_copyable_v<T>);
+		*reinterpret_cast<T *>(address) = value;
+	}
+
+	template <typename T> auto write(void * address, T const array[], int size) noexcept -> void
+	{
+		static_assert(std::is_trivially_copyable_v<T>);
+		memcpy(address, array, size * sizeof(T));
 	}
 
 	template <typename T> auto push(ProgramStack & stack, T const & value) -> void
 	{
 		int const address = alloc(stack, sizeof(T), alignof(T));
 		write(stack, address, value);
-	}
-
-	template <typename T> auto write(ProgramStack & stack, int address, T const array[], int size) noexcept -> void
-	{
-		memcpy(pointer_at_address(stack, address), array, size * sizeof(T));
 	}
 
 	struct StackGuard
@@ -43,30 +64,30 @@ namespace interpreter
 		}
 	};
 
-	auto call_extern_function(complete::ExternFunction const & function, span<complete::Expression const> parameters, ProgramStack & stack, RuntimeContext context, int return_address)
+	auto call_extern_function(complete::ExternFunction const & function, span<complete::Expression const> parameters, ProgramStack & stack, RuntimeContext context, char * return_address)
 		->expected<void, UnmetPrecondition>;
-	auto call_extern_function(complete::ExternFunction const & function, span<complete::Expression const> parameters, ProgramStack & stack, CompileTimeContext context, int return_address)
+	auto call_extern_function(complete::ExternFunction const & function, span<complete::Expression const> parameters, ProgramStack & stack, CompileTimeContext context, char * return_address)
 		->expected<void, UnmetPrecondition>;
 
-	auto eval_variable_node(complete::TypeId variable_type, int address, ProgramStack & stack, int return_address) noexcept -> void;
+	auto eval_variable_node(complete::TypeId variable_type, int address, ProgramStack & stack, char * return_address) noexcept -> void;
 
 	template <typename Ret, typename A, typename B>
-	inline auto call_intrinsic_function(ProgramStack & stack, int return_address, Ret(*function)(A, B)) -> void
+	inline auto call_intrinsic_function(ProgramStack & stack, char * return_address, Ret(*function)(A, B)) -> void
 	{
 		int const a_address = stack.base_pointer;
 		int const b_address = align(a_address + sizeof(A), alignof(B));
-		write(stack, return_address, function(read<A>(stack, a_address), read<B>(stack, b_address)));
+		write(return_address, function(read<A>(stack, a_address), read<B>(stack, b_address)));
 	}
 
 	template <typename Ret, typename A>
-	auto call_intrinsic_function(ProgramStack & stack, int return_address, Ret(*function)(A)) -> void
+	auto call_intrinsic_function(ProgramStack & stack, char * return_address, Ret(*function)(A)) -> void
 	{
 		int const a_address = stack.base_pointer;
-		write(stack, return_address, function(read<A>(stack, a_address)));
+		write(return_address, function(read<A>(stack, a_address)));
 	}
 
 	template <typename ExecutionContext>
-	auto destroy_variable(int address, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
+	auto destroy_variable(char * address, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
 		-> expected<void, UnmetPrecondition>
 	{
 		FunctionId const destructor = destructor_for(context.program, type);
@@ -74,11 +95,18 @@ namespace interpreter
 		{
 			try_call_void(call_function(destructor, stack, context, 0, [address](int parameters_start, ProgramStack & stack)
 			{
-				write(stack, parameters_start, pointer_at_address(stack, address));
+				write(stack, parameters_start, address);
 			}));
 		}
 
 		return success;
+	}
+
+	template <typename ExecutionContext>
+	auto destroy_variable(int address, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
+		->expected<void, UnmetPrecondition>
+	{
+		return destroy_variable(pointer_at_address(stack, address), type, stack, context);
 	}
 
 	template <typename ExecutionContext>
@@ -100,20 +128,48 @@ namespace interpreter
 	}
 
 	template <typename ExecutionContext>
-	auto copy_variable(int from, int to, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
+	auto copy_variable(char * from, char * to, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
 		-> expected<void, UnmetPrecondition>
 	{
 		FunctionId const copy_constructor = copy_constructor_for(context.program, type);
 		assert(copy_constructor != deleted_function_id);
 		if (copy_constructor == invalid_function_id)
 		{
-			memcpy(pointer_at_address(stack, to), pointer_at_address(stack, from), type_size(context.program, type));
+			memcpy(to, from, type_size(context.program, type));
 		}
 		else
 		{
 			try_call_void(call_function(copy_constructor, stack, context, to, [from](int parameters_start, ProgramStack & stack)
 			{
-				write(stack, parameters_start, pointer_at_address(stack, from));
+				write(stack, parameters_start, from);
+			}));
+		}
+
+		return success;
+	}
+
+	template <typename ExecutionContext>
+	auto copy_variable(int from, int to, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
+		-> expected<void, UnmetPrecondition>
+	{
+		return copy_variable(pointer_at_address(stack, from), pointer_at_address(stack, to), stack, context);
+	}
+
+	template <typename ExecutionContext>
+	auto move_variable(char * from, char * to, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
+		-> expected<void, UnmetPrecondition>
+	{
+		FunctionId const move_constructor = move_constructor_for(context.program, type);
+		assert(move_constructor != deleted_function_id);
+		if (move_constructor == invalid_function_id)
+		{
+			memcpy(to, from, type_size(context.program, type));
+		}
+		else
+		{
+			try_call_void(call_function(move_constructor, stack, context, to, [from](int parameters_start, ProgramStack & stack)
+			{
+				write(stack, parameters_start, from);
 			}));
 		}
 
@@ -124,25 +180,11 @@ namespace interpreter
 	auto move_variable(int from, int to, complete::TypeId type, ProgramStack & stack, ExecutionContext context) noexcept
 		-> expected<void, UnmetPrecondition>
 	{
-		FunctionId const move_constructor = move_constructor_for(context.program, type);
-		assert(move_constructor != deleted_function_id);
-		if (move_constructor == invalid_function_id)
-		{
-			memcpy(pointer_at_address(stack, to), pointer_at_address(stack, from), type_size(context.program, type));
-		}
-		else
-		{
-			try_call_void(call_function(move_constructor, stack, context, to, [from](int parameters_start, ProgramStack & stack)
-			{
-				write(stack, parameters_start, pointer_at_address(stack, from));
-			}));
-		}
-
-		return success;
+		return move_variable(pointer_at_address(stack, from), pointer_at_address(stack, to), stack, context);
 	}
 
 	template <typename ExecutionContext>
-	auto call_function_with_parameters_already_set(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
+	auto call_function_with_parameters_already_set(FunctionId function_id, ProgramStack & stack, ExecutionContext context, char * return_address) noexcept
 		-> expected<void, UnmetPrecondition>
 	{
 		if (function_id.type == FunctionId::Type::intrinsic)
@@ -437,7 +479,7 @@ namespace interpreter
 	}
 
 	template <typename ExecutionContext, typename SetParameters>
-	auto call_function(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address, SetParameters set_parameters) noexcept
+	auto call_function(FunctionId function_id, ProgramStack & stack, ExecutionContext context, char * return_address, SetParameters set_parameters) noexcept
 		-> expected<void, UnmetPrecondition>
 	{
 		// Save previous stack frame bounds.
@@ -464,7 +506,7 @@ namespace interpreter
 	}
 
 	template <typename ExecutionContext>
-	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
+	auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, char * return_address) noexcept
 		-> expected<void, UnmetPrecondition>
 	{
 		int const param_size = stack_frame_size(context.program, function_id);
@@ -504,14 +546,14 @@ namespace interpreter
 			complete::TypeId const param_type = expression_type_id(parameters[i], context.program);
 			if (!param_type.is_reference && parameter_types[i].is_reference)
 			{
-				try_call_void(eval_expression(parameters[i], stack, context, next_temporary_address));
+				try_call_void(eval_expression(parameters[i], stack, context, pointer_at_address(stack, next_temporary_address)));
 				write(stack, next_parameter_address, pointer_at_address(stack, next_temporary_address));
 				next_temporary_address += expression_type_size(parameters[i], context.program);
 				next_parameter_address += sizeof(void *);
 			}
 			else
 			{
-				try_call_void(eval_expression(parameters[i], stack, context, next_parameter_address));
+				try_call_void(eval_expression(parameters[i], stack, context, pointer_at_address(stack, next_parameter_address)));
 				next_parameter_address += expression_type_size(parameters[i], context.program);
 			}
 		}
@@ -545,7 +587,7 @@ namespace interpreter
 	{
 		complete::TypeId const & expr_type = expression_type_id(tree, context.program);
 		int const address = alloc(stack, type_size(context.program, expr_type), type_alignment(context.program, expr_type));
-		try_call_void(eval_expression(tree, stack, context, address));
+		try_call_void(eval_expression(tree, stack, context, pointer_at_address(stack, address)));
 		return address;
 	}
 
@@ -561,42 +603,42 @@ namespace interpreter
 
 	namespace detail
 	{
-		inline auto eval_type_literal_expression(ProgramStack &, RuntimeContext, int)
+		inline auto eval_type_literal_expression(ProgramStack &, RuntimeContext, char *)
 		{
 			return [](complete::expression::Literal<complete::TypeId>) { declare_unreachable(); };
 		}
-		inline auto eval_type_literal_expression(ProgramStack & stack, CompileTimeContext, int return_address)
+		inline auto eval_type_literal_expression(ProgramStack & stack, CompileTimeContext, char * return_address)
 		{
-			return [&stack, return_address](complete::expression::Literal<complete::TypeId> literal) { write(stack, return_address, literal.value); };
+			return [&stack, return_address](complete::expression::Literal<complete::TypeId> literal) { write(return_address, literal.value); };
 		}
 
-		inline auto eval_compiles_expression(ProgramStack &, RuntimeContext, int) noexcept
+		inline auto eval_compiles_expression(ProgramStack &, RuntimeContext, char *) noexcept
 		{
 			return [](complete::expression::Compiles const &) { declare_unreachable(); };
 		}
-		auto eval_compiles_expression_impl(complete::expression::Compiles const & compiles_expr, ProgramStack & stack, CompileTimeContext context, int return_address) noexcept
+		auto eval_compiles_expression_impl(complete::expression::Compiles const & compiles_expr, ProgramStack & stack, CompileTimeContext context, char * return_address) noexcept
 			-> expected<void, UnmetPrecondition>;
-		inline auto eval_compiles_expression(ProgramStack & stack, CompileTimeContext context, int return_address) noexcept
+		inline auto eval_compiles_expression(ProgramStack & stack, CompileTimeContext context, char * return_address) noexcept
 		{
 			return [=, &stack](complete::expression::Compiles const & compiles_expr) { return eval_compiles_expression_impl(compiles_expr, stack, context, return_address); };
 		}
 	} // namespace detail
 
 	template <typename ExecutionContext>
-	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, ExecutionContext context, int return_address) noexcept -> expected<void, UnmetPrecondition>
+	auto eval_expression(complete::Expression const & expr, ProgramStack & stack, ExecutionContext context, char * return_address) noexcept -> expected<void, UnmetPrecondition>
 	{
 		using namespace complete;
 
 		auto const visitor = overload_default_ret(expected<void, UnmetPrecondition>(success),
-			[&](expression::Literal<int> literal) { write(stack, return_address, literal.value); },
-			[&](expression::Literal<float> literal) { write(stack, return_address, literal.value); },
-			[&](expression::Literal<bool> literal) { write(stack, return_address, literal.value); },
-			[&](expression::Literal<char_t> literal) { write(stack, return_address, literal.value); },
+			[&](expression::Literal<int> literal) { write(return_address, literal.value); },
+			[&](expression::Literal<float> literal) { write(return_address, literal.value); },
+			[&](expression::Literal<bool> literal) { write(return_address, literal.value); },
+			[&](expression::Literal<char_t> literal) { write(return_address, literal.value); },
 			[&](expression::Literal<null_t>) {},
 			detail::eval_type_literal_expression(stack, context, return_address),
 			[&](expression::StringLiteral literal)
 			{
-				write(stack, return_address, literal.value.data(), static_cast<int>(literal.value.size())); 
+				write(return_address, literal.value.data(), static_cast<int>(literal.value.size())); 
 			},
 			[&](expression::LocalVariable const & var_node)
 			{
@@ -616,28 +658,28 @@ namespace interpreter
 				if (owner_type.is_reference)
 				{
 					char * const owner_ptr = read<char *>(stack, owner_address);
-					write(stack, return_address, owner_ptr + var_node.variable_offset);
+					write(return_address, owner_ptr + var_node.variable_offset);
 				}
 				// If the owner is an rvalue, return the member by value.
 				else
 				{
 					int const variable_size = type_size(context.program, var_node.variable_type);
-					move_variable(owner_address + var_node.variable_offset, return_address, var_node.variable_type, stack, context);
-					destroy_variable(owner_address, owner_type, stack, context);
+					char * const owner_ptr = pointer_at_address(stack, owner_address);
+					move_variable(owner_ptr + var_node.variable_offset, return_address, var_node.variable_type, stack, context);
+					destroy_variable(owner_ptr, owner_type, stack, context);
 				}
 				return success;
 			},
 			[&](expression::Constant const & constant_node)
 			{
-				//write(stack, return_address, constant_node.value.data(), static_cast<int>(constant_node.value.size()));
-				write(stack, return_address, constant_node.value.data());
+				write(return_address, constant_node.value.data());
 			},
 			[&](expression::Dereference const & deref_node) -> expected<void, UnmetPrecondition>
 			{
 				StackGuard const g(stack);
 				try_call_decl(int const pointer_address, eval_expression(*deref_node.expression, stack, context));
 				auto const pointer = read<void const *>(stack, pointer_address);
-				memcpy(pointer_at_address(stack, return_address), pointer, type_size(context.program, deref_node.return_type));
+				memcpy(return_address, pointer, type_size(context.program, deref_node.return_type));
 				return success;
 			},
 			[&](expression::ReinterpretCast const & addressof_node)
@@ -658,7 +700,7 @@ namespace interpreter
 					char const * const array = read<char const *>(stack, array_address);
 					int const index = read<int>(stack, index_address);
 					int const value_type_size = type_size(context.program, remove_reference(subscript_node.return_type));
-					write(stack, return_address, array + index * value_type_size);
+					write(return_address, array + index * value_type_size);
 				}
 				else // array rvalue
 				{
@@ -666,7 +708,7 @@ namespace interpreter
 					try_call_decl(int const index_address, eval_expression(*subscript_node.index, stack, context));
 					int const index = read<int>(stack, index_address);
 					int const value_type_size = type_size(context.program, subscript_node.return_type);
-					move_variable(array_address + index * value_type_size, return_address, subscript_node.return_type, stack, context);
+					move_variable(pointer_at_address(stack, array_address + index * value_type_size), return_address, subscript_node.return_type, stack, context);
 					destroy_variable(array_address, array_type_id, stack, context);
 				}
 				return success;
@@ -678,7 +720,7 @@ namespace interpreter
 				size_t pointer = read<size_t>(stack, pointer_address);
 				int const index = read<int>(stack, index_address);
 				pointer += index * type_size(context.program, pointee_type(pointer_add_node.return_type, context.program));
-				write(stack, return_address, pointer);
+				write(return_address, pointer);
 				return success;
 			},
 			[&](expression::PointerMinusInt const & pointer_subtract_node) -> expected<void, UnmetPrecondition>
@@ -688,7 +730,7 @@ namespace interpreter
 				size_t pointer = read<size_t>(stack, pointer_address);
 				int const index = read<int>(stack, index_address);
 				pointer -= index * type_size(context.program, pointee_type(pointer_subtract_node.return_type, context.program));
-				write(stack, return_address, pointer);
+				write(return_address, pointer);
 				return success;
 			},
 			[&](expression::PointerMinusPointer const & pointer_subtract_node) -> expected<void, UnmetPrecondition>
@@ -701,7 +743,7 @@ namespace interpreter
 				int const value_type_size = type_size(context.program, pointee_type(expression_type_id(*pointer_subtract_node.left, context.program), context.program));
 				assert(is_divisible(static_cast<int>(difference), value_type_size));
 				difference /= value_type_size;
-				write(stack, return_address, static_cast<int>(difference));
+				write(return_address, static_cast<int>(difference));
 				return success;
 			},
 			[&](expression::FunctionCall const & func_call_node)
@@ -715,13 +757,13 @@ namespace interpreter
 					// Call operator ==.
 					try_call_void(call_function(op_node.function_id, op_node.parameters, stack, context, return_address));
 					// Negate the result.
-					write(stack, return_address, !read<bool>(stack, return_address));
+					write(return_address, !read<bool>(return_address));
 				}
 				else // We need to call operator <=>, and convert the int it returns into a boolean.
 				{
 					int const prev_stack_top = stack.top_pointer;
 					int const temp_storage = alloc(stack, sizeof(int), alignof(int));
-					try_call_void(call_function(op_node.function_id, op_node.parameters, stack, context, temp_storage));
+					try_call_void(call_function(op_node.function_id, op_node.parameters, stack, context, pointer_at_address(stack, temp_storage)));
 
 					int const three_way_result = read_word(stack, temp_storage);
 					bool boolean_result;
@@ -735,7 +777,7 @@ namespace interpreter
 					}
 
 					// Write final result to return address.
-					write(stack, return_address, boolean_result);
+					write(return_address, boolean_result);
 					free_up_to(stack, prev_stack_top);
 				}
 				return success;
@@ -817,7 +859,7 @@ namespace interpreter
 	}
 
 	template <typename ExecutionContext>
-	auto run_statement(complete::Statement const & tree, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
+	auto run_statement(complete::Statement const & tree, ProgramStack & stack, ExecutionContext context, char * return_address) noexcept
 		-> expected<ControlFlow, UnmetPrecondition>
 	{
 		using namespace complete;
@@ -826,21 +868,17 @@ namespace interpreter
 			[&](statement::VariableDeclaration const & node) -> expected<ControlFlow, UnmetPrecondition>
 			{
 				int const address = stack.base_pointer + node.variable_offset;
-				try_call_void(eval_expression(node.assigned_expression, stack, context, address));
+				try_call_void(eval_expression(node.assigned_expression, stack, context, pointer_at_address(stack, address)));
 				return ControlFlow_Nothing;
 			},
 			[&](statement::PlacementLet const & node) -> expected<ControlFlow, UnmetPrecondition>
 			{
 				auto const g = StackGuard(stack);
 				int const address_address = alloc(stack, sizeof(void *), alignof(void *));
-				try_call_void(eval_expression(node.address_expression, stack, context, address_address));
+				try_call_void(eval_expression(node.address_expression, stack, context, pointer_at_address(stack, address_address)));
 				
 				char * const placement_pointer = read<char *>(stack, address_address);
-				TODO("CHANGE HOW RETURN ADDRESS WORKS SO THAT IT CAN ASSIGN TO ANY ARBITRARY ADDRESS, NOT JUST THE STACK!!!");
-				int const placement_address = static_cast<int>(placement_pointer - stack.memory.data());
-				assert(placement_address >= 0 && placement_address < stack.memory.size());
-
-				try_call_void(eval_expression(node.assigned_expression, stack, context, placement_address));
+				try_call_void(eval_expression(node.assigned_expression, stack, context, placement_pointer));
 				return ControlFlow_Nothing;
 			},
 			[&](statement::ExpressionStatement const & expr_node) -> expected<ControlFlow, UnmetPrecondition>

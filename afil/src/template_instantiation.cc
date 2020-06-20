@@ -2290,7 +2290,8 @@ namespace instantiation
 					return make_syntax_error(incomplete_statement.address_expression.source, "Address of placement let statement must be of type byte[] or pointer to assigned type.");
 
 				complete::statement::PlacementLet complete_placement_let;
-				complete_placement_let.address_expression = std::move(address_expression);
+				try_call(assign_to(complete_placement_let.address_expression), insert_implicit_conversion_node(
+					std::move(address_expression), address_expression_type_id, decay(address_expression_type_id), scope_stack, *program, incomplete_statement.address_expression.source));
 				complete_placement_let.assigned_expression = std::move(assigned_expression);
 				return std::move(complete_placement_let);
 			},

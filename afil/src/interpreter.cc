@@ -38,34 +38,34 @@ namespace interpreter
 		return stack.memory.data() + address;
 	}
 
-	auto call_extern_function(complete::ExternFunction const & function, ProgramStack & stack, RuntimeContext context, int return_address)
+	auto call_extern_function(complete::ExternFunction const & function, ProgramStack & stack, RuntimeContext context, char * return_address)
 		-> expected<void, UnmetPrecondition>
 	{
 		static_cast<void>(context);
-		function.caller(function.function_pointer, pointer_at_address(stack, stack.base_pointer), pointer_at_address(stack, return_address));
+		function.caller(function.function_pointer, pointer_at_address(stack, stack.base_pointer), return_address);
 		return success;
 	}
-	auto call_extern_function(complete::ExternFunction const & function, ProgramStack & stack, CompileTimeContext context, int return_address)
+	auto call_extern_function(complete::ExternFunction const & function, ProgramStack & stack, CompileTimeContext context, char * return_address)
 		->expected<void, UnmetPrecondition>
 	{
 		static_cast<void>(function, stack, context, return_address);
 		declare_unreachable();
 	}
 
-	auto eval_variable_node(complete::TypeId variable_type, int address, ProgramStack & stack, int return_address) noexcept -> void
+	auto eval_variable_node(complete::TypeId variable_type, int address, ProgramStack & stack, char * return_address) noexcept -> void
 	{
 		if (variable_type.is_reference)
 		{
 			auto const pointer = read<void const *>(stack, address);
-			write(stack, return_address, pointer);
+			write(return_address, pointer);
 		}
 		else
 		{
-			write(stack, return_address, pointer_at_address(stack, address));
+			write(return_address, pointer_at_address(stack, address));
 		}
 	}
 
-	auto detail::eval_compiles_expression_impl(complete::expression::Compiles const & compiles_expr, ProgramStack & stack, CompileTimeContext context, int return_address) noexcept 
+	auto detail::eval_compiles_expression_impl(complete::expression::Compiles const & compiles_expr, ProgramStack & stack, CompileTimeContext context, char * return_address) noexcept 
 		-> expected<void, UnmetPrecondition>
 	{
 		complete::Scope fake_scope;
@@ -90,7 +90,7 @@ namespace interpreter
 			}
 		}
 
-		write(stack, return_address, all_body_expressions_compile);
+		write(return_address, all_body_expressions_compile);
 		return success;
 	}
 
@@ -129,7 +129,7 @@ namespace interpreter
 
 		// Run main.
 		int const return_address = alloc(stack, sizeof(int), alignof(int));
-		try_call_void(call_function(program.main_function, {}, stack, RuntimeContext{program}, return_address));
+		try_call_void(call_function(program.main_function, {}, stack, RuntimeContext{program}, pointer_at_address(stack, return_address)));
 		return read<int>(stack, return_address);
 	}
 

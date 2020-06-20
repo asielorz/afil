@@ -66,25 +66,25 @@ namespace interpreter
 	};
 
 	template <typename ExecutionContext>
-	[[nodiscard]] auto call_function_with_parameters_already_set(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
+	[[nodiscard]] auto call_function_with_parameters_already_set(FunctionId function_id, ProgramStack & stack, ExecutionContext context, char * return_address) noexcept
 		->expected<void, UnmetPrecondition>;
 
 	template <typename ExecutionContext, typename SetParameters>
-	[[nodiscard]] auto call_function(FunctionId function_id, ProgramStack & stack, ExecutionContext context, int return_address, SetParameters set_parameters) noexcept
+	[[nodiscard]] auto call_function(FunctionId function_id, ProgramStack & stack, ExecutionContext context, char * return_address, SetParameters set_parameters) noexcept
 		-> expected<void, UnmetPrecondition>;
 
 	template <typename ExecutionContext>
-	[[nodiscard]] auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
+	[[nodiscard]] auto call_function(FunctionId function_id, span<complete::Expression const> parameters, ProgramStack & stack, ExecutionContext context, char * return_address) noexcept
 		->expected<void, UnmetPrecondition>;
 
 	template <typename ExecutionContext>
 	[[nodiscard]] auto eval_expression(complete::Expression const & tree, ProgramStack & stack, ExecutionContext context) noexcept -> expected<int, UnmetPrecondition>;
 
 	template <typename ExecutionContext>
-	[[nodiscard]] auto eval_expression(complete::Expression const & expr, ProgramStack & stack, ExecutionContext context, int return_address) noexcept -> expected<void, UnmetPrecondition>;
+	[[nodiscard]] auto eval_expression(complete::Expression const & expr, ProgramStack & stack, ExecutionContext context, char * return_address) noexcept -> expected<void, UnmetPrecondition>;
 
 	template <typename ExecutionContext>
-	[[nodiscard]] auto run_statement(complete::Statement const & tree, ProgramStack & stack, ExecutionContext context, int return_address) noexcept
+	[[nodiscard]] auto run_statement(complete::Statement const & tree, ProgramStack & stack, ExecutionContext context, char * return_address) noexcept
 		-> expected<ControlFlow, UnmetPrecondition>;
 
 	[[nodiscard]] auto evaluate_constant_expression(

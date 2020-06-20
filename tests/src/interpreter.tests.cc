@@ -3484,6 +3484,33 @@ TEST_CASE("Placement let allows constructing an object in a preallocated memory 
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
+TEST_CASE("Placement let to a memory block allocated with malloc")
+{
+	auto const src = R"(
+		let malloc = fn(uint64 size) -> byte mut[]
+			extern_symbol("malloc");
+
+		let free = fn<T>(T mut * memory)
+		{
+			let free_impl = fn(byte mut[] memory) -> void
+				extern_symbol("free");
+			
+			free_impl(byte mut[](memory));
+		};
+
+		let main = fn() -> int32
+		{
+			let pi = int32 mut*(malloc(uint64(4)));
+			let(pi) = 1073741824;
+			let x = *pi;
+			free(pi);
+			return x;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1073741824);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {
