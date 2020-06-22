@@ -8,6 +8,7 @@
 #include "scope_stack.hh"
 #include "syntax_error.hh"
 #include "utils/callc.hh"
+#include "utils/function_ptr.hh"
 #include <optional>
 #include <map>
 
@@ -133,6 +134,14 @@ namespace complete
 		bool is_reference : 1;
 	};
 
+	struct IntrinsicFunctionTemplate
+	{
+		function_ptr<auto(span<TypeId const>, Program const &) -> Function> instantiation_function;
+		std::vector<FunctionTemplateParameterType> parameter_types;
+		std::string ABI_name;
+		int template_parameter_count;
+	};
+
 	struct FunctionTemplate
 	{
 		incomplete::FunctionTemplate incomplete_function;
@@ -214,6 +223,7 @@ namespace complete
 	auto ABI_name(Program const & program, TypeId id) noexcept -> std::string_view;
 	auto is_trivially_destructible(Program const & program, TypeId id) noexcept -> bool;
 	auto is_destructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool;
+	auto is_destructible_at_runtime(Program const & program, TypeId id) noexcept -> bool;
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId;
 	auto is_copy_constructible(Program const & program, TypeId id) noexcept -> bool;
 	auto is_trivially_copy_constructible(Program const & program, TypeId id) noexcept -> bool;
@@ -271,6 +281,8 @@ namespace complete
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, PartialSyntaxError>;
 	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, std::string_view instantiation_in_source) noexcept 
 		-> expected<TypeId, PartialSyntaxError>;
+
+	auto instantiate_destroy_function_template(span<TypeId const> parameters, Program const & program) noexcept -> Function;
 
 	struct ConversionNotFound
 	{

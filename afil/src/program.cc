@@ -88,7 +88,7 @@ namespace complete
 		return intrinsic_function_descriptor_helper(name, static_cast<F *>(nullptr));
 	}
 
-	const IntrinsicFunction intrinsic_functions[] = {
+	IntrinsicFunction const intrinsic_functions[] = {
 		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("+"sv),
 		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("-"sv),
 		intrinsic_function_descriptor<int8_t(int8_t, int8_t)>("*"sv),
@@ -328,6 +328,95 @@ namespace complete
 		intrinsic_function_descriptor<double(float)>("conversion"sv),
 	};
 
+	template <int N> struct Param : std::integral_constant<int, N> {};
+
+	template <int N>
+	auto parameter_type_for(BoxedType<Param<N>>) -> FunctionTemplateParameterType
+	{
+		FunctionTemplateParameterType param;
+		param.is_mutable = true;
+		param.is_reference = false;
+		param.value = FunctionTemplateParameterType::TemplateParameter{N};
+		return param;
+	}
+
+	template <typename T>
+	auto parameter_type_for(BoxedType<T>) -> FunctionTemplateParameterType
+	{
+		FunctionTemplateParameterType param;
+		param.is_mutable = true;
+		param.is_reference = false;
+		param.value = FunctionTemplateParameterType::BaseCase{id_for(box<T>)};
+		return param;
+	}
+
+	template <typename T>
+	auto parameter_type_for(BoxedType<T const>) -> FunctionTemplateParameterType
+	{
+		FunctionTemplateParameterType param = parameter_type_for(box<T>);
+		param.is_mutable = false;
+		return param;
+	}
+
+	template <typename T>
+	auto parameter_type_for(BoxedType<T &>) -> FunctionTemplateParameterType
+	{
+		FunctionTemplateParameterType param = parameter_type_for(box<T>);
+		param.is_reference = true;
+		return param;
+	}
+
+	template <typename T>
+	auto parameter_type_for(BoxedType<T *>) -> FunctionTemplateParameterType
+	{
+		FunctionTemplateParameterType pointee = parameter_type_for(box<T>);
+		FunctionTemplateParameterType param;
+		param.is_mutable = true;
+		param.is_mutable = false;
+		param.value = FunctionTemplateParameterType::Pointer{allocate(std::move(pointee))};
+		return param;
+	}
+
+	template <typename T, int N>
+	auto parameter_type_for(BoxedType<T[N]>) -> FunctionTemplateParameterType
+	{
+		FunctionTemplateParameterType pointee = parameter_type_for(box<T>);
+		FunctionTemplateParameterType param;
+		param.is_mutable = true;
+		param.is_mutable = false;
+		param.value = FunctionTemplateParameterType::Array{allocate(std::move(pointee)), N};
+		return param;
+	}
+
+	template <int N> constexpr auto highest_template_parameter(BoxedType<Param<N>>) -> int { return N + 1; }
+	template <typename T> constexpr auto highest_template_parameter(BoxedType<T>) -> int { return 0; }
+	template <typename T> constexpr auto highest_template_parameter(BoxedType<T const>) -> int { return highest_template_parameter(box<T>); }
+	template <typename T> constexpr auto highest_template_parameter(BoxedType<T &>) -> int { return highest_template_parameter(box<T>); }
+	template <typename T> constexpr auto highest_template_parameter(BoxedType<T *>) -> int { return highest_template_parameter(box<T>); }
+	template <typename T, int N> constexpr auto highest_template_parameter(BoxedType<T[N]>) -> int { return highest_template_parameter(box<T>); }
+
+	template <typename ... Params>
+	auto intrinsic_function_template_descriptor(
+		std::string_view name, 
+		function_ptr<auto(span<TypeId const>, Program const &) -> Function> instantiation_function
+	) noexcept -> IntrinsicFunctionTemplate
+	{
+		assert(instantiation_function != nullptr);
+
+		IntrinsicFunctionTemplate template_descriptor;
+		template_descriptor.ABI_name = name;
+		template_descriptor.instantiation_function = instantiation_function;
+		template_descriptor.parameter_types = {parameter_type_for(box<Params>)...};
+		constexpr int template_parameter_count = std::max({highest_template_parameter(box<Params>)...});
+		static_assert(template_parameter_count > 0);
+		template_descriptor.template_parameter_count = template_parameter_count;
+		return template_descriptor;
+	}
+
+	IntrinsicFunctionTemplate const intrinsic_function_templates[] = {
+		intrinsic_function_template_descriptor<Param<0> &>("destroy", instantiate_destroy_function_template)
+	};
+
 	Program::Program()
 	{
 		auto const built_in_types_to_add = built_in_types();
@@ -353,6 +442,15 @@ namespace complete
 		{
 			auto const & fn = intrinsic_functions[i];
 			global_scope.functions.push_back({std::string(fn.name), {FunctionId::Type::intrinsic, static_cast<unsigned>(i)}});
+		}
+
+		size_t const intrinsic_function_template_count = std::size(intrinsic_function_templates);
+		global_scope.function_templates.reserve(intrinsic_function_count);
+
+		for (size_t i = 0; i < intrinsic_function_template_count; ++i)
+		{
+			auto const & fn = intrinsic_function_templates[i];
+			global_scope.function_templates.push_back({fn.ABI_name, {true, static_cast<unsigned>(i)}});
 		}
 	}
 
@@ -474,6 +572,12 @@ namespace complete
 	{
 		FunctionId const destructor = destructor_for(program, id);
 		return destructor == invalid_function_id || is_callable_at_compile_time(program, destructor);
+	}
+
+	auto is_destructible_at_runtime(Program const & program, TypeId id) noexcept -> bool
+	{
+		FunctionId const destructor = destructor_for(program, id);
+		return destructor == invalid_function_id || is_callable_at_runtime(program, destructor);
 	}
 
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId
@@ -770,7 +874,7 @@ namespace complete
 
 	auto add_function_template(Program & program, FunctionTemplate new_function_template) noexcept -> FunctionTemplateId
 	{
-		FunctionTemplateId const function_template_id = FunctionTemplateId{static_cast<unsigned>(program.function_templates.size())};
+		FunctionTemplateId const function_template_id = FunctionTemplateId{false, static_cast<unsigned>(program.function_templates.size())};
 		program.function_templates.push_back(std::move(new_function_template));
 		return function_template_id;
 	}
@@ -968,33 +1072,43 @@ namespace complete
 
 	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, PartialSyntaxError>
 	{
-		FunctionTemplate & function_template = program.function_templates[template_id.index];
-		assert(parameters.size() == function_template.incomplete_function.template_parameters.size());
+		if (template_id.is_intrinsic)
+		{
+			// TODO: Cache
+			Function instantiated_function = intrinsic_function_templates[template_id.index].instantiation_function(parameters, program);
+			FunctionId const instantiated_function_id = add_function(program, std::move(instantiated_function));
+			return instantiated_function_id;
+		}
+		else
+		{
+			FunctionTemplate & function_template = program.function_templates[template_id.index];
+			assert(parameters.size() == function_template.incomplete_function.template_parameters.size());
 
-		auto const cached_instantiation = function_template.cached_instantiations.find(parameters);
-		if (cached_instantiation != function_template.cached_instantiations.end())
-			return cached_instantiation->second;
+			auto const cached_instantiation = function_template.cached_instantiations.find(parameters);
+			if (cached_instantiation != function_template.cached_instantiations.end())
+				return cached_instantiation->second;
 
-		std::vector<ResolvedTemplateParameter> all_template_parameters;
-		all_template_parameters.reserve(function_template.scope_template_parameters.size() + parameters.size());
-		for (ResolvedTemplateParameter const id : function_template.scope_template_parameters) 
-			all_template_parameters.push_back(id);
+			std::vector<ResolvedTemplateParameter> all_template_parameters;
+			all_template_parameters.reserve(function_template.scope_template_parameters.size() + parameters.size());
+			for (ResolvedTemplateParameter const id : function_template.scope_template_parameters)
+				all_template_parameters.push_back(id);
 
-		for (size_t i = 0; i < parameters.size(); ++i) 
-			all_template_parameters.push_back({std::string(function_template.incomplete_function.template_parameters[i].name), parameters[i]});
+			for (size_t i = 0; i < parameters.size(); ++i)
+				all_template_parameters.push_back({ std::string(function_template.incomplete_function.template_parameters[i].name), parameters[i] });
 
-		instantiation::ScopeStack scope_stack = function_template.scope_stack;
+			instantiation::ScopeStack scope_stack = function_template.scope_stack;
 
-		try_call_decl(Function instantiated_function,
-			instantiation::instantiate_function_template(function_template.incomplete_function, all_template_parameters, scope_stack, out(program)));
+			try_call_decl(Function instantiated_function,
+				instantiation::instantiate_function_template(function_template.incomplete_function, all_template_parameters, scope_stack, out(program)));
 
-		instantiated_function.ABI_name = function_template.ABI_name;
-		FunctionId const instantiated_function_id = add_function(program, std::move(instantiated_function));
+			instantiated_function.ABI_name = function_template.ABI_name;
+			FunctionId const instantiated_function_id = add_function(program, std::move(instantiated_function));
 
-		auto parameters_to_insert = std::vector<TypeId>(parameters.begin(), parameters.end());
-		function_template.cached_instantiations.emplace(std::move(parameters_to_insert), instantiated_function_id);
+			auto parameters_to_insert = std::vector<TypeId>(parameters.begin(), parameters.end());
+			function_template.cached_instantiations.emplace(std::move(parameters_to_insert), instantiated_function_id);
 
-		return instantiated_function_id;
+			return instantiated_function_id;
+		}
 	}
 
 	auto check_concepts(
@@ -1071,6 +1185,39 @@ namespace complete
 		try_call_void(instantiation::instantiate_incomplete_struct_functions(struct_template.incomplete_struct, new_type_id, new_struct_id, all_template_parameters, scope_stack, out(program)));
 
 		return new_type_id;
+	}
+
+	auto instantiate_destroy_function_template(span<TypeId const> parameters, Program const & program) noexcept -> Function
+	{
+		TypeId const parameter_type = make_mutable(make_reference(parameters[0]));
+
+		Function destroy_function;
+		destroy_function.ABI_name = "destroy";
+		destroy_function.is_callable_at_compile_time = is_destructible_at_compile_time(program, parameters[0]);
+		destroy_function.is_callable_at_runtime = is_destructible_at_runtime(program, parameters[0]);
+		destroy_function.parameter_count = 1;
+		destroy_function.parameter_size = sizeof(void *);
+		destroy_function.return_type = TypeId::void_;
+		add_variable_to_scope(destroy_function, "t", parameter_type, 0, program);
+
+		// Add code to call the destructor only if the type is not trivially destructible.
+		if (!is_trivially_destructible(program, parameters[0]))
+		{
+			expression::LocalVariable parameter_access;
+			parameter_access.variable_type = parameter_type;
+			parameter_access.variable_offset = 0;
+
+			expression::FunctionCall destructor_call;
+			destructor_call.function_id = destructor_for(program, parameters[0]);
+			destructor_call.parameters.push_back(parameter_access);
+
+			statement::ExpressionStatement constructor_call_statement;
+			constructor_call_statement.expression = std::move(destructor_call);
+
+			destroy_function.statements.push_back(std::move(constructor_call_statement));
+		}
+
+		return destroy_function;
 	}
 
 	auto is_mutability_conversion_legal(bool from_is_mutable, bool to_is_mutable) noexcept -> bool
@@ -1303,11 +1450,30 @@ namespace complete
 
 		for (FunctionTemplateId template_id : overload_set.function_template_ids)
 		{
-			FunctionTemplate const & fn = program.function_templates[template_id.index];
-			span<FunctionTemplateParameterType const> const fn_parameters = fn.parameter_types;
+			span<FunctionTemplateParameterType const> fn_parameters;
+			size_t function_template_parameter_count;
+			span<FunctionId const> concepts;
+			std::vector<ResolvedTemplateParameter> scope_template_parameters;
+			instantiation::ScopeStack scope_stack;
+
+			if (template_id.is_intrinsic)
+			{
+				fn_parameters = intrinsic_function_templates[template_id.index].parameter_types;
+				function_template_parameter_count = intrinsic_function_templates[template_id.index].template_parameter_count;
+			}
+			else
+			{
+				FunctionTemplate const & fn = program.function_templates[template_id.index];
+				fn_parameters = fn.parameter_types;
+				function_template_parameter_count = fn.incomplete_function.template_parameters.size();
+				concepts = fn.concepts;
+				scope_template_parameters = fn.scope_template_parameters;
+				scope_stack = fn.scope_stack;
+			}
+
 			if (fn_parameters.size() == parameters.size())
 			{
-				dependent_type_count = fn.incomplete_function.template_parameters.size();
+				dependent_type_count = function_template_parameter_count;
 				std::fill(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none);
 
 				int conversions = 0;
@@ -1328,8 +1494,9 @@ namespace complete
 					}
 				}
 
-				if (check_concepts(fn.concepts, {resolved_dependent_types, dependent_type_count}, fn.scope_template_parameters, fn.scope_stack, program) != fn.concepts.size())
-					discard = true;
+				if (!concepts.empty())
+					if (check_concepts(concepts, {resolved_dependent_types, dependent_type_count}, std::move(scope_template_parameters), std::move(scope_stack), program) != concepts.size())
+						discard = true;
 
 				if (!discard)
 				{

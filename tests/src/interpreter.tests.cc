@@ -3511,6 +3511,37 @@ TEST_CASE("Placement let to a memory block allocated with malloc")
 	REQUIRE(tests::parse_and_run(src) == 1073741824);
 }
 
+TEST_CASE("destroy invokes the destructor on an object")
+{
+	auto const src = R"(
+		let mut global = 0;
+
+		struct DestructorTest
+		{
+			int32 value;
+
+			constructor with_value(int32 x) { return DestructorTest(x); }
+
+			destructor(DestructorTest mut & this)
+			{
+				global = this.value;
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			uninit byte[4] memory;
+			let (data(memory)) = DestructorTest::with_value(5);
+			let p = DestructorTest mut*(data(memory));
+			destroy(*p);
+
+			return global;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {

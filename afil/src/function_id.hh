@@ -22,4 +22,8 @@ constexpr FunctionId pointer_three_way_compare_intrinsic = (sizeof(void *) == 4)
 constexpr auto operator == (FunctionId a, FunctionId b) noexcept -> bool { return a.type == b.type && a.index == b.index; }
 constexpr auto operator != (FunctionId a, FunctionId b) noexcept -> bool { return !(a == b); }
 
-struct FunctionTemplateId { unsigned index; };
+struct FunctionTemplateId
+{
+	unsigned is_intrinsic : 1;
+	unsigned index : 31;
+};
