@@ -80,6 +80,7 @@ namespace complete
 		TypeId return_type;
 		std::vector<TypeId> parameter_types;
 		std::string_view name;
+		bool is_callable_at_runtime;
 	};
 
 	struct MemcmpRanges

@@ -78,7 +78,8 @@ namespace complete
 		return IntrinsicFunction{
 			id_for(box<R>),
 			{id_for(box<Args>)...},
-			name
+			name,
+			!(std::is_same_v<R, TypeId> || (std::is_same_v<Args, TypeId> || ...))
 		};
 	}
 
@@ -973,7 +974,7 @@ namespace complete
 	auto is_callable_at_runtime(Program const & program, FunctionId id) noexcept -> bool
 	{
 		if (id.type == FunctionId::Type::intrinsic)
-			return true;
+			return intrinsic_functions[id.index].is_callable_at_runtime;
 		else if (id.type == FunctionId::Type::imported)
 			return true;
 		else
