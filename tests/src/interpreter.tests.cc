@@ -2850,6 +2850,29 @@ TEST_CASE("The null type that automatically converts to a null pointer of all po
 	REQUIRE(tests::parse_and_run(src) == 2);
 }
 
+TEST_CASE("The null type that also converts to a null pointer of array pointer types")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let i = int32[1](5);
+			let j = int32[](null);
+
+			let mut result = 0;			
+			
+			if (&i != null)
+				result = result + 1;
+
+			if (j == null)
+				result = result + 1;
+	
+			return result;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 2);
+}
+
 TEST_CASE("uninit lets the programmer create variables without initializing them")
 {
 	auto const src = R"(
@@ -3540,6 +3563,38 @@ TEST_CASE("destroy invokes the destructor on an object")
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src) == 5);
+}
+
+TEST_CASE("size_in_bytes_of is an intrinsic function that returns the size in bytes of a type")
+{
+	auto const src1 = R"(
+		let main = fn() -> int32
+		{
+			//let x = size_in_bytes_of(int32);
+			//return x;
+			return size_in_bytes_of(int32);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src1) == 4);
+	/*
+	auto const src2 = R"(
+		let main = fn() -> int32
+		{
+			return size_in_bytes_of(float64);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src2) == 8);
+
+	auto const src3 = R"(
+		let main = fn() -> int32
+		{
+			return size_in_bytes_of(bool);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src3) == 1);*/
 }
 
 #if 0

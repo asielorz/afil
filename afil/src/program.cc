@@ -326,6 +326,9 @@ namespace complete
 		intrinsic_function_descriptor<double(uint32_t)>("conversion"sv),
 		intrinsic_function_descriptor<double(uint64_t)>("conversion"sv),
 		intrinsic_function_descriptor<double(float)>("conversion"sv),
+
+		intrinsic_function_descriptor<int(TypeId)>("size_in_bytes_of"sv),
+		intrinsic_function_descriptor<int(TypeId)>("alignment_of"sv),
 	};
 
 	template <int N> struct Param : std::integral_constant<int, N> {};

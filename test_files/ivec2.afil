@@ -1,9 +1,0 @@
-struct ivec2
-{
-	int x = 0;
-	int y = 0;
-}
-let operator+ = fn(ivec2 a, ivec2 b)
-{
-	return ivec2(a.x + b.x, a.y + b.y);
-};

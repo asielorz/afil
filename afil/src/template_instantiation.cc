@@ -131,7 +131,7 @@ namespace instantiation
 		complete::Program & program
 	) noexcept -> expected<complete::Expression, complete::ConversionNotFound>
 	{
-		if (decay(from) == complete::TypeId::null_t && is_pointer(type_with_id(program, to)))
+		if (decay(from) == complete::TypeId::null_t && is_pointer_or_array_pointer(type_with_id(program, to)))
 		{
 			complete::expression::Constant constant_null_pointer;
 			constant_null_pointer.type = decay(to);
@@ -2684,8 +2684,10 @@ namespace instantiation
 				}
 				else
 				{
-					incomplete::Module::File const & file = file_that_contains(incomplete_modules[i], analysis_result.error().error_in_source);
-					return Error(complete_syntax_error(std::move(analysis_result.error()), file.source, file.filename));
+					for (int j : parse_order)
+						if (incomplete::Module::File const * file = file_that_contains(incomplete_modules[j], analysis_result.error().error_in_source))
+							return Error(complete_syntax_error(std::move(analysis_result.error()), file->source, file->filename));
+					declare_unreachable();
 				}
 			}
 		}

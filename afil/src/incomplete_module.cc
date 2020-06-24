@@ -138,14 +138,16 @@ namespace incomplete
 		return join(module_name, module_extension);
 	}
 
-	auto file_that_contains(Module const & module, std::string_view src) noexcept -> Module::File const &
+	auto file_that_contains(Module const & module, std::string_view src) noexcept -> Module::File const *
 	{
 		auto const file = std::find_if(module.files, [=](const incomplete::Module::File & file)
 		{
 			return is_contained_in(file.source, src);
 		});
-		assert(file != module.files.end());
-		return *file;
+		if (file != module.files.end())
+			return &*file;
+		else
+			return nullptr;
 	}
 
 } // namespace incomplete

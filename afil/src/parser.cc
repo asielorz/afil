@@ -1813,7 +1813,7 @@ namespace parser
 		auto statements = parse_global_scope(tokens, type_names);
 		if (!statements.has_value())
 		{
-			incomplete::Module::File const & file = file_that_contains(modules[index], statements.error().error_in_source);
+			incomplete::Module::File const & file = *file_that_contains(modules[index], statements.error().error_in_source);
 			return Error(complete_syntax_error(std::move(statements.error()), file.source, file.filename));
 		}
 

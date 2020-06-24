@@ -1,0 +1,23 @@
+let is_pow2 = fn(uint64 x) -> bool
+{
+	return true; // TODO
+};
+
+struct Block
+{
+	byte mut[] memory;
+	uint64 size;
+}
+
+let malloc_allocate = fn(uint64 n, uint64 alignment)
+	assert{is_pow2(alignment);}
+{
+	let malloc = fn(uint64 n, uint64 alignment) -> byte mut[] extern_symbol("_aligned_malloc");
+	return Block(malloc(n, alignment), n);
+};
+
+let malloc_deallocate = fn(byte mut[] memory, uint64 n, uint64 alignment) -> void
+{
+	let free = fn(byte mut[] memory) -> void extern_symbol("_aligned_free");
+	free(memory);
+};

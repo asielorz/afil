@@ -1,0 +1,20 @@
+struct<T> vector
+{
+	T mut[] data = null;
+	uint64 size = uint64(0);
+	uint64 capacity = uint64(0);
+	
+	constructor default = default;
+	
+	destructor(vector<T> mut & this)
+	{
+		if (this.data != null)
+		{
+			let n = int32(this.size);
+			for (let mut i = 0; i < n; i = i + 1)
+				destroy(this.data[i]);
+			
+			malloc_deallocate(byte mut[](this.data), this.size, uint64(16));
+		}
+	}
+}

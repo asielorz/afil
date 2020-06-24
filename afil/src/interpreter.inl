@@ -431,6 +431,19 @@ namespace interpreter
 				case 214: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> double { return double(a); }); break;
 				case 215: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> double { return double(a); }); break;
 				case 216: call_intrinsic_function(stack, return_address, +[](float a) -> double { return double(a); }); break;
+
+				case 217: 
+				{
+					complete::TypeId const type = read<complete::TypeId>(stack, stack.base_pointer);
+					write(return_address, type_size(context.program, type));
+					break;
+				}
+				case 218: 
+				{
+					complete::TypeId const type = read<complete::TypeId>(stack, stack.base_pointer);
+					write(return_address, type_alignment(context.program, type));
+					break;
+				}
 			}
 
 			free_up_to(stack, stack_top);
