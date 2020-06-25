@@ -33,23 +33,31 @@ namespace detail
 }
 
 template <typename T>
-struct function_pointer_type
+struct function_interface_type
 	: public detail::function_pointer_type_base<decltype(&T::operator())>
+{};
+
+template <typename Ret, typename... Args>
+struct function_interface_type<function_ptr<auto(Args...)->Ret>>
+{
+	using type = function_ptr<auto(Args...)->Ret>;
+};
+
+template <typename Ret, typename... Args>
+struct function_interface_type<function_ptr<auto(Args...) noexcept->Ret>>
+{
+	using type = function_ptr<auto(Args...) noexcept->Ret>;
+};
+
+template <typename T>
+struct function_pointer_type
+	: public function_interface_type<T>
 {
 	static_assert(std::is_convertible_v<T, typename function_pointer_type::type>);
 };
 
-template <typename Ret, typename... Args>
-struct function_pointer_type<function_ptr<auto(Args...)->Ret>>
-{
-	using type = function_ptr<auto(Args...) -> Ret>;
-};
-
-template <typename Ret, typename... Args>
-struct function_pointer_type<function_ptr<auto(Args...) noexcept -> Ret>>
-{
-	using type = function_ptr<auto(Args...) noexcept -> Ret>;
-};
+template <typename T> using function_pointer_type_t = typename function_pointer_type<T>::type;
+template <typename T> using function_interface_type_t = typename function_interface_type<T>::type;
 
 template <typename F>
 constexpr auto cast_to_function_pointer(F f) noexcept -> typename function_pointer_type<F>::type

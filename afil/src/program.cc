@@ -330,9 +330,16 @@ namespace complete
 
 		intrinsic_function_descriptor<int(TypeId)>("size_in_bytes_of"sv),
 		intrinsic_function_descriptor<int(TypeId)>("alignment_of"sv),
+		intrinsic_function_descriptor<bool(TypeId)>("is_struct"sv),
+		intrinsic_function_descriptor<bool(TypeId)>("is_array"sv),
+		intrinsic_function_descriptor<bool(TypeId)>("is_pointer"sv),
+		intrinsic_function_descriptor<bool(TypeId)>("is_array_pointer"sv),
+		intrinsic_function_descriptor<bool(TypeId)>("is_mutable"sv),
+		intrinsic_function_descriptor<bool(TypeId)>("is_reference"sv),
+		intrinsic_function_descriptor<bool(TypeId)>("=="sv),
 	};
 
-	template <int N> struct Param : std::integral_constant<int, N> {};
+	template <int N> using Param = std::integral_constant<int, N>;
 
 	template <int N>
 	auto parameter_type_for(BoxedType<Param<N>>) -> FunctionTemplateParameterType

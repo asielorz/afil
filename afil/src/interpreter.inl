@@ -71,19 +71,26 @@ namespace interpreter
 
 	auto eval_variable_node(complete::TypeId variable_type, int address, ProgramStack & stack, char * return_address) noexcept -> void;
 
-	template <typename Ret, typename A, typename B>
-	inline auto call_intrinsic_function(ProgramStack & stack, char * return_address, Ret(*function)(A, B)) -> void
+	template <typename F, typename Ret, typename A, typename B>
+	inline auto call_intrinsic_function_impl(ProgramStack & stack, char * return_address, F && function, function_ptr<Ret(A, B)>) -> void
 	{
 		int const a_address = stack.base_pointer;
 		int const b_address = align(a_address + sizeof(A), alignof(B));
 		write(return_address, function(read<A>(stack, a_address), read<B>(stack, b_address)));
 	}
 
-	template <typename Ret, typename A>
-	auto call_intrinsic_function(ProgramStack & stack, char * return_address, Ret(*function)(A)) -> void
+	template <typename F, typename Ret, typename A>
+	auto call_intrinsic_function_impl(ProgramStack & stack, char * return_address, F && function, function_ptr<Ret(A)>) -> void
 	{
 		int const a_address = stack.base_pointer;
 		write(return_address, function(read<A>(stack, a_address)));
+	}
+
+	template <typename F>
+	auto call_intrinsic_function(ProgramStack & stack, char * return_address, F && function) -> void
+	{
+		using function_interface = function_interface_type_t<F>;
+		call_intrinsic_function_impl(stack, return_address, std::forward<F>(function), function_interface(nullptr));
 	}
 
 	template <typename ExecutionContext>
@@ -193,257 +200,254 @@ namespace interpreter
 
 			switch (function_id.index)
 			{
-				case 0: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a + b; }); break;
-				case 1: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a - b; }); break;
-				case 2: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a * b; }); break;
-				case 3: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a / b; }); break;
-				case 4: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a % b; }); break;
-				case 5: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> bool { return a == b; }); break;
-				case 6: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> order_t { return a - b; }); break; // <=>
-				case 7: call_intrinsic_function(stack, return_address, +[](int8_t a) -> int8_t { return -a; }); break;
-				case 8: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a & b; }); break;
-				case 9: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a | b; }); break;
-				case 10: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a ^ b; }); break;
-				case 11: call_intrinsic_function(stack, return_address, +[](int8_t a) -> int8_t { return ~a; }); break;
-				case 12: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a >> b; }); break;
-				case 13: call_intrinsic_function(stack, return_address, +[](int8_t a, int8_t b) -> int8_t { return a << b; }); break;
+				case 0: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a + b; }); break;
+				case 1: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a - b; }); break;
+				case 2: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a * b; }); break;
+				case 3: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a / b; }); break;
+				case 4: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a % b; }); break;
+				case 5: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> bool { return a == b; }); break;
+				case 6: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> order_t { return a - b; }); break; // <=>
+				case 7: call_intrinsic_function(stack, return_address, [](int8_t a) -> int8_t { return -a; }); break;
+				case 8: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a & b; }); break;
+				case 9: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a | b; }); break;
+				case 10: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a ^ b; }); break;
+				case 11: call_intrinsic_function(stack, return_address, [](int8_t a) -> int8_t { return ~a; }); break;
+				case 12: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a >> b; }); break;
+				case 13: call_intrinsic_function(stack, return_address, [](int8_t a, int8_t b) -> int8_t { return a << b; }); break;
 
-				case 14: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a + b; }); break;
-				case 15: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a - b; }); break;
-				case 16: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a * b; }); break;
-				case 17: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a / b; }); break;
-				case 18: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a % b; }); break;
-				case 19: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> bool { return a == b; }); break;
-				case 20: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> order_t { return a - b; }); break; // <=>
-				case 21: call_intrinsic_function(stack, return_address, +[](int16_t a) -> int16_t { return -a; }); break;
-				case 22: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a & b; }); break;
-				case 23: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a | b; }); break;
-				case 24: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a ^ b; }); break;
-				case 25: call_intrinsic_function(stack, return_address, +[](int16_t a) -> int16_t { return ~a; }); break;
-				case 26: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a >> b; }); break;
-				case 27: call_intrinsic_function(stack, return_address, +[](int16_t a, int16_t b) -> int16_t { return a << b; }); break;
+				case 14: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a + b; }); break;
+				case 15: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a - b; }); break;
+				case 16: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a * b; }); break;
+				case 17: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a / b; }); break;
+				case 18: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a % b; }); break;
+				case 19: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> bool { return a == b; }); break;
+				case 20: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> order_t { return a - b; }); break; // <=>
+				case 21: call_intrinsic_function(stack, return_address, [](int16_t a) -> int16_t { return -a; }); break;
+				case 22: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a & b; }); break;
+				case 23: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a | b; }); break;
+				case 24: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a ^ b; }); break;
+				case 25: call_intrinsic_function(stack, return_address, [](int16_t a) -> int16_t { return ~a; }); break;
+				case 26: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a >> b; }); break;
+				case 27: call_intrinsic_function(stack, return_address, [](int16_t a, int16_t b) -> int16_t { return a << b; }); break;
 
-				case 28: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a + b; }); break;
-				case 29: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a - b; }); break;
-				case 30: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a * b; }); break;
-				case 31: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a / b; }); break;
-				case 32: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a % b; }); break;
-				case 33: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> bool { return a == b; }); break;
-				case 34: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> order_t { return a - b; }); break; // <=>
-				case 35: call_intrinsic_function(stack, return_address, +[](int32_t a) -> int32_t { return -a; }); break;
-				case 36: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a & b; }); break;
-				case 37: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a | b; }); break;
-				case 38: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a ^ b; }); break;
-				case 39: call_intrinsic_function(stack, return_address, +[](int32_t a) -> int32_t { return ~a; }); break;
-				case 40: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a >> b; }); break;
-				case 41: call_intrinsic_function(stack, return_address, +[](int32_t a, int32_t b) -> int32_t { return a << b; }); break;
+				case 28: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a + b; }); break;
+				case 29: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a - b; }); break;
+				case 30: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a * b; }); break;
+				case 31: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a / b; }); break;
+				case 32: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a % b; }); break;
+				case 33: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> bool { return a == b; }); break;
+				case 34: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> order_t { return a - b; }); break; // <=>
+				case 35: call_intrinsic_function(stack, return_address, [](int32_t a) -> int32_t { return -a; }); break;
+				case 36: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a & b; }); break;
+				case 37: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a | b; }); break;
+				case 38: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a ^ b; }); break;
+				case 39: call_intrinsic_function(stack, return_address, [](int32_t a) -> int32_t { return ~a; }); break;
+				case 40: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a >> b; }); break;
+				case 41: call_intrinsic_function(stack, return_address, [](int32_t a, int32_t b) -> int32_t { return a << b; }); break;
 
-				case 42: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a + b; }); break;
-				case 43: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a - b; }); break;
-				case 44: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a * b; }); break;
-				case 45: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a / b; }); break;
-				case 46: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a % b; }); break;
-				case 47: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> bool { return a == b; }); break;
-				case 48: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> order_t { return order_t(a - b); }); break; // <=>
-				case 49: call_intrinsic_function(stack, return_address, +[](int64_t a) -> int64_t { return -a; }); break;
-				case 50: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a & b; }); break;
-				case 51: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a | b; }); break;
-				case 52: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a ^ b; }); break;
-				case 53: call_intrinsic_function(stack, return_address, +[](int64_t a) -> int64_t { return ~a; }); break;
-				case 54: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a >> b; }); break;
-				case 55: call_intrinsic_function(stack, return_address, +[](int64_t a, int64_t b) -> int64_t { return a << b; }); break;
+				case 42: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a + b; }); break;
+				case 43: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a - b; }); break;
+				case 44: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a * b; }); break;
+				case 45: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a / b; }); break;
+				case 46: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a % b; }); break;
+				case 47: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> bool { return a == b; }); break;
+				case 48: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> order_t { return order_t(a - b); }); break; // <=>
+				case 49: call_intrinsic_function(stack, return_address, [](int64_t a) -> int64_t { return -a; }); break;
+				case 50: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a & b; }); break;
+				case 51: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a | b; }); break;
+				case 52: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a ^ b; }); break;
+				case 53: call_intrinsic_function(stack, return_address, [](int64_t a) -> int64_t { return ~a; }); break;
+				case 54: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a >> b; }); break;
+				case 55: call_intrinsic_function(stack, return_address, [](int64_t a, int64_t b) -> int64_t { return a << b; }); break;
 
-				case 56: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a + b; }); break;
-				case 57: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a - b; }); break;
-				case 58: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a * b; }); break;
-				case 59: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a / b; }); break;
-				case 60: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a % b; }); break;
-				case 61: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> bool { return a == b; }); break;
-				case 62: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> order_t { return int(a) - int(b); }); break; // <=>
-				case 63: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a & b; }); break;
-				case 64: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a | b; }); break;
-				case 65: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a ^ b; }); break;
-				case 66: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> uint8_t { return ~a; }); break;
-				case 67: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a >> b; }); break;
-				case 68: call_intrinsic_function(stack, return_address, +[](uint8_t a, uint8_t b) -> uint8_t { return a << b; }); break;
+				case 56: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a + b; }); break;
+				case 57: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a - b; }); break;
+				case 58: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a * b; }); break;
+				case 59: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a / b; }); break;
+				case 60: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a % b; }); break;
+				case 61: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> bool { return a == b; }); break;
+				case 62: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> order_t { return int(a) - int(b); }); break; // <=>
+				case 63: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a & b; }); break;
+				case 64: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a | b; }); break;
+				case 65: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a ^ b; }); break;
+				case 66: call_intrinsic_function(stack, return_address, [](uint8_t a) -> uint8_t { return ~a; }); break;
+				case 67: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a >> b; }); break;
+				case 68: call_intrinsic_function(stack, return_address, [](uint8_t a, uint8_t b) -> uint8_t { return a << b; }); break;
 
-				case 69: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a + b; }); break;
-				case 70: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a - b; }); break;
-				case 71: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a * b; }); break;
-				case 72: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a / b; }); break;
-				case 73: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a % b; }); break;
-				case 74: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> bool { return a == b; }); break;
-				case 75: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> order_t { return int(a) - int(b); }); break; // <=>
-				case 76: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a & b; }); break;
-				case 77: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a | b; }); break;
-				case 78: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a ^ b; }); break;
-				case 79: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> uint16_t { return ~a; }); break;
-				case 80: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a >> b; }); break;
-				case 81: call_intrinsic_function(stack, return_address, +[](uint16_t a, uint16_t b) -> uint16_t { return a << b; }); break;
+				case 69: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a + b; }); break;
+				case 70: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a - b; }); break;
+				case 71: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a * b; }); break;
+				case 72: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a / b; }); break;
+				case 73: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a % b; }); break;
+				case 74: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> bool { return a == b; }); break;
+				case 75: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> order_t { return int(a) - int(b); }); break; // <=>
+				case 76: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a & b; }); break;
+				case 77: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a | b; }); break;
+				case 78: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a ^ b; }); break;
+				case 79: call_intrinsic_function(stack, return_address, [](uint16_t a) -> uint16_t { return ~a; }); break;
+				case 80: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a >> b; }); break;
+				case 81: call_intrinsic_function(stack, return_address, [](uint16_t a, uint16_t b) -> uint16_t { return a << b; }); break;
 
-				case 83: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a - b; }); break;
-				case 82: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a + b; }); break;
-				case 84: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a * b; }); break;
-				case 85: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a / b; }); break;
-				case 86: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a % b; }); break;
-				case 87: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> bool { return a == b; }); break;
-				case 88: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> order_t { return int(a) - int(b); }); break; // <=>
-				case 89: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a & b; }); break;
-				case 90: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a | b; }); break;
-				case 91: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a ^ b; }); break;
-				case 92: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> uint32_t { return ~a; }); break;
-				case 93: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a >> b; }); break;
-				case 94: call_intrinsic_function(stack, return_address, +[](uint32_t a, uint32_t b) -> uint32_t { return a << b; }); break;
+				case 83: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a - b; }); break;
+				case 82: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a + b; }); break;
+				case 84: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a * b; }); break;
+				case 85: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a / b; }); break;
+				case 86: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a % b; }); break;
+				case 87: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> bool { return a == b; }); break;
+				case 88: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> order_t { return int(a) - int(b); }); break; // <=>
+				case 89: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a & b; }); break;
+				case 90: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a | b; }); break;
+				case 91: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a ^ b; }); break;
+				case 92: call_intrinsic_function(stack, return_address, [](uint32_t a) -> uint32_t { return ~a; }); break;
+				case 93: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a >> b; }); break;
+				case 94: call_intrinsic_function(stack, return_address, [](uint32_t a, uint32_t b) -> uint32_t { return a << b; }); break;
 
-				case 95: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a + b; }); break;
-				case 96: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a - b; }); break;
-				case 97: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a * b; }); break;
-				case 98: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a / b; }); break;
-				case 99: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a % b; }); break;
-				case 100: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> bool { return a == b; }); break;
-				case 101: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> order_t { return int(a) - int(b); }); break; // <=>
-				case 102: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a & b; }); break;
-				case 103: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a | b; }); break;
-				case 104: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a ^ b; }); break;
-				case 105: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> uint64_t { return ~a; }); break;
-				case 106: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a >> b; }); break;
-				case 107: call_intrinsic_function(stack, return_address, +[](uint64_t a, uint64_t b) -> uint64_t { return a << b; }); break;
+				case 95: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a + b; }); break;
+				case 96: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a - b; }); break;
+				case 97: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a * b; }); break;
+				case 98: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a / b; }); break;
+				case 99: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a % b; }); break;
+				case 100: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> bool { return a == b; }); break;
+				case 101: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> order_t { return int(a) - int(b); }); break; // <=>
+				case 102: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a & b; }); break;
+				case 103: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a | b; }); break;
+				case 104: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a ^ b; }); break;
+				case 105: call_intrinsic_function(stack, return_address, [](uint64_t a) -> uint64_t { return ~a; }); break;
+				case 106: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a >> b; }); break;
+				case 107: call_intrinsic_function(stack, return_address, [](uint64_t a, uint64_t b) -> uint64_t { return a << b; }); break;
 
-				case 108: call_intrinsic_function(stack, return_address, +[](float a, float b) -> float { return a + b; }); break;
-				case 109: call_intrinsic_function(stack, return_address, +[](float a, float b) -> float { return a - b; }); break;
-				case 110: call_intrinsic_function(stack, return_address, +[](float a, float b) -> float { return a * b; }); break;
-				case 111: call_intrinsic_function(stack, return_address, +[](float a, float b) -> float { return a / b; }); break;
-				case 112: call_intrinsic_function(stack, return_address, +[](float a, float b) -> bool { return a == b; }); break;
-				case 113: call_intrinsic_function(stack, return_address, +[](float a, float b) -> float { return a - b; }); break; // <=>
-				case 114: call_intrinsic_function(stack, return_address, +[](float a) -> float { return -a; }); break;
+				case 108: call_intrinsic_function(stack, return_address, [](float a, float b) -> float { return a + b; }); break;
+				case 109: call_intrinsic_function(stack, return_address, [](float a, float b) -> float { return a - b; }); break;
+				case 110: call_intrinsic_function(stack, return_address, [](float a, float b) -> float { return a * b; }); break;
+				case 111: call_intrinsic_function(stack, return_address, [](float a, float b) -> float { return a / b; }); break;
+				case 112: call_intrinsic_function(stack, return_address, [](float a, float b) -> bool { return a == b; }); break;
+				case 113: call_intrinsic_function(stack, return_address, [](float a, float b) -> float { return a - b; }); break; // <=>
+				case 114: call_intrinsic_function(stack, return_address, [](float a) -> float { return -a; }); break;
 
-				case 115: call_intrinsic_function(stack, return_address, +[](double a, double b) -> double { return a + b; }); break;
-				case 116: call_intrinsic_function(stack, return_address, +[](double a, double b) -> double { return a - b; }); break;
-				case 117: call_intrinsic_function(stack, return_address, +[](double a, double b) -> double { return a * b; }); break;
-				case 118: call_intrinsic_function(stack, return_address, +[](double a, double b) -> double { return a / b; }); break;
-				case 119: call_intrinsic_function(stack, return_address, +[](double a, double b) -> bool { return a == b; }); break;
-				case 120: call_intrinsic_function(stack, return_address, +[](double a, double b) -> float { return float(a - b); }); break; // <=>
-				case 121: call_intrinsic_function(stack, return_address, +[](double a) -> double { return -a; }); break;
+				case 115: call_intrinsic_function(stack, return_address, [](double a, double b) -> double { return a + b; }); break;
+				case 116: call_intrinsic_function(stack, return_address, [](double a, double b) -> double { return a - b; }); break;
+				case 117: call_intrinsic_function(stack, return_address, [](double a, double b) -> double { return a * b; }); break;
+				case 118: call_intrinsic_function(stack, return_address, [](double a, double b) -> double { return a / b; }); break;
+				case 119: call_intrinsic_function(stack, return_address, [](double a, double b) -> bool { return a == b; }); break;
+				case 120: call_intrinsic_function(stack, return_address, [](double a, double b) -> float { return float(a - b); }); break; // <=>
+				case 121: call_intrinsic_function(stack, return_address, [](double a) -> double { return -a; }); break;
 
-				case 122: call_intrinsic_function(stack, return_address, +[](bool a, bool b) -> bool { return a && b; }); break;
-				case 123: call_intrinsic_function(stack, return_address, +[](bool a, bool b) -> bool { return a || b; }); break;
-				case 124: call_intrinsic_function(stack, return_address, +[](bool a, bool b) -> bool { return a != b; }); break;
-				case 125: call_intrinsic_function(stack, return_address, +[](bool a) -> bool { return !a; }); break;
-				case 126: call_intrinsic_function(stack, return_address, +[](bool a, bool b) -> bool { return a == b; }); break;
+				case 122: call_intrinsic_function(stack, return_address, [](bool a, bool b) -> bool { return a && b; }); break;
+				case 123: call_intrinsic_function(stack, return_address, [](bool a, bool b) -> bool { return a || b; }); break;
+				case 124: call_intrinsic_function(stack, return_address, [](bool a, bool b) -> bool { return a != b; }); break;
+				case 125: call_intrinsic_function(stack, return_address, [](bool a) -> bool { return !a; }); break;
+				case 126: call_intrinsic_function(stack, return_address, [](bool a, bool b) -> bool { return a == b; }); break;
 
 				// Conversions
-				case 127: call_intrinsic_function(stack, return_address, +[](int16_t a) -> int8_t { return int8_t(a); }); break;
-				case 128: call_intrinsic_function(stack, return_address, +[](int32_t a) -> int8_t { return int8_t(a); }); break;
-				case 129: call_intrinsic_function(stack, return_address, +[](int64_t a) -> int8_t { return int8_t(a); }); break;
-				case 130: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> int8_t { return int8_t(a); }); break;
-				case 131: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> int8_t { return int8_t(a); }); break;
-				case 132: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> int8_t { return int8_t(a); }); break;
-				case 133: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> int8_t { return int8_t(a); }); break;
-				case 134: call_intrinsic_function(stack, return_address, +[](float a) -> int8_t { return int8_t(a); }); break;
-				case 135: call_intrinsic_function(stack, return_address, +[](double a) -> int8_t { return int8_t(a); }); break;
+				case 127: call_intrinsic_function(stack, return_address, [](int16_t a) -> int8_t { return int8_t(a); }); break;
+				case 128: call_intrinsic_function(stack, return_address, [](int32_t a) -> int8_t { return int8_t(a); }); break;
+				case 129: call_intrinsic_function(stack, return_address, [](int64_t a) -> int8_t { return int8_t(a); }); break;
+				case 130: call_intrinsic_function(stack, return_address, [](uint8_t a) -> int8_t { return int8_t(a); }); break;
+				case 131: call_intrinsic_function(stack, return_address, [](uint16_t a) -> int8_t { return int8_t(a); }); break;
+				case 132: call_intrinsic_function(stack, return_address, [](uint32_t a) -> int8_t { return int8_t(a); }); break;
+				case 133: call_intrinsic_function(stack, return_address, [](uint64_t a) -> int8_t { return int8_t(a); }); break;
+				case 134: call_intrinsic_function(stack, return_address, [](float a) -> int8_t { return int8_t(a); }); break;
+				case 135: call_intrinsic_function(stack, return_address, [](double a) -> int8_t { return int8_t(a); }); break;
 
-				case 136: call_intrinsic_function(stack, return_address, +[](int8_t a) -> int16_t { return int16_t(a); }); break;
-				case 137: call_intrinsic_function(stack, return_address, +[](int32_t a) -> int16_t { return int16_t(a); }); break;
-				case 138: call_intrinsic_function(stack, return_address, +[](int64_t a) -> int16_t { return int16_t(a); }); break;
-				case 139: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> int16_t { return int16_t(a); }); break;
-				case 140: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> int16_t { return int16_t(a); }); break;
-				case 141: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> int16_t { return int16_t(a); }); break;
-				case 142: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> int16_t { return int16_t(a); }); break;
-				case 143: call_intrinsic_function(stack, return_address, +[](float a) -> int16_t { return int16_t(a); }); break;
-				case 144: call_intrinsic_function(stack, return_address, +[](double a) -> int16_t { return int16_t(a); }); break;
+				case 136: call_intrinsic_function(stack, return_address, [](int8_t a) -> int16_t { return int16_t(a); }); break;
+				case 137: call_intrinsic_function(stack, return_address, [](int32_t a) -> int16_t { return int16_t(a); }); break;
+				case 138: call_intrinsic_function(stack, return_address, [](int64_t a) -> int16_t { return int16_t(a); }); break;
+				case 139: call_intrinsic_function(stack, return_address, [](uint8_t a) -> int16_t { return int16_t(a); }); break;
+				case 140: call_intrinsic_function(stack, return_address, [](uint16_t a) -> int16_t { return int16_t(a); }); break;
+				case 141: call_intrinsic_function(stack, return_address, [](uint32_t a) -> int16_t { return int16_t(a); }); break;
+				case 142: call_intrinsic_function(stack, return_address, [](uint64_t a) -> int16_t { return int16_t(a); }); break;
+				case 143: call_intrinsic_function(stack, return_address, [](float a) -> int16_t { return int16_t(a); }); break;
+				case 144: call_intrinsic_function(stack, return_address, [](double a) -> int16_t { return int16_t(a); }); break;
 
-				case 145: call_intrinsic_function(stack, return_address, +[](int8_t a) -> int32_t { return int32_t(a); }); break;
-				case 146: call_intrinsic_function(stack, return_address, +[](int16_t a) -> int32_t { return int32_t(a); }); break;
-				case 147: call_intrinsic_function(stack, return_address, +[](int64_t a) -> int32_t { return int32_t(a); }); break;
-				case 148: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> int32_t { return int32_t(a); }); break;
-				case 149: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> int32_t { return int32_t(a); }); break;
-				case 150: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> int32_t { return int32_t(a); }); break;
-				case 151: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> int32_t { return int32_t(a); }); break;
-				case 152: call_intrinsic_function(stack, return_address, +[](float a) -> int32_t { return int32_t(a); }); break;
-				case 153: call_intrinsic_function(stack, return_address, +[](double a) -> int32_t { return int32_t(a); }); break;
+				case 145: call_intrinsic_function(stack, return_address, [](int8_t a) -> int32_t { return int32_t(a); }); break;
+				case 146: call_intrinsic_function(stack, return_address, [](int16_t a) -> int32_t { return int32_t(a); }); break;
+				case 147: call_intrinsic_function(stack, return_address, [](int64_t a) -> int32_t { return int32_t(a); }); break;
+				case 148: call_intrinsic_function(stack, return_address, [](uint8_t a) -> int32_t { return int32_t(a); }); break;
+				case 149: call_intrinsic_function(stack, return_address, [](uint16_t a) -> int32_t { return int32_t(a); }); break;
+				case 150: call_intrinsic_function(stack, return_address, [](uint32_t a) -> int32_t { return int32_t(a); }); break;
+				case 151: call_intrinsic_function(stack, return_address, [](uint64_t a) -> int32_t { return int32_t(a); }); break;
+				case 152: call_intrinsic_function(stack, return_address, [](float a) -> int32_t { return int32_t(a); }); break;
+				case 153: call_intrinsic_function(stack, return_address, [](double a) -> int32_t { return int32_t(a); }); break;
 
-				case 154: call_intrinsic_function(stack, return_address, +[](int8_t a) -> int64_t { return int64_t(a); }); break;
-				case 155: call_intrinsic_function(stack, return_address, +[](int16_t a) -> int64_t { return int64_t(a); }); break;
-				case 156: call_intrinsic_function(stack, return_address, +[](int32_t a) -> int64_t { return int64_t(a); }); break;
-				case 157: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> int64_t { return int64_t(a); }); break;
-				case 158: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> int64_t { return int64_t(a); }); break;
-				case 159: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> int64_t { return int64_t(a); }); break;
-				case 160: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> int64_t { return int64_t(a); }); break;
-				case 161: call_intrinsic_function(stack, return_address, +[](float a) -> int64_t { return int64_t(a); }); break;
-				case 162: call_intrinsic_function(stack, return_address, +[](double a) -> int64_t { return int64_t(a); }); break;
+				case 154: call_intrinsic_function(stack, return_address, [](int8_t a) -> int64_t { return int64_t(a); }); break;
+				case 155: call_intrinsic_function(stack, return_address, [](int16_t a) -> int64_t { return int64_t(a); }); break;
+				case 156: call_intrinsic_function(stack, return_address, [](int32_t a) -> int64_t { return int64_t(a); }); break;
+				case 157: call_intrinsic_function(stack, return_address, [](uint8_t a) -> int64_t { return int64_t(a); }); break;
+				case 158: call_intrinsic_function(stack, return_address, [](uint16_t a) -> int64_t { return int64_t(a); }); break;
+				case 159: call_intrinsic_function(stack, return_address, [](uint32_t a) -> int64_t { return int64_t(a); }); break;
+				case 160: call_intrinsic_function(stack, return_address, [](uint64_t a) -> int64_t { return int64_t(a); }); break;
+				case 161: call_intrinsic_function(stack, return_address, [](float a) -> int64_t { return int64_t(a); }); break;
+				case 162: call_intrinsic_function(stack, return_address, [](double a) -> int64_t { return int64_t(a); }); break;
 
-				case 163: call_intrinsic_function(stack, return_address, +[](int8_t a) -> uint8_t { return uint8_t(a); }); break;
-				case 164: call_intrinsic_function(stack, return_address, +[](int16_t a) -> uint8_t { return uint8_t(a); }); break;
-				case 165: call_intrinsic_function(stack, return_address, +[](int32_t a) -> uint8_t { return uint8_t(a); }); break;
-				case 166: call_intrinsic_function(stack, return_address, +[](int64_t a) -> uint8_t { return uint8_t(a); }); break;
-				case 167: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> uint8_t { return uint8_t(a); }); break;
-				case 168: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> uint8_t { return uint8_t(a); }); break;
-				case 169: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> uint8_t { return uint8_t(a); }); break;
-				case 170: call_intrinsic_function(stack, return_address, +[](float a) -> uint8_t { return uint8_t(a); }); break;
-				case 171: call_intrinsic_function(stack, return_address, +[](double a) -> uint8_t { return uint8_t(a); }); break;
+				case 163: call_intrinsic_function(stack, return_address, [](int8_t a) -> uint8_t { return uint8_t(a); }); break;
+				case 164: call_intrinsic_function(stack, return_address, [](int16_t a) -> uint8_t { return uint8_t(a); }); break;
+				case 165: call_intrinsic_function(stack, return_address, [](int32_t a) -> uint8_t { return uint8_t(a); }); break;
+				case 166: call_intrinsic_function(stack, return_address, [](int64_t a) -> uint8_t { return uint8_t(a); }); break;
+				case 167: call_intrinsic_function(stack, return_address, [](uint16_t a) -> uint8_t { return uint8_t(a); }); break;
+				case 168: call_intrinsic_function(stack, return_address, [](uint32_t a) -> uint8_t { return uint8_t(a); }); break;
+				case 169: call_intrinsic_function(stack, return_address, [](uint64_t a) -> uint8_t { return uint8_t(a); }); break;
+				case 170: call_intrinsic_function(stack, return_address, [](float a) -> uint8_t { return uint8_t(a); }); break;
+				case 171: call_intrinsic_function(stack, return_address, [](double a) -> uint8_t { return uint8_t(a); }); break;
 
-				case 172: call_intrinsic_function(stack, return_address, +[](int8_t a) -> uint16_t { return uint16_t(a); }); break;
-				case 173: call_intrinsic_function(stack, return_address, +[](int16_t a) -> uint16_t { return uint16_t(a); }); break;
-				case 174: call_intrinsic_function(stack, return_address, +[](int32_t a) -> uint16_t { return uint16_t(a); }); break;
-				case 175: call_intrinsic_function(stack, return_address, +[](int64_t a) -> uint16_t { return uint16_t(a); }); break;
-				case 176: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> uint16_t { return uint16_t(a); }); break;
-				case 177: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> uint16_t { return uint16_t(a); }); break;
-				case 178: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> uint16_t { return uint16_t(a); }); break;
-				case 179: call_intrinsic_function(stack, return_address, +[](float a) -> uint16_t { return uint16_t(a); }); break;
-				case 180: call_intrinsic_function(stack, return_address, +[](double a) -> uint16_t { return uint16_t(a); }); break;
+				case 172: call_intrinsic_function(stack, return_address, [](int8_t a) -> uint16_t { return uint16_t(a); }); break;
+				case 173: call_intrinsic_function(stack, return_address, [](int16_t a) -> uint16_t { return uint16_t(a); }); break;
+				case 174: call_intrinsic_function(stack, return_address, [](int32_t a) -> uint16_t { return uint16_t(a); }); break;
+				case 175: call_intrinsic_function(stack, return_address, [](int64_t a) -> uint16_t { return uint16_t(a); }); break;
+				case 176: call_intrinsic_function(stack, return_address, [](uint8_t a) -> uint16_t { return uint16_t(a); }); break;
+				case 177: call_intrinsic_function(stack, return_address, [](uint32_t a) -> uint16_t { return uint16_t(a); }); break;
+				case 178: call_intrinsic_function(stack, return_address, [](uint64_t a) -> uint16_t { return uint16_t(a); }); break;
+				case 179: call_intrinsic_function(stack, return_address, [](float a) -> uint16_t { return uint16_t(a); }); break;
+				case 180: call_intrinsic_function(stack, return_address, [](double a) -> uint16_t { return uint16_t(a); }); break;
 
-				case 181: call_intrinsic_function(stack, return_address, +[](int8_t a) -> uint32_t { return uint32_t(a); }); break;
-				case 182: call_intrinsic_function(stack, return_address, +[](int16_t a) -> uint32_t { return uint32_t(a); }); break;
-				case 183: call_intrinsic_function(stack, return_address, +[](int32_t a) -> uint32_t { return uint32_t(a); }); break;
-				case 184: call_intrinsic_function(stack, return_address, +[](int64_t a) -> uint32_t { return uint32_t(a); }); break;
-				case 185: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> uint32_t { return uint32_t(a); }); break;
-				case 186: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> uint32_t { return uint32_t(a); }); break;
-				case 187: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> uint32_t { return uint32_t(a); }); break;
-				case 188: call_intrinsic_function(stack, return_address, +[](float a) -> uint32_t { return uint32_t(a); }); break;
-				case 189: call_intrinsic_function(stack, return_address, +[](double a) -> uint32_t { return uint32_t(a); }); break;
+				case 181: call_intrinsic_function(stack, return_address, [](int8_t a) -> uint32_t { return uint32_t(a); }); break;
+				case 182: call_intrinsic_function(stack, return_address, [](int16_t a) -> uint32_t { return uint32_t(a); }); break;
+				case 183: call_intrinsic_function(stack, return_address, [](int32_t a) -> uint32_t { return uint32_t(a); }); break;
+				case 184: call_intrinsic_function(stack, return_address, [](int64_t a) -> uint32_t { return uint32_t(a); }); break;
+				case 185: call_intrinsic_function(stack, return_address, [](uint8_t a) -> uint32_t { return uint32_t(a); }); break;
+				case 186: call_intrinsic_function(stack, return_address, [](uint16_t a) -> uint32_t { return uint32_t(a); }); break;
+				case 187: call_intrinsic_function(stack, return_address, [](uint64_t a) -> uint32_t { return uint32_t(a); }); break;
+				case 188: call_intrinsic_function(stack, return_address, [](float a) -> uint32_t { return uint32_t(a); }); break;
+				case 189: call_intrinsic_function(stack, return_address, [](double a) -> uint32_t { return uint32_t(a); }); break;
 
-				case 190: call_intrinsic_function(stack, return_address, +[](int8_t a) -> uint64_t { return uint64_t(a); }); break;
-				case 191: call_intrinsic_function(stack, return_address, +[](int16_t a) -> uint64_t { return uint64_t(a); }); break;
-				case 192: call_intrinsic_function(stack, return_address, +[](int32_t a) -> uint64_t { return uint64_t(a); }); break;
-				case 193: call_intrinsic_function(stack, return_address, +[](int64_t a) -> uint64_t { return uint64_t(a); }); break;
-				case 194: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> uint64_t { return uint64_t(a); }); break;
-				case 195: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> uint64_t { return uint64_t(a); }); break;
-				case 196: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> uint64_t { return uint64_t(a); }); break;
-				case 197: call_intrinsic_function(stack, return_address, +[](float a) -> uint64_t { return uint64_t(a); }); break;
-				case 198: call_intrinsic_function(stack, return_address, +[](double a) -> uint64_t { return uint64_t(a); }); break;
+				case 190: call_intrinsic_function(stack, return_address, [](int8_t a) -> uint64_t { return uint64_t(a); }); break;
+				case 191: call_intrinsic_function(stack, return_address, [](int16_t a) -> uint64_t { return uint64_t(a); }); break;
+				case 192: call_intrinsic_function(stack, return_address, [](int32_t a) -> uint64_t { return uint64_t(a); }); break;
+				case 193: call_intrinsic_function(stack, return_address, [](int64_t a) -> uint64_t { return uint64_t(a); }); break;
+				case 194: call_intrinsic_function(stack, return_address, [](uint8_t a) -> uint64_t { return uint64_t(a); }); break;
+				case 195: call_intrinsic_function(stack, return_address, [](uint16_t a) -> uint64_t { return uint64_t(a); }); break;
+				case 196: call_intrinsic_function(stack, return_address, [](uint32_t a) -> uint64_t { return uint64_t(a); }); break;
+				case 197: call_intrinsic_function(stack, return_address, [](float a) -> uint64_t { return uint64_t(a); }); break;
+				case 198: call_intrinsic_function(stack, return_address, [](double a) -> uint64_t { return uint64_t(a); }); break;
 
-				case 199: call_intrinsic_function(stack, return_address, +[](int8_t a) -> float { return float(a); }); break;
-				case 200: call_intrinsic_function(stack, return_address, +[](int16_t a) -> float { return float(a); }); break;
-				case 201: call_intrinsic_function(stack, return_address, +[](int32_t a) -> float { return float(a); }); break;
-				case 202: call_intrinsic_function(stack, return_address, +[](int64_t a) -> float { return float(a); }); break;
-				case 203: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> float { return float(a); }); break;
-				case 204: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> float { return float(a); }); break;
-				case 205: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> float { return float(a); }); break;
-				case 206: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> float { return float(a); }); break;
-				case 207: call_intrinsic_function(stack, return_address, +[](double a) -> float { return float(a); }); break;
+				case 199: call_intrinsic_function(stack, return_address, [](int8_t a) -> float { return float(a); }); break;
+				case 200: call_intrinsic_function(stack, return_address, [](int16_t a) -> float { return float(a); }); break;
+				case 201: call_intrinsic_function(stack, return_address, [](int32_t a) -> float { return float(a); }); break;
+				case 202: call_intrinsic_function(stack, return_address, [](int64_t a) -> float { return float(a); }); break;
+				case 203: call_intrinsic_function(stack, return_address, [](uint8_t a) -> float { return float(a); }); break;
+				case 204: call_intrinsic_function(stack, return_address, [](uint16_t a) -> float { return float(a); }); break;
+				case 205: call_intrinsic_function(stack, return_address, [](uint32_t a) -> float { return float(a); }); break;
+				case 206: call_intrinsic_function(stack, return_address, [](uint64_t a) -> float { return float(a); }); break;
+				case 207: call_intrinsic_function(stack, return_address, [](double a) -> float { return float(a); }); break;
 
-				case 208: call_intrinsic_function(stack, return_address, +[](int8_t a) -> double { return double(a); }); break;
-				case 209: call_intrinsic_function(stack, return_address, +[](int16_t a) -> double { return double(a); }); break;
-				case 210: call_intrinsic_function(stack, return_address, +[](int32_t a) -> double { return double(a); }); break;
-				case 211: call_intrinsic_function(stack, return_address, +[](int64_t a) -> double { return double(a); }); break;
-				case 212: call_intrinsic_function(stack, return_address, +[](uint8_t a) -> double { return double(a); }); break;
-				case 213: call_intrinsic_function(stack, return_address, +[](uint16_t a) -> double { return double(a); }); break;
-				case 214: call_intrinsic_function(stack, return_address, +[](uint32_t a) -> double { return double(a); }); break;
-				case 215: call_intrinsic_function(stack, return_address, +[](uint64_t a) -> double { return double(a); }); break;
-				case 216: call_intrinsic_function(stack, return_address, +[](float a) -> double { return double(a); }); break;
+				case 208: call_intrinsic_function(stack, return_address, [](int8_t a) -> double { return double(a); }); break;
+				case 209: call_intrinsic_function(stack, return_address, [](int16_t a) -> double { return double(a); }); break;
+				case 210: call_intrinsic_function(stack, return_address, [](int32_t a) -> double { return double(a); }); break;
+				case 211: call_intrinsic_function(stack, return_address, [](int64_t a) -> double { return double(a); }); break;
+				case 212: call_intrinsic_function(stack, return_address, [](uint8_t a) -> double { return double(a); }); break;
+				case 213: call_intrinsic_function(stack, return_address, [](uint16_t a) -> double { return double(a); }); break;
+				case 214: call_intrinsic_function(stack, return_address, [](uint32_t a) -> double { return double(a); }); break;
+				case 215: call_intrinsic_function(stack, return_address, [](uint64_t a) -> double { return double(a); }); break;
+				case 216: call_intrinsic_function(stack, return_address, [](float a) -> double { return double(a); }); break;
 
-				case 217: 
-				{
-					complete::TypeId const type = read<complete::TypeId>(stack, stack.base_pointer);
-					write(return_address, type_size(context.program, type));
-					break;
-				}
-				case 218: 
-				{
-					complete::TypeId const type = read<complete::TypeId>(stack, stack.base_pointer);
-					write(return_address, type_alignment(context.program, type));
-					break;
-				}
+				case 217: call_intrinsic_function(stack, return_address, [context](complete::TypeId t) -> int { return type_size(context.program, t); }); break;
+				case 218: call_intrinsic_function(stack, return_address, [context](complete::TypeId t) -> int { return type_alignment(context.program, t); }); break;
+				case 219: call_intrinsic_function(stack, return_address, [context](complete::TypeId t) -> bool { return is_struct(type_with_id(context.program, t)); }); break;
+				case 220: call_intrinsic_function(stack, return_address, [context](complete::TypeId t) -> bool { return is_array(type_with_id(context.program, t)); }); break;
+				case 221: call_intrinsic_function(stack, return_address, [context](complete::TypeId t) -> bool { return is_pointer(type_with_id(context.program, t)); }); break;
+				case 222: call_intrinsic_function(stack, return_address, [context](complete::TypeId t) -> bool { return is_array_pointer(type_with_id(context.program, t)); }); break;
+				case 223: call_intrinsic_function(stack, return_address, [](complete::TypeId t) -> bool { return t.is_mutable; }); break;
+				case 224: call_intrinsic_function(stack, return_address, [](complete::TypeId t) -> bool { return t.is_reference; }); break;
+				case 225: call_intrinsic_function(stack, return_address, [](complete::TypeId a, complete::TypeId b) -> bool { return a == b; }); break;
 			}
 
 			free_up_to(stack, stack_top);

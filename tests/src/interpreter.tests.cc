@@ -3680,6 +3680,128 @@ TEST_CASE("Calling the named constructor of a struct template")
 	REQUIRE(tests::parse_and_run(src) == 4);
 }
 
+TEST_CASE("is_struct queries whether a type is a struct or not")
+{
+	auto const src = R"(
+		struct Test {}
+
+		let main = fn() -> int32
+		{
+			let mut i = 0;
+
+			if (is_struct(Test))
+				i = i + 1;
+
+			if (not is_struct(int32))
+				i = i + 2;
+
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("is_array queries whether a type is an array or not")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let mut i = 0;
+
+			if (is_array(bool[5]))
+				i = i + 1;
+
+			if (not is_array(bool))
+				i = i + 2;
+
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("is_pointer queries whether a type is a pointer or not")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let mut i = 0;
+
+			if (is_pointer(bool *))
+				i = i + 1;
+
+			if (not is_pointer(bool))
+				i = i + 2;
+
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("is_array_pointer queries whether a type is an array pointer or not")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let mut i = 0;
+
+			if (is_array_pointer(bool[]))
+				i = i + 1;
+
+			if (not is_array_pointer(bool))
+				i = i + 2;
+
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("is_mutable queries whether a type is mutable or not")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let mut i = 0;
+
+			if (is_mutable(bool mut))
+				i = i + 1;
+
+			if (not is_mutable(bool))
+				i = i + 2;
+
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
+TEST_CASE("is_reference queries whether a type is a reference or not")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let mut i = 0;
+
+			if (is_reference(bool &))
+				i = i + 1;
+
+			if (not is_reference(bool))
+				i = i + 2;
+
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {
