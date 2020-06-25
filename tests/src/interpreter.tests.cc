@@ -3802,6 +3802,31 @@ TEST_CASE("is_reference queries whether a type is a reference or not")
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
+TEST_CASE("Equality operator for types")
+{
+	auto const src = R"(
+		let main = fn() -> int32
+		{
+			let mut i = 0;
+
+			if (bool == bool)
+				i = i + 1;
+
+			if (bool != int32)
+				i = i + 2;
+
+			type bool_alias = bool;
+			
+			if (bool == bool_alias)
+				i = i + 4;
+
+			return i;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 7);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {

@@ -336,7 +336,7 @@ namespace complete
 		intrinsic_function_descriptor<bool(TypeId)>("is_array_pointer"sv),
 		intrinsic_function_descriptor<bool(TypeId)>("is_mutable"sv),
 		intrinsic_function_descriptor<bool(TypeId)>("is_reference"sv),
-		intrinsic_function_descriptor<bool(TypeId)>("=="sv),
+		intrinsic_function_descriptor<bool(TypeId, TypeId)>("=="sv),
 	};
 
 	template <int N> using Param = std::integral_constant<int, N>;
