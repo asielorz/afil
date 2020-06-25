@@ -3827,6 +3827,31 @@ TEST_CASE("Equality operator for types")
 	REQUIRE(tests::parse_and_run(src) == 7);
 }
 
+TEST_CASE("User can specialize data for their types")
+{
+	auto const src = R"(
+		struct<T> span
+		{
+			T[] data;
+			int32 size;
+		}
+
+		let data = fn<T>(span<T> s) -> T[]
+		{
+			return s.data;
+		};
+
+		let main = fn() -> int32
+		{
+			let x = int32[](1, 2, 3, 4);
+			let s = span<int32>(data(x), size(x));
+			return data(s)[2];
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 3);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {
@@ -3854,6 +3879,7 @@ TEST_CASE("A function pointer type may point to any function with its signature 
 /*****************************************************************
 Backlog
 - data and size as built in function templates instead of rules of the parser
+- clearing the template caches on an error
 - dynamic memory allocation
 - reflection
 - argument dependent lookup (depends on namespaces, sort of)
