@@ -56,6 +56,12 @@ namespace complete
 			span<char const> value;
 		};
 
+		struct ConstantTemporary
+		{
+			TypeId type;
+			std::vector<char> value;
+		};
+
 		struct FunctionCall
 		{
 			FunctionId function_id;
@@ -144,7 +150,7 @@ namespace complete
 		{
 			using ExpressionTreeBase = std::variant<
 				Literal<int>, Literal<float>, Literal<bool>, StringLiteral, Literal<char_t>, Literal<null_t>, Literal<TypeId>,
-				LocalVariable, GlobalVariable, MemberVariable, Constant,
+				LocalVariable, GlobalVariable, MemberVariable, Constant, ConstantTemporary,
 				FunctionCall, RelationalOperatorCall, Assignment,
 				Constructor,
 				Dereference, ReinterpretCast, Subscript,

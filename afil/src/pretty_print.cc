@@ -166,6 +166,10 @@ auto pretty_print(Expression const & expression, Program const & program, ScopeS
 		{
 			return join("constant<", type_name(constant_expr.type, program), ">: ", print_constant(constant_expr.type, constant_expr.value.data()), "\n");
 		},
+		[&](expression::ConstantTemporary const & constant_expr)
+		{
+			return join("constant temporary<", type_name(constant_expr.type, program), ">: ", print_constant(constant_expr.type, constant_expr.value.data()), "\n");
+		},
 		[&](expression::FunctionCall const & func_call_expr)
 		{
 			std::string str = join("function call: ", function_name(func_call_expr.function_id, program), '\n');

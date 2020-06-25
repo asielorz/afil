@@ -66,6 +66,7 @@ namespace complete
 			[](expression::GlobalVariable const &) { return false; },
 			[&](expression::MemberVariable const & var_node) { return is_constant_expression(*var_node.owner, program, constant_base_index); },
 			[](expression::Constant const &) { return true; },
+			[](expression::ConstantTemporary const &) { return true; },
 			[&](expression::FunctionCall const & func_call_node)
 			{
 				return
@@ -127,9 +128,18 @@ namespace complete
 					is_constant_expression(*assign_node.source, program, constant_base_index) &&
 					is_constant_expression(*assign_node.destination, program, constant_base_index);
 			},
-			[](expression::Compiles const &) { return true; }
+			[&](expression::Compiles const & compiles)
+			{
+				return std::all_of(compiles.variables, 
+					[&](CompilesFakeVariable const & var) {return is_constant_expression(var.type, program, constant_base_index);});
+			}
 		);
 		return my::visit(expr.as_variant(), visitor);
+	}
+
+	auto is_constant_expression_only(Expression const & expr, Program const & program, int constant_base_index) noexcept -> bool
+	{
+		return is_constant_expression(expr, program, constant_base_index) && !can_be_run_at_runtime(expr, program);
 	}
 
 	auto can_be_run_in_a_constant_expression(Function const & function, Program const & program) noexcept -> bool
@@ -195,6 +205,7 @@ namespace complete
 			[](expression::GlobalVariable const &) { return false; },
 			[&](expression::MemberVariable const & var_node) { return can_be_run_at_runtime(*var_node.owner, program); },
 			[](expression::Constant const &) { return true; },
+			[](expression::ConstantTemporary const &) { return true; },
 			[&](expression::FunctionCall const & func_call_node)
 			{
 				return

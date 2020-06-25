@@ -687,6 +687,10 @@ namespace interpreter
 			{
 				write(return_address, constant_node.value.data());
 			},
+			[&](expression::ConstantTemporary const & constant_node)
+			{
+				write(return_address, constant_node.value.data(), static_cast<int>(constant_node.value.size()));
+			},
 			[&](expression::Dereference const & deref_node) -> expected<void, UnmetPrecondition>
 			{
 				StackGuard const g(stack);

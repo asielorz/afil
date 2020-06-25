@@ -121,32 +121,6 @@ namespace instantiation
 		return nullptr;
 	}
 
-	auto make_function_call_node(
-		FunctionId function_id, 
-		span<complete::Expression> parameters, 
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		ScopeStack & scope_stack, 
-		complete::Program & program) -> complete::Expression
-	{
-		complete::expression::FunctionCall function_call_node;
-		function_call_node.function_id = function_id;
-		function_call_node.parameters.reserve(parameters.size());
-		for (size_t i = 0; i < parameters.size(); ++i)
-			function_call_node.parameters.push_back(std::move(parameters[i]));
-
-		if (is_callable_at_compile_time(program, function_id))
-		{
-			complete::expression::Constant constant_node;
-			constant_node.type = return_type(program, function_id);
-			constant_node.value.resize(type_size(program, constant_node.type));
-			evaluate_constant_expression(std::move(function_call_node), template_parameters, scope_stack, program, constant_node.value.data());
-		}
-		else
-		{
-			return std::move(function_call_node);
-		}
-	}
-
 	constexpr char null[sizeof(void *)] = {0};
 
 	auto insert_implicit_conversion_node(
@@ -2176,7 +2150,23 @@ namespace instantiation
 			}
 		);
 
-		return my::visit(incomplete_expression_.variant, visitor);
+		// If a expression can only be run at compile time, 
+		try_call_decl(complete::Expression expression, my::visit(incomplete_expression_.variant, visitor));
+		if (is_constant_expression_only(expression, *program, next_block_scope_offset(scope_stack)))
+		{
+			complete::expression::ConstantTemporary constant;
+			constant.type = expression_type_id(expression, *program);
+			int const buffer_size = type_size(*program, constant.type);
+			constant.value.resize(buffer_size);
+			auto const result = interpreter::evaluate_constant_expression(expression, template_parameters, scope_stack, *program, constant.value.data());
+			if (!result)
+				return make_syntax_error(incomplete_expression_.source, "Unmet precondition when evaluation constant expression");
+			return std::move(constant);
+		}
+		else
+		{
+			return std::move(expression);
+		}
 	}
 
 	auto instantiate_statement(

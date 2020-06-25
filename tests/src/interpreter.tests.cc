@@ -3570,14 +3570,12 @@ TEST_CASE("size_in_bytes_of is an intrinsic function that returns the size in by
 	auto const src1 = R"(
 		let main = fn() -> int32
 		{
-			//let x = size_in_bytes_of(int32);
-			//return x;
 			return size_in_bytes_of(int32);
 		};
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src1) == 4);
-	/*
+	
 	auto const src2 = R"(
 		let main = fn() -> int32
 		{
@@ -3594,7 +3592,7 @@ TEST_CASE("size_in_bytes_of is an intrinsic function that returns the size in by
 		};
 	)"sv;
 
-	REQUIRE(tests::parse_and_run(src3) == 1);*/
+	REQUIRE(tests::parse_and_run(src3) == 1);
 }
 
 #if 0
