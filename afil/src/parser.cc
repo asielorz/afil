@@ -353,32 +353,63 @@ namespace parser
 		return template_parameters;
 	}
 
+	auto parse_type_name_namespaces(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept 
+		-> expected<std::optional<std::pair<TypeName, std::vector<std::string_view>>>, PartialSyntaxError>
+	{
+		size_t const index_start = index;
+		std::vector<std::string_view> namespaces;
+		TypeName found_type;
+
+		while (true)
+		{
+			if (tokens[index].type != TokenType::identifier)
+				return make_syntax_error(tokens[index].source, "Expected identifier after \"::\".");
+
+			std::string_view const name_to_look_up = tokens[index].source;
+			index++;
+			auto const it = std::find_if(type_names.rbegin(), type_names.rend(), [name_to_look_up](TypeName const & type_name) { return type_name.name == name_to_look_up; });
+
+			// Found a type. Return it.
+			if (it != type_names.rend())
+			{
+				found_type = {name_to_look_up, it->type};
+				break;
+			}
+
+			// Found a namespace. Add it to the list of namespaces and continue.
+			if (tokens[index].type == TokenType::scope_resolution)
+			{
+				index++;
+				namespaces.push_back(name_to_look_up);
+			}
+			// Found something that is neither type or namespace. Return nothing.
+			else
+			{
+				index = index_start;
+				return std::nullopt;
+			}
+		}
+
+		return std::make_pair(found_type, std::move(namespaces));
+	}
+
 	auto parse_type_name(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<std::optional<incomplete::TypeId>, PartialSyntaxError>
 	{
 		using namespace incomplete;
 		
-		size_t const index_start = index;
-		try_call_decl(std::vector<std::string_view> namespaces, parse_namespaces(tokens, index));
-		
-		std::string_view const name_to_look_up = tokens[index].source;
-		auto const it = std::find_if(type_names.rbegin(), type_names.rend(), [name_to_look_up](TypeName const & type_name) { return type_name.name == name_to_look_up; });
-		if (it == type_names.rend())
-		{
-			index = index_start;
+		try_call_decl(auto type_and_namespaces, parse_type_name_namespaces(tokens, index, type_names));
+		if (!type_and_namespaces)
 			return std::nullopt;
-		}
 
-		index++;
+		auto[type_name, namespaces] = std::move(*type_and_namespaces);
 
-		int const found_index = static_cast<int>(&*it - type_names.data());
-
-		switch (it->type)
+		switch (type_name.type)
 		{
 			case TypeName::Type::type:
 			case TypeName::Type::template_parameter:
 			{
 				TypeId::BaseCase base_case;
-				base_case.name = name_to_look_up;
+				base_case.name = type_name.name;
 				base_case.namespaces = std::move(namespaces);
 				TypeId type;
 				type.is_mutable = false;
@@ -390,7 +421,7 @@ namespace parser
 			case TypeName::Type::struct_template:
 			{
 				TypeId::TemplateInstantiation template_instantiation;
-				template_instantiation.template_name = name_to_look_up;
+				template_instantiation.template_name = type_name.name;
 				template_instantiation.namespaces = std::move(namespaces);
 				try_call(assign_to(template_instantiation.parameters), parse_template_instantiation_parameter_list(tokens, index, type_names));
 				TypeId type;
@@ -936,17 +967,20 @@ namespace parser
 			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (type.has_value())
 			{
-				//if (tokens[index].type == TokenType::open_parenthesis && tokens[index + 1].type == TokenType::period)
-				//{
-				//	incomplete::expression::DesignatedInitializerConstructor ctor_node;
-				//	ctor_node.constructed_type = std::move(*type);
-				//	try_call(assign_to(ctor_node.parameters), parse_designated_initializer_list(tokens, index, type_names));
-				//	return std::move(ctor_node);
-				//}
-				//else
-				//{
-					return incomplete::expression::Literal<incomplete::TypeId>(std::move(*type));
-				//}
+				if (tokens[index].type == TokenType::scope_resolution)
+				{
+					index++;
+					if (tokens[index].type != TokenType::identifier)
+						return make_syntax_error(tokens[index].source, "Expected identifier after ::.");
+
+					incomplete::expression::IdentifierInsideStruct id_node;
+					id_node.type = std::move(*type);
+					id_node.name = tokens[index].source;
+					index++;
+					return std::move(id_node);
+				}
+
+				return incomplete::expression::Literal<incomplete::TypeId>(std::move(*type));
 			}
 			else
 			{

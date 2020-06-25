@@ -34,6 +34,12 @@ namespace incomplete
 			std::string_view name;
 		};
 
+		struct IdentifierInsideStruct
+		{
+			TypeId type;
+			std::string_view name;
+		};
+
 		struct MemberVariable
 		{
 			std::string_view name;
@@ -126,7 +132,7 @@ namespace incomplete
 		using Variant = std::variant<
 			Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<char_t>, Literal<null_t>, Literal<TypeId>,
 			Dereference, Addressof, Subscript,
-			Identifier, MemberVariable,
+			Identifier, MemberVariable, IdentifierInsideStruct,
 			Function, FunctionTemplate,	ExternFunction,
 			FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 			If, StatementBlock,

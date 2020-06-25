@@ -3657,6 +3657,29 @@ TEST_CASE("alignment_of is an intrinsic function that returns the alignment requ
 	REQUIRE(tests::parse_and_run(src4) == 4);
 }
 
+TEST_CASE("Calling the named constructor of a struct template")
+{
+	auto const src = R"(
+		struct<T> Test
+		{
+			T value;
+
+			constructor with_value(T x)
+			{
+				return Test<T>(x);
+			}
+		}
+
+		let main = fn() -> int32
+		{
+			let t = Test<int32>::with_value(4);
+			return t.value;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {
@@ -3683,6 +3706,7 @@ TEST_CASE("A function pointer type may point to any function with its signature 
 
 /*****************************************************************
 Backlog
+- data and size as built in function templates instead of rules of the parser
 - dynamic memory allocation
 - reflection
 - argument dependent lookup (depends on namespaces, sort of)

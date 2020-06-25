@@ -1525,28 +1525,28 @@ namespace instantiation
 					[&](lookup_result::NamespaceNotFound) -> expected<complete::Expression, PartialSyntaxError>
 					{
 						// Try to look for a constructor.
-						complete::TypeId const struct_type = type_with_name(
-							incomplete_expression.namespaces.back(), scope_stack, 
-							{incomplete_expression.namespaces.data(), incomplete_expression.namespaces.size() - 1});
-
-						if (struct_type == complete::TypeId::none)
+						//complete::TypeId const struct_type = type_with_name(
+						//	incomplete_expression.namespaces.back(), scope_stack, 
+						//	{incomplete_expression.namespaces.data(), incomplete_expression.namespaces.size() - 1});
+						//
+						//if (struct_type == complete::TypeId::none)
 							return make_syntax_error(incomplete_expression.namespaces[0], "Namespace not found.");
 						
-						complete::Struct const * struct_data = struct_for_type(*program, struct_type);
-
-						if (struct_data == nullptr)
-							return make_syntax_error(incomplete_expression.namespaces.back(), "Cannot call a named constructor on a type that is not a struct.");
-
-						std::vector<FunctionId> constructors = constructor_overload_set(*struct_data, incomplete_expression.name);
-						if (constructors.empty())
-							return make_syntax_error(incomplete_expression.name, "Constructor not found.");
-
-						complete::OverloadSet ctor_overload_set;
-						ctor_overload_set.function_ids = std::move(constructors);
-
-						complete::expression::Constant complete_expression;
-						complete_expression.type = type_for_overload_set(*program, ctor_overload_set);
-						return complete_expression;
+						//complete::Struct const * struct_data = struct_for_type(*program, struct_type);
+						//
+						//if (struct_data == nullptr)
+						//	return make_syntax_error(incomplete_expression.namespaces.back(), "Cannot call a named constructor on a type that is not a struct.");
+						//
+						//std::vector<FunctionId> constructors = constructor_overload_set(*struct_data, incomplete_expression.name);
+						//if (constructors.empty())
+						//	return make_syntax_error(incomplete_expression.name, "Constructor not found.");
+						//
+						//complete::OverloadSet ctor_overload_set;
+						//ctor_overload_set.function_ids = std::move(constructors);
+						//
+						//complete::expression::Constant complete_expression;
+						//complete_expression.type = type_for_overload_set(*program, ctor_overload_set);
+						//return complete_expression;
 					},
 					[&](auto const &) -> expected<complete::Expression, PartialSyntaxError>
 					{
@@ -1554,6 +1554,27 @@ namespace instantiation
 					}
 				);
 				return std::visit(lookup_visitor, lookup);
+			},
+			[&](incomplete::expression::IdentifierInsideStruct const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
+			{
+				try_call_decl(complete::TypeId const struct_type,
+					resolve_dependent_type(incomplete_expression.type, template_parameters, scope_stack, program));
+
+				complete::Struct const * struct_data = struct_for_type(*program, struct_type);
+
+				if (struct_data == nullptr)
+					return make_syntax_error(incomplete_expression.name, "Cannot call a named constructor on a type that is not a struct.");
+
+				std::vector<FunctionId> constructors = constructor_overload_set(*struct_data, incomplete_expression.name);
+				if (constructors.empty())
+					return make_syntax_error(incomplete_expression.name, "Constructor not found.");
+
+				complete::OverloadSet ctor_overload_set;
+				ctor_overload_set.function_ids = std::move(constructors);
+
+				complete::expression::Constant complete_expression;
+				complete_expression.type = type_for_overload_set(*program, ctor_overload_set);
+				return complete_expression;
 			},
 			[&](incomplete::expression::MemberVariable const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
