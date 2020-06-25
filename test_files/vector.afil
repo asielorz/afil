@@ -6,6 +6,18 @@ struct<T> vector
 	
 	constructor default = default;
 	
+	constructor with_capacity(uint64 capacity)
+	{
+		if (capacity == uint64(0))
+			return vector<T>();
+		
+		let block = malloc_allocate(capacity * uint64(size_in_bytes_of(T)), uint64(alignment_of(T)));
+		return vector<T>(
+			.data = T mut[](block.memory),
+			.capacity = block.size / uint64(size_in_bytes_of(T))
+		);
+	}
+	
 	destructor(vector<T> mut & this)
 	{
 		if (this.data != null)
@@ -14,7 +26,7 @@ struct<T> vector
 			for (let mut i = 0; i < n; i = i + 1)
 				destroy(this.data[i]);
 			
-			malloc_deallocate(byte mut[](this.data), this.size, uint64(16));
+			malloc_deallocate(byte mut[](this.data), uint64(size_in_bytes_of(T)), uint64(alignment_of(T)));
 		}
 	}
 }

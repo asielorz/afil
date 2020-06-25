@@ -3593,6 +3593,68 @@ TEST_CASE("size_in_bytes_of is an intrinsic function that returns the size in by
 	)"sv;
 
 	REQUIRE(tests::parse_and_run(src3) == 1);
+
+	auto const src4 = R"(
+		struct vec3
+		{
+			float32 x;
+			float32 y;
+			float32 z;
+		}
+
+		let main = fn() -> int32
+		{
+			return size_in_bytes_of(vec3);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src4) == 12);
+}
+
+TEST_CASE("alignment_of is an intrinsic function that returns the alignment requirement of a type")
+{
+	auto const src1 = R"(
+		let main = fn() -> int32
+		{
+			return alignment_of(int32);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src1) == 4);
+
+	auto const src2 = R"(
+		let main = fn() -> int32
+		{
+			return alignment_of(float64);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src2) == 8);
+
+	auto const src3 = R"(
+		let main = fn() -> int32
+		{
+			return alignment_of(bool);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src3) == 1);
+
+	auto const src4 = R"(
+		struct vec3
+		{
+			float32 x;
+			float32 y;
+			float32 z;
+		}
+
+		let main = fn() -> int32
+		{
+			return alignment_of(vec3);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src4) == 4);
 }
 
 #if 0

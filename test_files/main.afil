@@ -1,5 +1,5 @@
 let main = fn() -> int32
 {
-	let v = vector<int32>();
-	return int32(v.size);
+	let v = vector<int32>::with_capacity(10);
+	return int32(v.capacity);
 };
