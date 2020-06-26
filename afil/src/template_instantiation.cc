@@ -2545,11 +2545,11 @@ namespace instantiation
 	[[nodiscard]] auto semantic_analysis(
 		span<incomplete::Statement const> incomplete_program, 
 		out<complete::Program> complete_program, 
-		ScopeStack & scope_stack
+		ScopeStack & scope_stack,
+		TemplateCache & template_cache
 	) noexcept -> expected<void, PartialSyntaxError>
 	{
 		std::vector<complete::ResolvedTemplateParameter> template_parameters;
-		TemplateCache template_cache;
 		size_t const scope_stack_original_size = scope_stack.size();
 
 		std::vector<std::variant<std::nullopt_t, complete::Statement, PartialSyntaxError>> complete_statements(incomplete_program.size(), std::nullopt);
@@ -2613,7 +2613,10 @@ namespace instantiation
 	{
 		ScopeStack scope_stack;
 		scope_stack.push_back({&complete_program->global_scope, ScopeType::global, 0});
-		return semantic_analysis(incomplete_program, complete_program, scope_stack);
+
+		TemplateCache template_cache;
+
+		return semantic_analysis(incomplete_program, complete_program, scope_stack, template_cache);
 	}
 
 	auto push_global_scopes_of_dependent_modules(
@@ -2640,11 +2643,13 @@ namespace instantiation
 		ScopeStack scope_stack;
 		scope_stack.push_back({&program.global_scope, ScopeType::global, 0});
 
+		TemplateCache template_cache;
+
 		for (int i : parse_order)
 		{
 			scope_stack.resize(1);
 			push_global_scopes_of_dependent_modules(incomplete_modules, i, module_global_scopes, out(scope_stack));
-			auto analysis_result = semantic_analysis(incomplete_modules[i].statements, out(program), scope_stack);
+			auto analysis_result = semantic_analysis(incomplete_modules[i].statements, out(program), scope_stack, template_cache);
 			if (!analysis_result)
 			{
 				if (analysis_result.error().error_in_source.empty())
