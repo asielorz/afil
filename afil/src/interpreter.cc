@@ -83,7 +83,7 @@ namespace interpreter
 		bool all_body_expressions_compile = true;
 		for (incomplete::ExpressionToTest const & expression_to_test : compiles_expr.body)
 		{
-			if (!instantiation::test_if_expression_compiles(expression_to_test, context.template_parameters, context.scope_stack, out(context.program), nullptr))
+			if (!instantiation::test_if_expression_compiles(expression_to_test, {context.template_parameters, context.scope_stack, out(context.program), context.template_cache}, nullptr))
 			{
 				all_body_expressions_compile = false;
 				break;
@@ -96,21 +96,18 @@ namespace interpreter
 
 	[[nodiscard]] auto evaluate_constant_expression(
 		complete::Expression const & expression, 
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		instantiation::ScopeStack & scope_stack,
-		complete::Program & program, 
+		instantiation::SemanticAnalysisArgs args,
 		void * outValue
-	) noexcept
-		-> expected<void, UnmetPrecondition>
+	) noexcept -> expected<void, UnmetPrecondition>
 	{
-		assert(is_constant_expression(expression, program, next_block_scope_offset(scope_stack)));
+		assert(is_constant_expression(expression, *args.program, next_block_scope_offset(args.scope_stack)));
 
 		interpreter::ProgramStack stack;
 		alloc_stack(stack, 256);
 
-		try_call_void(interpreter::eval_expression(expression, stack, interpreter::CompileTimeContext{program, template_parameters, scope_stack}));
+		try_call_void(interpreter::eval_expression(expression, stack, interpreter::CompileTimeContext{*args.program, args.template_parameters, args.scope_stack, args.template_cache}));
 
-		memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, program));
+		memcpy(outValue, pointer_at_address(stack, 0), expression_type_size(expression, *args.program));
 
 		return success;
 	}

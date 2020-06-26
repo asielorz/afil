@@ -1086,23 +1086,26 @@ namespace complete
 		return program.overload_set_types[overload_set_type.index];
 	}
 
-	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, PartialSyntaxError>
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters, instantiation::TemplateCache & template_cache) noexcept -> expected<FunctionId, PartialSyntaxError>
 	{
+		instantiation::TemplateInstantiation<FunctionTemplateId> search;
+		search.id = template_id;
+		search.parameters.assign(parameters.begin(), parameters.end());
+		auto const cached_instantiation = template_cache.functions.find(search);
+		if (cached_instantiation != template_cache.functions.end())
+			return cached_instantiation->second;
+
 		if (template_id.is_intrinsic)
 		{
-			// TODO: Cache
 			Function instantiated_function = intrinsic_function_templates[template_id.index].instantiation_function(parameters, program);
 			FunctionId const instantiated_function_id = add_function(program, std::move(instantiated_function));
+			template_cache.functions.emplace(std::move(search), instantiated_function_id);
 			return instantiated_function_id;
 		}
 		else
 		{
 			FunctionTemplate & function_template = program.function_templates[template_id.index];
 			assert(parameters.size() == function_template.incomplete_function.template_parameters.size());
-
-			auto const cached_instantiation = function_template.cached_instantiations.find(parameters);
-			if (cached_instantiation != function_template.cached_instantiations.end())
-				return cached_instantiation->second;
 
 			std::vector<ResolvedTemplateParameter> all_template_parameters;
 			all_template_parameters.reserve(function_template.scope_template_parameters.size() + parameters.size());
@@ -1115,13 +1118,13 @@ namespace complete
 			instantiation::ScopeStack scope_stack = function_template.scope_stack;
 
 			try_call_decl(Function instantiated_function,
-				instantiation::instantiate_function_template(function_template.incomplete_function, all_template_parameters, scope_stack, out(program)));
+				instantiation::instantiate_function_template(function_template.incomplete_function, {all_template_parameters, scope_stack, out(program), template_cache}));
 
 			instantiated_function.ABI_name = function_template.ABI_name;
 			FunctionId const instantiated_function_id = add_function(program, std::move(instantiated_function));
 
 			auto parameters_to_insert = std::vector<TypeId>(parameters.begin(), parameters.end());
-			function_template.cached_instantiations.emplace(std::move(parameters_to_insert), instantiated_function_id);
+			template_cache.functions.emplace(std::move(search), instantiated_function_id);
 
 			return instantiated_function_id;
 		}
@@ -1132,7 +1135,8 @@ namespace complete
 		span<TypeId const> parameters, 
 		std::vector<ResolvedTemplateParameter> template_parameters,
 		instantiation::ScopeStack scope_stack,
-		Program& program
+		Program& program,
+		instantiation::TemplateCache & template_cache
 	) noexcept -> size_t
 	{
 		assert(concepts.size() == parameters.size());
@@ -1144,7 +1148,7 @@ namespace complete
 			{
 				function_call.function_id = concepts[i];
 				function_call.parameters.push_back(expression::Literal<TypeId>{parameters[i]});
-				auto const concept_passed = interpreter::evaluate_constant_expression_as<bool>(function_call, template_parameters, scope_stack, program);
+				auto const concept_passed = interpreter::evaluate_constant_expression_as<bool>(function_call, {template_parameters, scope_stack, out(program), template_cache});
 				if (!concept_passed.has_value() || !concept_passed.value())
 					return i;
 			}
@@ -1154,19 +1158,22 @@ namespace complete
 		return concepts.size();
 	}
 
-	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, std::string_view instantiation_in_source) noexcept 
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, instantiation::TemplateCache & template_cache, std::string_view instantiation_in_source) noexcept
 		-> expected<TypeId, PartialSyntaxError>
 	{
-		StructTemplate & struct_template = program.struct_templates[template_id.index];
+		instantiation::TemplateInstantiation<StructTemplateId> search;
+		search.id = template_id;
+		search.parameters.assign(parameters.begin(), parameters.end());
+		auto const cached_instantiation = template_cache.structs.find(search);
+		if (cached_instantiation != template_cache.structs.end())
+			return cached_instantiation->second;
 
-		if (auto const it = struct_template.cached_instantiations.find(parameters);
-			it != struct_template.cached_instantiations.end())
-			return it->second;
+		StructTemplate & struct_template = program.struct_templates[template_id.index];
 
 		if (parameters.size() != struct_template.incomplete_struct.template_parameters.size())
 			return make_syntax_error(instantiation_in_source, "Incorrect number of parameters for function template instantiation.");
 
-		size_t const failed_concept = check_concepts(struct_template.concepts, parameters, struct_template.scope_template_parameters, struct_template.scope_stack, program);
+		size_t const failed_concept = check_concepts(struct_template.concepts, parameters, struct_template.scope_template_parameters, struct_template.scope_stack, program, template_cache);
 		if (failed_concept != parameters.size())
 			return make_syntax_error(
 				instantiation_in_source, 
@@ -1183,7 +1190,7 @@ namespace complete
 		instantiation::ScopeStack scope_stack = struct_template.scope_stack;
 
 		try_call_decl(instantiation::InstantiatedStruct new_struct,
-			instantiate_incomplete_struct_variables(struct_template.incomplete_struct, all_template_parameters, scope_stack, out(program)));
+			instantiation::instantiate_incomplete_struct_variables(struct_template.incomplete_struct, {all_template_parameters, scope_stack, out(program), template_cache}));
 
 		Type new_type;
 		new_type.size = new_struct.size;
@@ -1196,9 +1203,9 @@ namespace complete
 		new_type.template_instantiation = std::move(template_instantiation);
 
 		auto const[new_type_id, new_struct_id] = add_struct_type(program, std::move(new_type), std::move(new_struct.complete_struct));
-		struct_template.cached_instantiations.emplace(std::vector<TypeId>(parameters.begin(), parameters.end()), new_type_id);
+		template_cache.structs.emplace(std::move(search), new_type_id);
 
-		try_call_void(instantiation::instantiate_incomplete_struct_functions(struct_template.incomplete_struct, new_type_id, new_struct_id, all_template_parameters, scope_stack, out(program)));
+		try_call_void(instantiation::instantiate_incomplete_struct_functions(struct_template.incomplete_struct, new_type_id, new_struct_id, {all_template_parameters, scope_stack, out(program), template_cache}));
 
 		return new_type_id;
 	}
@@ -1495,7 +1502,7 @@ namespace complete
 		return expected_type;
 	}
 
-	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId
+	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program, instantiation::TemplateCache & template_cache) noexcept -> FunctionId
 	{
 		struct Candidate
 		{
@@ -1588,7 +1595,7 @@ namespace complete
 				}
 
 				if (!concepts.empty())
-					if (check_concepts(concepts, {resolved_dependent_types.data(), dependent_type_count}, std::move(scope_template_parameters), std::move(scope_stack), program) != concepts.size())
+					if (check_concepts(concepts, {resolved_dependent_types.data(), dependent_type_count}, std::move(scope_template_parameters), std::move(scope_stack), program, template_cache) != concepts.size())
 						discard = true;
 
 				if (!discard)
@@ -1631,7 +1638,7 @@ namespace complete
 
 				// Ensure that all template parameters have been resolved.
 				assert(std::find(resolved_dependent_types.begin(), resolved_dependent_types.begin() + dependent_type_count, TypeId::none) == resolved_dependent_types.begin() + dependent_type_count);
-				auto function_id = instantiate_function_template(program, best_template_candidate.id, {resolved_dependent_types.data(), dependent_type_count});
+				auto function_id = instantiate_function_template(program, best_template_candidate.id, {resolved_dependent_types.data(), dependent_type_count}, template_cache);
 				assert(function_id.has_value());
 				return *function_id;
 			}
@@ -1641,7 +1648,8 @@ namespace complete
 	auto check_function_template_as_conversion_candidate(
 		FunctionTemplateId template_id, TypeId from, TypeId to, 
 		size_t & dependent_type_count, span<TypeId> resolved_dependent_types, int & conversions,
-		Program & program) -> bool
+		Program & program, instantiation::TemplateCache & template_cache
+	) -> bool
 	{
 		FunctionTemplate const & fn = program.function_templates[template_id.index];
 		span<FunctionTemplateParameterType const> const fn_parameters = fn.parameter_types;
@@ -1664,13 +1672,13 @@ namespace complete
 		if (!check_type_validness_as_overload_candidate(to, expected_type_to, program, conversions))
 			return false;
 
-		if (check_concepts(fn.concepts, resolved_dependent_types.subspan(0, dependent_type_count), fn.scope_template_parameters, fn.scope_stack, program) != fn.concepts.size())
+		if (check_concepts(fn.concepts, resolved_dependent_types.subspan(0, dependent_type_count), fn.scope_template_parameters, fn.scope_stack, program, template_cache) != fn.concepts.size())
 			return false;
 
 		return true;
 	}
 
-	auto resolve_function_overloading_for_conversions(OverloadSetView overload_set, TypeId from, TypeId to, Program & program) noexcept -> FunctionId
+	auto resolve_function_overloading_for_conversions(OverloadSetView overload_set, TypeId from, TypeId to, Program & program, instantiation::TemplateCache & template_cache) noexcept -> FunctionId
 	{
 		struct Candidate
 		{
@@ -1718,7 +1726,7 @@ namespace complete
 		for (FunctionTemplateId template_id : overload_set.function_template_ids)
 		{
 			int conversions = 0;
-			if (check_function_template_as_conversion_candidate(template_id, from, to, dependent_type_count, resolved_dependent_types, conversions, program))
+			if (check_function_template_as_conversion_candidate(template_id, from, to, dependent_type_count, resolved_dependent_types, conversions, program, template_cache))
 			{
 				template_candidates[template_candidate_count++] = TemplateCandidate{conversions, template_id};
 			}
@@ -1754,17 +1762,22 @@ namespace complete
 			{
 				// Ensure that all template parameters have been resolved.
 				assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
-				auto function_id = instantiate_function_template(program, best_template_candidate.id, { resolved_dependent_types, dependent_type_count });
+				auto function_id = instantiate_function_template(program, best_template_candidate.id, {resolved_dependent_types, dependent_type_count}, template_cache);
 				assert(function_id.has_value());
 				return *function_id;
 			}
 		}
 	}
 
-	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
-		-> FunctionId
+	auto resolve_function_overloading_and_insert_conversions(
+		OverloadSetView overload_set, 
+		span<Expression> parameters, 
+		span<TypeId const> parameter_types, 
+		Program & program,
+		instantiation::TemplateCache & template_cache
+	) noexcept -> FunctionId
 	{
-		FunctionId const function_id = resolve_function_overloading(overload_set, parameter_types, program);
+		FunctionId const function_id = resolve_function_overloading(overload_set, parameter_types, program, template_cache);
 		if (function_id == function_id_constants::invalid)
 			return function_id_constants::invalid;
 

@@ -1019,15 +1019,13 @@ namespace interpreter
 	}
 
 	template <typename T>
-	auto evaluate_constant_expression_as(
+	[[nodiscard]] auto evaluate_constant_expression_as(
 		complete::Expression const & expression,
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		instantiation::ScopeStack & scope_stack,
-		complete::Program & program) noexcept
-		-> expected<T, UnmetPrecondition>
+		instantiation::SemanticAnalysisArgs args
+	) noexcept -> expected<T, UnmetPrecondition>
 	{
 		T result;
-		try_call_void(evaluate_constant_expression(expression, template_parameters, scope_stack, program, &result));
+		try_call_void(evaluate_constant_expression(expression, args, &result));
 		return result;
 	}
 

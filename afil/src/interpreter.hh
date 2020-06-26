@@ -2,6 +2,7 @@
 
 #include "function_id.hh"
 #include "program.hh"
+#include "template_instantiation.hh"
 #include "utils/expected.hh"
 #include "utils/overload.hh"
 #include "utils/span.hh"
@@ -63,6 +64,7 @@ namespace interpreter
 		complete::Program & program;
 		std::vector<complete::ResolvedTemplateParameter> & template_parameters;
 		instantiation::ScopeStack & scope_stack;
+		instantiation::TemplateCache & template_cache;
 	};
 
 	template <typename ExecutionContext>
@@ -89,20 +91,15 @@ namespace interpreter
 
 	[[nodiscard]] auto evaluate_constant_expression(
 		complete::Expression const & expression, 
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		instantiation::ScopeStack & scope_stack,
-		complete::Program & program,
+		instantiation::SemanticAnalysisArgs args,
 		void * outValue
-	) noexcept
-		->expected<void, UnmetPrecondition>;
+	) noexcept -> expected<void, UnmetPrecondition>;
 
 	template <typename T>
 	[[nodiscard]] auto evaluate_constant_expression_as(
 		complete::Expression const & expression, 
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		instantiation::ScopeStack & scope_stack,
-		complete::Program & program) noexcept
-		-> expected<T, UnmetPrecondition>;
+		instantiation::SemanticAnalysisArgs args
+	) noexcept -> expected<T, UnmetPrecondition>;
 
 	// TODO: argc, argv. Decide a good stack size.
 	auto run(complete::Program const & program, int stack_size = 2048) noexcept -> expected<int, UnmetPrecondition>;

@@ -16,6 +16,36 @@ namespace instantiation
 	
 	//[[nodiscard]] auto semantic_analysis(span<incomplete::Statement const> incomplete_program, out<complete::Program> complete_program) noexcept -> expected<void, PartialSyntaxError>;
 
+	template <typename Id>
+	struct TemplateInstantiation
+	{
+		Id id;
+		std::vector<complete::TypeId> parameters;
+
+		bool operator < (TemplateInstantiation const & other) const noexcept
+		{
+			int const a_cmp = memcmp(&id, &other.id, sizeof(Id));
+			if (a_cmp == 0)
+				return memcmp(parameters.data(), other.parameters.data(), parameters.size() * sizeof(complete::TypeId)) < 0;
+			else
+				return a_cmp < 0;
+		}
+	};
+
+	struct TemplateCache
+	{
+		std::map<TemplateInstantiation<FunctionTemplateId>, FunctionId> functions;
+		std::map<TemplateInstantiation<complete::StructTemplateId>, complete::TypeId> structs;
+	};
+
+	struct SemanticAnalysisArgs
+	{
+		std::vector<complete::ResolvedTemplateParameter> & template_parameters;
+		ScopeStack & scope_stack;
+		out<complete::Program> program;
+		TemplateCache & template_cache;
+	};
+
 	auto semantic_analysis(
 		span<incomplete::Module const> incomplete_modules,
 		span<int const> parse_order
@@ -23,16 +53,12 @@ namespace instantiation
 
 	auto instantiate_function_template(
 		incomplete::Function const & incomplete_function,
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		ScopeStack & scope_stack,
-		out<complete::Program> program
+		SemanticAnalysisArgs args
 	) -> expected<complete::Function, PartialSyntaxError>;
 
 	auto instantiate_expression(
 		incomplete::Expression const & incomplete_expression_,
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		ScopeStack & scope_stack,
-		out<complete::Program> program,
+		SemanticAnalysisArgs args,
 		optional_out<complete::TypeId> current_scope_return_type
 	) -> expected<complete::Expression, PartialSyntaxError>;
 
@@ -91,16 +117,12 @@ namespace instantiation
 
 	auto resolve_dependent_type(
 		incomplete::TypeId const & dependent_type,
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		ScopeStack & scope_stack,
-		out<complete::Program> program)
-		-> expected<complete::TypeId, PartialSyntaxError>;
+		SemanticAnalysisArgs args
+	) noexcept -> expected<complete::TypeId, PartialSyntaxError>;
 
 	auto test_if_expression_compiles(
 		incomplete::ExpressionToTest const & expression_to_test,
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		ScopeStack & scope_stack,
-		out<complete::Program> program,
+		SemanticAnalysisArgs args,
 		optional_out<complete::TypeId> current_scope_return_type
 	) -> bool;
 
@@ -131,17 +153,13 @@ namespace instantiation
 	};
 	[[nodiscard]] auto instantiate_incomplete_struct_variables(
 		incomplete::Struct const & incomplete_struct,
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		ScopeStack & scope_stack,
-		out<complete::Program> program
+		SemanticAnalysisArgs args
 	) -> expected<InstantiatedStruct, PartialSyntaxError>;
 
 	[[nodiscard]] auto instantiate_incomplete_struct_functions(
 		incomplete::Struct const & incomplete_struct,
 		complete::TypeId new_type_id, int new_struct_id,
-		std::vector<complete::ResolvedTemplateParameter> & template_parameters,
-		ScopeStack & scope_stack,
-		out<complete::Program> program
+		SemanticAnalysisArgs args
 	) -> expected<void, PartialSyntaxError>;
 
 } // namespace instantiation

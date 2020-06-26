@@ -12,6 +12,11 @@
 #include <optional>
 #include <map>
 
+namespace instantiation
+{
+	struct TemplateCache;
+}
+
 namespace complete
 {
 
@@ -83,17 +88,6 @@ namespace complete
 		bool is_callable_at_runtime;
 	};
 
-	struct MemcmpRanges
-	{
-		using is_transparent = std::true_type;
-
-		template <typename T, typename U>
-		[[nodiscard]] constexpr auto operator () (T const & a, U const & b) const noexcept -> bool
-		{
-			return memcmp(a.data(), b.data(), a.size() * sizeof(*a.data())) < 0;
-		}
-	};
-
 	struct ResolvedTemplateParameter
 	{
 		std::string name;
@@ -151,7 +145,6 @@ namespace complete
 		std::vector<FunctionTemplateParameterType> parameter_types;
 		std::vector<ResolvedTemplateParameter> scope_template_parameters;
 		instantiation::ScopeStack scope_stack;
-		std::map<std::vector<TypeId>, FunctionId, MemcmpRanges> cached_instantiations;
 		std::string ABI_name;
 	};
 
@@ -181,7 +174,6 @@ namespace complete
 		std::vector<FunctionId> concepts;
 		std::vector<ResolvedTemplateParameter> scope_template_parameters;
 		instantiation::ScopeStack scope_stack;
-		std::map<std::vector<TypeId>, TypeId, MemcmpRanges> cached_instantiations;
 		std::string ABI_name;
 	};
 
@@ -280,8 +272,8 @@ namespace complete
 	auto ABI_name(Program & program, StructTemplateId id) noexcept -> std::string &;
 	auto ABI_name(Program const & program, StructTemplateId id) noexcept -> std::string_view;
 
-	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters) noexcept -> expected<FunctionId, PartialSyntaxError>;
-	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, std::string_view instantiation_in_source) noexcept 
+	auto instantiate_function_template(Program & program, FunctionTemplateId template_id, span<TypeId const> parameters, instantiation::TemplateCache & template_cache) noexcept -> expected<FunctionId, PartialSyntaxError>;
+	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, instantiation::TemplateCache & template_cache, std::string_view instantiation_in_source) noexcept
 		-> expected<TypeId, PartialSyntaxError>;
 
 	namespace template_intrinsics
@@ -317,10 +309,27 @@ namespace complete
 		span<FunctionId const> function_ids;
 		span<FunctionTemplateId const> function_template_ids;
 	};
-	auto resolve_function_overloading(OverloadSetView overload_set, span<TypeId const> parameters, Program & program) noexcept -> FunctionId;
-	auto resolve_function_overloading_for_conversions(OverloadSetView overload_set, TypeId from, TypeId to, Program & program) noexcept -> FunctionId;
-	auto resolve_function_overloading_and_insert_conversions(OverloadSetView overload_set, span<Expression> parameters, span<TypeId const> parameter_types, Program & program) noexcept
-		-> FunctionId;
+	auto resolve_function_overloading(
+		OverloadSetView overload_set, 
+		span<TypeId const> parameters, 
+		Program & program, 
+		instantiation::TemplateCache & template_cache
+	) noexcept -> FunctionId;
+
+	auto resolve_function_overloading_for_conversions(
+		OverloadSetView overload_set, 
+		TypeId from, TypeId to, 
+		Program & program, 
+		instantiation::TemplateCache & template_cache
+	) noexcept -> FunctionId;
+
+	auto resolve_function_overloading_and_insert_conversions(
+		OverloadSetView overload_set, 
+		span<Expression> parameters, 
+		span<TypeId const> parameter_types, 
+		Program & program, 
+		instantiation::TemplateCache & template_cache
+	) noexcept -> FunctionId;
 
 	auto type_for_overload_set(Program & program, OverloadSet overload_set) noexcept -> TypeId;
 	auto overload_set_for_type(Program const & program, TypeId overload_set_type) noexcept -> OverloadSetView;
