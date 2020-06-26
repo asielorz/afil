@@ -137,8 +137,9 @@ namespace complete
 
 	struct IntrinsicFunctionTemplate
 	{
-		function_ptr<auto(span<TypeId const>, Program const &) -> Function> instantiation_function;
+		function_ptr<auto(span<TypeId const>, Program &) -> Function> instantiation_function;
 		std::vector<FunctionTemplateParameterType> parameter_types;
+		std::vector<FunctionId> concepts;
 		std::string ABI_name;
 		int template_parameter_count;
 	};
@@ -166,11 +167,11 @@ namespace complete
 	struct Struct
 	{
 		std::vector<MemberVariable> member_variables;
-		FunctionId destructor = invalid_function_id;
+		FunctionId destructor = function_id_constants::invalid;
 		std::vector<Constructor> constructors;
-		FunctionId default_constructor = invalid_function_id;
-		FunctionId copy_constructor = invalid_function_id;
-		FunctionId move_constructor = invalid_function_id;
+		FunctionId default_constructor = function_id_constants::invalid;
+		FunctionId copy_constructor = function_id_constants::invalid;
+		FunctionId move_constructor = function_id_constants::invalid;
 		bool has_compiler_generated_constructors;
 	};
 
@@ -207,7 +208,7 @@ namespace complete
 		std::vector<FunctionTemplate> function_templates;
 		std::vector<Statement> global_initialization_statements;
 		Namespace global_scope;
-		FunctionId main_function = invalid_function_id;
+		FunctionId main_function = function_id_constants::invalid;
 	};
 
 	auto add_type(Program & program, Type new_type) noexcept -> TypeId;
@@ -283,7 +284,13 @@ namespace complete
 	auto instantiate_struct_template(Program & program, StructTemplateId template_id, span<TypeId const> parameters, std::string_view instantiation_in_source) noexcept 
 		-> expected<TypeId, PartialSyntaxError>;
 
-	auto instantiate_destroy_function_template(span<TypeId const> parameters, Program const & program) noexcept -> Function;
+	namespace template_intrinsics
+	{
+		auto instantiate_destroy_function_template(span<TypeId const> parameters, Program & program) noexcept -> Function;
+		auto instantiate_data_function_template(span<TypeId const> parameters, Program & program) noexcept -> Function;
+		auto instantiate_data_function_template_mutable(span<TypeId const> parameters, Program & program) noexcept -> Function;
+		auto instantiate_size_function_template(span<TypeId const> parameters, Program & program) noexcept -> Function;
+	}
 
 	struct ConversionNotFound
 	{

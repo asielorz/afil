@@ -32,7 +32,10 @@ namespace instantiation
 
 	auto next_block_scope_offset(ScopeStackView scope_stack) -> int
 	{
-		return scope_stack.back().scope_offset + top(scope_stack).stack_frame_size;
+		if (scope_stack.empty())
+			return 0;
+		else
+			return scope_stack.back().scope_offset + top(scope_stack).stack_frame_size;
 	}
 
 	auto push_global_scope(ScopeStack & scope_stack, complete::Scope & scope) noexcept -> StackGuard<ScopeStack>
@@ -144,7 +147,7 @@ namespace instantiation
 			FunctionId const conversion_function = resolve_function_overloading_for_conversions(
 				*implicit_conversion_functions, from, to, program);
 
-			if (conversion_function != invalid_function_id)
+			if (conversion_function != function_id_constants::invalid)
 			{
 				complete::expression::FunctionCall conversion_call;
 				conversion_call.function_id = conversion_function;
@@ -744,7 +747,7 @@ namespace instantiation
 		{
 			if (param.concept.empty())
 			{
-				concepts.push_back(invalid_function_id);
+				concepts.push_back(function_id_constants::invalid);
 			}
 			else
 			{
@@ -753,7 +756,7 @@ namespace instantiation
 					return make_syntax_error(param.concept, "Name does not name a concept. A concept is a function type -> bool");
 
 				FunctionId const concept_function = resolve_function_overloading(*set, {complete::TypeId::type}, *program);
-				if (concept_function == invalid_function_id || return_type(*program, concept_function) != complete::TypeId::bool_)
+				if (concept_function == function_id_constants::invalid || return_type(*program, concept_function) != complete::TypeId::bool_)
 					return make_syntax_error(param.concept, "Name does not name a concept. A concept is a function type -> bool");
 
 				concepts.push_back(concept_function);
@@ -794,7 +797,7 @@ namespace instantiation
 				FunctionId const conversion_function = resolve_function_overloading_for_conversions(
 					*explicit_conversion_functions, param_type_id, constructed_type_id, *program);
 
-				if (conversion_function != invalid_function_id)
+				if (conversion_function != function_id_constants::invalid)
 				{
 					complete::expression::FunctionCall conversion_call;
 					conversion_call.function_id = conversion_function;
@@ -962,7 +965,7 @@ namespace instantiation
 	auto add_member_destructor(out<complete::Function> destructor, complete::TypeId destroyed_type, complete::TypeId member_type, int member_offset, complete::Program const & program) -> void
 	{
 		FunctionId const member_destructor = destructor_for(program, member_type);
-		if (member_destructor != invalid_function_id)
+		if (member_destructor != function_id_constants::invalid)
 		{
 			complete::expression::LocalVariable parameter_access;
 			parameter_access.variable_offset = 0;
@@ -1071,7 +1074,7 @@ namespace instantiation
 		member_access.owner = allocate(complete::Expression(parameter_access));
 
 		FunctionId const member_copy_constructor = copy_constructor_for(program, member_type);
-		if (member_copy_constructor == invalid_function_id) // Trivially copyable member
+		if (member_copy_constructor == function_id_constants::invalid) // Trivially copyable member
 		{
 			complete::expression::Dereference member_dereference;
 			member_dereference.expression = allocate(complete::Expression(std::move(member_access)));
@@ -1157,7 +1160,7 @@ namespace instantiation
 		member_access.owner = allocate(complete::Expression(parameter_access));
 
 		FunctionId const member_move_constructor = move_constructor_for(program, member_type);
-		if (member_move_constructor == invalid_function_id) // Trivially movable member
+		if (member_move_constructor == function_id_constants::invalid) // Trivially movable member
 		{
 			complete::expression::Dereference member_dereference;
 			member_dereference.expression = allocate(complete::Expression(std::move(member_access)));
@@ -1300,9 +1303,9 @@ namespace instantiation
 			}
 		}
 
-		FunctionId default_constructor = invalid_function_id;
-		FunctionId copy_constructor = invalid_function_id;
-		FunctionId move_constructor = invalid_function_id;
+		FunctionId default_constructor = function_id_constants::invalid;
+		FunctionId copy_constructor = function_id_constants::invalid;
+		FunctionId move_constructor = function_id_constants::invalid;
 
 		bool const custom_default_constructor_declared = !has_type<nothing_t>(incomplete_struct.default_constructor);
 		if (incomplete::Function const * incomplete_default_constructor = try_get<incomplete::Function>(incomplete_struct.default_constructor))
@@ -1370,7 +1373,7 @@ namespace instantiation
 
 		new_struct.has_compiler_generated_constructors = (!custom_copy_constructor_declared && !custom_move_constructor_declared && !custom_destructor_declared);
 		if (!new_struct.has_compiler_generated_constructors && !custom_default_constructor_declared)
-			default_constructor = deleted_function_id;
+			default_constructor = function_id_constants::deleted;
 
 		// There are 4 type categories. Rule of 0, only destructor, destructor + move and destructor, copy and move
 		// Ensure that this type falls into one of them.
@@ -1378,12 +1381,12 @@ namespace instantiation
 		{
 			if (custom_destructor_declared && !custom_copy_constructor_declared && !custom_move_constructor_declared)
 			{
-				copy_constructor = deleted_function_id;
-				move_constructor = deleted_function_id;
+				copy_constructor = function_id_constants::deleted;
+				move_constructor = function_id_constants::deleted;
 			}
 			else if (custom_destructor_declared && !custom_copy_constructor_declared && custom_move_constructor_declared)
 			{
-				copy_constructor = deleted_function_id;
+				copy_constructor = function_id_constants::deleted;
 			}
 			else if (!(custom_destructor_declared && custom_copy_constructor_declared && custom_move_constructor_declared))
 			{
@@ -1394,7 +1397,7 @@ namespace instantiation
 		}
 
 		// Synthesize default copy and move constructors if not provided by the user.
-		if (copy_constructor == invalid_function_id)
+		if (copy_constructor == function_id_constants::invalid)
 		{
 			if (are_all_copy_constructible(new_struct.member_variables, *program))
 			{
@@ -1406,10 +1409,10 @@ namespace instantiation
 			}
 			else
 			{
-				copy_constructor = deleted_function_id;
+				copy_constructor = function_id_constants::deleted;
 			}
 		}
-		if (move_constructor == invalid_function_id)
+		if (move_constructor == function_id_constants::invalid)
 		{
 			if (are_all_move_constructible(new_struct.member_variables, *program))
 			{
@@ -1421,7 +1424,7 @@ namespace instantiation
 			}
 			else
 			{
-				move_constructor = deleted_function_id;
+				move_constructor = function_id_constants::deleted;
 			}
 		}
 
@@ -1632,7 +1635,7 @@ namespace instantiation
 					FunctionId const function = resolve_function_overloading_and_insert_conversions(
 						operator_overload_set(Operator::dereference, scope_stack), {&operand, 1}, {&operand_type_id, 1}, *program);
 
-					if (function == invalid_function_id) 
+					if (function == function_id_constants::invalid)
 						return make_syntax_error(incomplete_expression_.source, "Overload not found for dereference operator.");
 
 					complete::expression::FunctionCall complete_expression;
@@ -1687,7 +1690,7 @@ namespace instantiation
 
 					FunctionId const function = resolve_function_overloading_and_insert_conversions(*named_overload_set("[]"sv, scope_stack), params, param_types, *program);
 
-					if (function == invalid_function_id) 
+					if (function == function_id_constants::invalid)
 						return make_syntax_error(incomplete_expression_.source, "Overload not found for subscript operator.");
 
 					complete::expression::FunctionCall complete_expression;
@@ -1802,7 +1805,7 @@ namespace instantiation
 					FunctionId const function = 
 						resolve_function_overloading_and_insert_conversions(overload_set, {parameters.data() + 1, parameter_types.size()}, parameter_types, *program);
 
-					if (function == invalid_function_id)
+					if (function == function_id_constants::invalid)
 						return make_syntax_error(incomplete_expression.parameters[0].source, "Overload not found.");
 					complete::expression::FunctionCall complete_expression;
 					complete_expression.function_id = function;
@@ -1837,7 +1840,7 @@ namespace instantiation
 				FunctionId const function = resolve_function_overloading_and_insert_conversions(
 					operator_overload_set(incomplete_expression.op, scope_stack), {&operand, 1}, {&operand_type, 1}, *program);
 
-				if (function == invalid_function_id) 
+				if (function == function_id_constants::invalid)
 					return make_syntax_error(incomplete_expression_.source, "Operator overload not found.");
 
 				complete::expression::FunctionCall complete_expression;
@@ -1857,7 +1860,7 @@ namespace instantiation
 				FunctionId function = resolve_function_overloading_and_insert_conversions(operator_overload_set(op, scope_stack), operands, operand_types, *program);
 
 				// Special case for built in assignment.
-				if (function == invalid_function_id && op == Operator::assign && is_trivially_copy_constructible(*program, decay(operand_types[0])))
+				if (function == function_id_constants::invalid && op == Operator::assign && is_trivially_copy_constructible(*program, decay(operand_types[0])))
 				{
 					if (!operand_types[0].is_reference)
 						return make_syntax_error(incomplete_expression.left->source, "Cannot assign to a temporary.");
@@ -1872,25 +1875,25 @@ namespace instantiation
 				}
 
 				// Special case for pointer comparison
-				if (function == invalid_function_id && is_comparison_operator(op))
+				if (function == function_id_constants::invalid && is_comparison_operator(op))
 				{
 					if (is_pointer_or_array_pointer(type_with_id(*program, operand_types[0])))
 					{
 						auto conversion = insert_implicit_conversion_node(std::move(operands[1]), decay(operand_types[0]), scope_stack, *program);
 						if (conversion.has_value())
 						{
-							function = (op == Operator::equal || op == Operator::not_equal) ? pointer_equal_intrinsic : pointer_three_way_compare_intrinsic;
+							function = (op == Operator::equal || op == Operator::not_equal) ? function_id_constants::pointer_equal_intrinsic : function_id_constants::pointer_three_way_compare_intrinsic;
 							try_call(assign_to(operands[0]), insert_implicit_conversion_node(
 								std::move(operands[0]), operand_types[0], decay(operand_types[0]), scope_stack, *program, incomplete_expression.left->source));
 							operands[1] = std::move(*conversion);
 						}
 					}
-					if (function == invalid_function_id && is_pointer_or_array_pointer(type_with_id(*program, operand_types[1])))
+					if (function == function_id_constants::invalid && is_pointer_or_array_pointer(type_with_id(*program, operand_types[1])))
 					{
 						auto conversion = insert_implicit_conversion_node(std::move(operands[0]), decay(operand_types[1]), scope_stack, *program);
 						if (conversion.has_value())
 						{
-							function = (op == Operator::equal || op == Operator::not_equal) ? pointer_equal_intrinsic : pointer_three_way_compare_intrinsic;
+							function = (op == Operator::equal || op == Operator::not_equal) ? function_id_constants::pointer_equal_intrinsic : function_id_constants::pointer_three_way_compare_intrinsic;
 							operands[0] = std::move(*conversion);
 							try_call(assign_to(operands[1]), insert_implicit_conversion_node(
 								std::move(operands[1]), operand_types[1], decay(operand_types[1]), scope_stack, *program, incomplete_expression.right->source));
@@ -1899,7 +1902,7 @@ namespace instantiation
 				}
 
 				// Special case for pointer arithmetic
-				if (function == invalid_function_id && op == Operator::add)
+				if (function == function_id_constants::invalid && op == Operator::add)
 				{
 					if (is_array_pointer(type_with_id(*program, operand_types[0])))
 					{
@@ -1934,7 +1937,7 @@ namespace instantiation
 					}
 				}
 
-				if (function == invalid_function_id && op == Operator::subtract && is_array_pointer(type_with_id(*program, operand_types[0])))
+				if (function == function_id_constants::invalid && op == Operator::subtract && is_array_pointer(type_with_id(*program, operand_types[0])))
 				{
 					// Pointer minus pointer
 					complete::TypeId const pointer_type = decay(operand_types[0]);
@@ -1965,7 +1968,7 @@ namespace instantiation
 					}
 				}
 
-				if (function == invalid_function_id) 
+				if (function == function_id_constants::invalid)
 					return make_syntax_error(incomplete_expression_.source, "Operator overload not found.");
 
 				if (op == Operator::not_equal || op == Operator::less || op == Operator::less_equal || op == Operator::greater || op == Operator::greater_equal)
@@ -2247,7 +2250,7 @@ namespace instantiation
 						return make_syntax_error(incomplete_statement.assigned_expression.source, "Main cannot take parameters.");
 
 					// There can only be one main function.
-					if (program->main_function != invalid_function_id) 
+					if (program->main_function != function_id_constants::invalid)
 						return make_syntax_error(incomplete_statement.variable_name, "Redefinition of main function. There can only be one main function.");
 
 					// Bind the function as the program's main function.

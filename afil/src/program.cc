@@ -409,7 +409,8 @@ namespace complete
 	template <typename ... Params>
 	auto intrinsic_function_template_descriptor(
 		std::string_view name, 
-		function_ptr<auto(span<TypeId const>, Program const &) -> Function> instantiation_function
+		function_ptr<auto(span<TypeId const>, Program &) -> Function> instantiation_function,
+		span<FunctionId const> concepts = {}
 	) noexcept -> IntrinsicFunctionTemplate
 	{
 		assert(instantiation_function != nullptr);
@@ -421,11 +422,14 @@ namespace complete
 		constexpr int template_parameter_count = std::max({highest_template_parameter(box<Params>)...});
 		static_assert(template_parameter_count > 0);
 		template_descriptor.template_parameter_count = template_parameter_count;
+		template_descriptor.concepts.assign(concepts.begin(), concepts.end());
 		return template_descriptor;
 	}
 
 	IntrinsicFunctionTemplate const intrinsic_function_templates[] = {
-		intrinsic_function_template_descriptor<Param<0> &>("destroy", instantiate_destroy_function_template)
+		intrinsic_function_template_descriptor<Param<0> &>("destroy", template_intrinsics::instantiate_destroy_function_template),
+		intrinsic_function_template_descriptor<Param<0> &>("data", template_intrinsics::instantiate_data_function_template_mutable, {function_id_constants::is_array}),
+		intrinsic_function_template_descriptor<Param<0> const &>("data", template_intrinsics::instantiate_data_function_template, {function_id_constants::is_array})
 	};
 
 	Program::Program()
@@ -500,7 +504,7 @@ namespace complete
 
 	auto is_default_constructible(Struct const & type) noexcept -> bool
 	{
-		return type.default_constructor != deleted_function_id;
+		return type.default_constructor != function_id_constants::deleted;
 	}
 
 	auto is_default_constructible(TypeId type_id, Program const & program) noexcept -> bool
@@ -525,7 +529,7 @@ namespace complete
 
 	auto synthesize_default_constructor(TypeId type_id, Struct const & struct_data) noexcept -> Expression
 	{
-		if (struct_data.default_constructor == invalid_function_id)
+		if (struct_data.default_constructor == function_id_constants::invalid)
 		{
 			expression::Constructor default_constructor_node;
 			default_constructor_node.constructed_type = type_id;
@@ -576,25 +580,25 @@ namespace complete
 
 	auto is_trivially_destructible(Program const & program, TypeId id) noexcept -> bool
 	{
-		return destructor_for(program, id) == invalid_function_id;
+		return destructor_for(program, id) == function_id_constants::invalid;
 	}
 
 	auto is_destructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool
 	{
 		FunctionId const destructor = destructor_for(program, id);
-		return destructor == invalid_function_id || is_callable_at_compile_time(program, destructor);
+		return destructor == function_id_constants::invalid || is_callable_at_compile_time(program, destructor);
 	}
 
 	auto is_destructible_at_runtime(Program const & program, TypeId id) noexcept -> bool
 	{
 		FunctionId const destructor = destructor_for(program, id);
-		return destructor == invalid_function_id || is_callable_at_runtime(program, destructor);
+		return destructor == function_id_constants::invalid || is_callable_at_runtime(program, destructor);
 	}
 
 	auto destructor_for(Program const & program, TypeId id) noexcept -> FunctionId
 	{
 		if (id.is_reference || id.is_function)
-			return invalid_function_id;
+			return function_id_constants::invalid;
 
 		Type const & type = type_with_id(program, id);
 		if (Type::Struct const * const struct_data = try_get<Type::Struct>(type.extra_data))
@@ -602,29 +606,29 @@ namespace complete
 		else if (Type::Array const * const array_data = try_get<Type::Array>(type.extra_data))
 			return array_data->destructor;
 		else
-			return invalid_function_id;
+			return function_id_constants::invalid;
 	}
 
 	auto is_copy_constructible(Program const & program, TypeId id) noexcept -> bool
 	{
-		return copy_constructor_for(program, id) != deleted_function_id;
+		return copy_constructor_for(program, id) != function_id_constants::deleted;
 	}
 
 	auto is_trivially_copy_constructible(Program const & program, TypeId id) noexcept -> bool
 	{
-		return copy_constructor_for(program, id) == invalid_function_id;
+		return copy_constructor_for(program, id) == function_id_constants::invalid;
 	}
 
 	auto is_copy_constructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool
 	{
 		FunctionId const copy_constructor = copy_constructor_for(program, id);
-		return copy_constructor == invalid_function_id || is_callable_at_compile_time(program, copy_constructor);
+		return copy_constructor == function_id_constants::invalid || is_callable_at_compile_time(program, copy_constructor);
 	}
 
 	auto copy_constructor_for(Program const & program, TypeId id) noexcept->FunctionId
 	{
 		if (id.is_reference || id.is_function)
-			return invalid_function_id;
+			return function_id_constants::invalid;
 
 		Type const & type = type_with_id(program, id);
 		if (Type::Struct const * const struct_data = try_get<Type::Struct>(type.extra_data))
@@ -632,29 +636,29 @@ namespace complete
 		else if (Type::Array const * const array_data = try_get<Type::Array>(type.extra_data))
 			return array_data->copy_constructor;
 		else
-			return invalid_function_id;
+			return function_id_constants::invalid;
 	}
 
 	auto is_move_constructible(Program const & program, TypeId id) noexcept -> bool
 	{
-		return move_constructor_for(program, id) != deleted_function_id;
+		return move_constructor_for(program, id) != function_id_constants::deleted;
 	}
 
 	auto is_trivially_move_constructible(Program const & program, TypeId id) noexcept -> bool
 	{
-		return move_constructor_for(program, id) == invalid_function_id;
+		return move_constructor_for(program, id) == function_id_constants::deleted;
 	}
 
 	auto is_move_constructible_at_compile_time(Program const & program, TypeId id) noexcept -> bool
 	{
 		FunctionId const move_constructor = move_constructor_for(program, id);
-		return move_constructor == invalid_function_id || is_callable_at_compile_time(program, move_constructor);
+		return move_constructor == function_id_constants::invalid || is_callable_at_compile_time(program, move_constructor);
 	}
 
 	auto move_constructor_for(Program const & program, TypeId id) noexcept -> FunctionId
 	{
 		if (id.is_reference || id.is_function)
-			return invalid_function_id;
+			return function_id_constants::invalid;
 
 		Type const & type = type_with_id(program, id);
 		if (Type::Struct const * const struct_data = try_get<Type::Struct>(type.extra_data))
@@ -662,12 +666,12 @@ namespace complete
 		else if (Type::Array const * const array_data = try_get<Type::Array>(type.extra_data))
 			return array_data->move_constructor;
 		else
-			return invalid_function_id;
+			return function_id_constants::invalid;
 	}
 
 	auto add_if_actual_function(std::vector<FunctionId> & constructors, FunctionId function_id) noexcept -> void
 	{
-		if (function_id != invalid_function_id && function_id != deleted_function_id)
+		if (function_id != function_id_constants::invalid && function_id != function_id_constants::deleted)
 			constructors.push_back(function_id);
 	}
 
@@ -794,7 +798,7 @@ namespace complete
 		Type new_type;
 		new_type.size = value_type_data.size * size;
 		new_type.alignment = value_type_data.alignment;
-		new_type.extra_data = Type::Array{value_type, size, invalid_function_id, invalid_function_id, invalid_function_id};
+		new_type.extra_data = Type::Array{value_type, size, function_id_constants::invalid, function_id_constants::invalid, function_id_constants::invalid};
 		complete::TypeId new_type_id = add_type(program, std::move(new_type));
 
 		if (!is_trivially_destructible(program, value_type))
@@ -814,7 +818,7 @@ namespace complete
 			}
 			else
 			{
-				array_data.copy_constructor = deleted_function_id;
+				array_data.copy_constructor = function_id_constants::deleted;
 			}
 			if (is_move_constructible(program, value_type))
 			{
@@ -824,7 +828,7 @@ namespace complete
 			}
 			else
 			{
-				array_data.move_constructor = deleted_function_id;
+				array_data.move_constructor = function_id_constants::deleted;
 			}
 		}
 
@@ -1135,7 +1139,7 @@ namespace complete
 		expression::FunctionCall function_call;
 		for (size_t i = 0; i < concepts.size(); ++i)
 		{
-			if (concepts[i] != invalid_function_id)
+			if (concepts[i] != function_id_constants::invalid)
 			{
 				function_call.function_id = concepts[i];
 				function_call.parameters.push_back(expression::Literal<TypeId>{parameters[i]});
@@ -1198,38 +1202,92 @@ namespace complete
 		return new_type_id;
 	}
 
-	auto instantiate_destroy_function_template(span<TypeId const> parameters, Program const & program) noexcept -> Function
+	namespace template_intrinsics
 	{
-		TypeId const parameter_type = make_mutable(make_reference(parameters[0]));
-
-		Function destroy_function;
-		destroy_function.ABI_name = "destroy";
-		destroy_function.is_callable_at_compile_time = is_destructible_at_compile_time(program, parameters[0]);
-		destroy_function.is_callable_at_runtime = is_destructible_at_runtime(program, parameters[0]);
-		destroy_function.parameter_count = 1;
-		destroy_function.parameter_size = sizeof(void *);
-		destroy_function.return_type = TypeId::void_;
-		add_variable_to_scope(destroy_function, "t", parameter_type, 0, program);
-
-		// Add code to call the destructor only if the type is not trivially destructible.
-		if (!is_trivially_destructible(program, parameters[0]))
+		auto instantiate_destroy_function_template(span<TypeId const> parameters, Program & program) noexcept -> Function
 		{
+			TypeId const parameter_type = make_mutable(make_reference(parameters[0]));
+
+			Function destroy_function;
+			destroy_function.ABI_name = "destroy";
+			destroy_function.is_callable_at_compile_time = is_destructible_at_compile_time(program, parameters[0]);
+			destroy_function.is_callable_at_runtime = is_destructible_at_runtime(program, parameters[0]);
+			destroy_function.parameter_count = 1;
+			destroy_function.parameter_size = sizeof(void *);
+			destroy_function.return_type = TypeId::void_;
+			add_variable_to_scope(destroy_function, "t", parameter_type, 0, program);
+
+			// Add code to call the destructor only if the type is not trivially destructible.
+			if (!is_trivially_destructible(program, parameters[0]))
+			{
+				expression::LocalVariable parameter_access;
+				parameter_access.variable_type = parameter_type;
+				parameter_access.variable_offset = 0;
+
+				expression::FunctionCall destructor_call;
+				destructor_call.function_id = destructor_for(program, parameters[0]);
+				destructor_call.parameters.push_back(parameter_access);
+
+				statement::ExpressionStatement constructor_call_statement;
+				constructor_call_statement.expression = std::move(destructor_call);
+
+				destroy_function.statements.push_back(std::move(constructor_call_statement));
+			}
+
+			return destroy_function;
+		}
+
+		template <bool is_mutable>
+		auto instantiate_data_function_template_impl(span<TypeId const> parameters, Program & program) noexcept -> Function
+		{
+			TypeId const parameter_type = make_mutable(make_reference(parameters[0]), is_mutable);
+
+			Function data_function;
+			data_function.ABI_name = "data";
+			data_function.is_callable_at_compile_time = true;
+			data_function.is_callable_at_runtime = true;
+			data_function.parameter_count = 1;
+			data_function.parameter_size = sizeof(void *);
+
+			complete::TypeId value_type = array_value_type(type_with_id(program, parameters[0]));
+			value_type.is_mutable = is_mutable;
+			data_function.return_type = array_pointer_type_for(value_type, program);
+
+			add_variable_to_scope(data_function, "t", parameter_type, 0, program);
+
 			expression::LocalVariable parameter_access;
 			parameter_access.variable_type = parameter_type;
 			parameter_access.variable_offset = 0;
 
-			expression::FunctionCall destructor_call;
-			destructor_call.function_id = destructor_for(program, parameters[0]);
-			destructor_call.parameters.push_back(parameter_access);
+			expression::ReinterpretCast array_to_pointer_cast;
+			array_to_pointer_cast.operand = allocate(Expression(parameter_access));
+			array_to_pointer_cast.return_type = data_function.return_type;
 
-			statement::ExpressionStatement constructor_call_statement;
-			constructor_call_statement.expression = std::move(destructor_call);
+			statement::Return return_statement;
+			return_statement.destroyed_stack_frame_size = sizeof(void *);
+			return_statement.returned_expression = std::move(array_to_pointer_cast);
 
-			destroy_function.statements.push_back(std::move(constructor_call_statement));
+			data_function.statements.push_back(std::move(return_statement));
+
+			return data_function;
 		}
 
-		return destroy_function;
-	}
+		auto instantiate_data_function_template(span<TypeId const> parameters, Program & program) noexcept -> Function
+		{
+			return instantiate_data_function_template_impl<false>(parameters, program);
+		}
+
+		auto instantiate_data_function_template_mutable(span<TypeId const> parameters, Program & program) noexcept -> Function
+		{
+			return instantiate_data_function_template_impl<true>(parameters, program);
+		}
+
+		//auto instantiate_size_function_template(span<TypeId const> parameters, Program & program) noexcept -> Function
+		//{
+		//
+		//}
+
+	} // namespace template_intrinsics
 
 	auto is_mutability_conversion_legal(bool from_is_mutable, bool to_is_mutable) noexcept -> bool
 	{
@@ -1250,7 +1308,7 @@ namespace complete
 			if (from.is_reference && !to.is_reference)
 			{
 				FunctionId const copy_constructor = copy_constructor_for(program, decay(to));
-				if (copy_constructor == invalid_function_id) // Trivially copyable member
+				if (copy_constructor == function_id_constants::invalid) // Trivially copyable member
 				{
 					expression::Dereference deref_node;
 					deref_node.expression = allocate(std::move(expr));
@@ -1429,6 +1487,8 @@ namespace complete
 		{
 			int conversions;
 			FunctionTemplateId id;
+			std::array<TypeId, 32> resolved_dependent_types;
+			size_t dependent_type_count;
 		};
 		TemplateCandidate template_candidates[64];
 		int template_candidate_count = 0;
@@ -1456,9 +1516,6 @@ namespace complete
 			}
 		}
 
-		TypeId resolved_dependent_types[32];
-		size_t dependent_type_count = 0;
-
 		for (FunctionTemplateId template_id : overload_set.function_template_ids)
 		{
 			span<FunctionTemplateParameterType const> fn_parameters;
@@ -1471,6 +1528,7 @@ namespace complete
 			{
 				fn_parameters = intrinsic_function_templates[template_id.index].parameter_types;
 				function_template_parameter_count = intrinsic_function_templates[template_id.index].template_parameter_count;
+				concepts = intrinsic_function_templates[template_id.index].concepts;
 			}
 			else
 			{
@@ -1484,8 +1542,10 @@ namespace complete
 
 			if (fn_parameters.size() == parameters.size())
 			{
-				dependent_type_count = function_template_parameter_count;
-				std::fill(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none);
+				std::array<TypeId, 32> resolved_dependent_types;
+				size_t const dependent_type_count = function_template_parameter_count;
+
+				std::fill(resolved_dependent_types.begin(), resolved_dependent_types.begin() + dependent_type_count, TypeId::none);
 
 				int conversions = 0;
 				bool discard = false;
@@ -1506,19 +1566,19 @@ namespace complete
 				}
 
 				if (!concepts.empty())
-					if (check_concepts(concepts, {resolved_dependent_types, dependent_type_count}, std::move(scope_template_parameters), std::move(scope_stack), program) != concepts.size())
+					if (check_concepts(concepts, {resolved_dependent_types.data(), dependent_type_count}, std::move(scope_template_parameters), std::move(scope_stack), program) != concepts.size())
 						discard = true;
 
 				if (!discard)
 				{
-					template_candidates[template_candidate_count++] = TemplateCandidate{conversions, template_id};
+					template_candidates[template_candidate_count++] = TemplateCandidate{conversions, template_id, resolved_dependent_types, dependent_type_count};
 				}
 			}
 		}
 
 		if (candidate_count == 0 && template_candidate_count == 0)
 		{
-			return invalid_function_id;
+			return function_id_constants::invalid;
 		}
 		else
 		{
@@ -1544,9 +1604,12 @@ namespace complete
 				return best_candidate.function_id;
 			else
 			{
+				auto const & resolved_dependent_types = best_template_candidate.resolved_dependent_types;
+				size_t const dependent_type_count = best_template_candidate.dependent_type_count;
+
 				// Ensure that all template parameters have been resolved.
-				assert(std::find(resolved_dependent_types, resolved_dependent_types + dependent_type_count, TypeId::none) == resolved_dependent_types + dependent_type_count);
-				auto function_id = instantiate_function_template(program, best_template_candidate.id, {resolved_dependent_types, dependent_type_count});
+				assert(std::find(resolved_dependent_types.begin(), resolved_dependent_types.begin() + dependent_type_count, TypeId::none) == resolved_dependent_types.begin() + dependent_type_count);
+				auto function_id = instantiate_function_template(program, best_template_candidate.id, {resolved_dependent_types.data(), dependent_type_count});
 				assert(function_id.has_value());
 				return *function_id;
 			}
@@ -1641,7 +1704,7 @@ namespace complete
 
 		if (candidate_count == 0 && template_candidate_count == 0)
 		{
-			return invalid_function_id;
+			return function_id_constants::invalid;
 		}
 		else
 		{
@@ -1680,8 +1743,8 @@ namespace complete
 		-> FunctionId
 	{
 		FunctionId const function_id = resolve_function_overloading(overload_set, parameter_types, program);
-		if (function_id == invalid_function_id)
-			return invalid_function_id;
+		if (function_id == function_id_constants::invalid)
+			return function_id_constants::invalid;
 
 		// If any conversion is needed in order to call the function, perform the conversion.
 		auto const target_parameter_types = parameter_types_of(program, function_id);

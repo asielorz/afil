@@ -117,7 +117,7 @@ namespace interpreter
 
 	auto run(complete::Program const & program, int stack_size) noexcept -> expected<int, UnmetPrecondition>
 	{
-		assert(program.main_function != invalid_function_id);
+		assert(program.main_function != function_id_constants::invalid);
 
 		ProgramStack stack;
 		alloc_stack(stack, stack_size);

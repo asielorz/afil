@@ -98,7 +98,7 @@ namespace interpreter
 		-> expected<void, UnmetPrecondition>
 	{
 		FunctionId const destructor = destructor_for(context.program, type);
-		if (destructor != invalid_function_id)
+		if (destructor != function_id_constants::invalid)
 		{
 			try_call_void(call_function(destructor, stack, context, 0, [address](int parameters_start, ProgramStack & stack)
 			{
@@ -139,8 +139,8 @@ namespace interpreter
 		-> expected<void, UnmetPrecondition>
 	{
 		FunctionId const copy_constructor = copy_constructor_for(context.program, type);
-		assert(copy_constructor != deleted_function_id);
-		if (copy_constructor == invalid_function_id)
+		assert(copy_constructor != function_id_constants::deleted);
+		if (copy_constructor == function_id_constants::invalid)
 		{
 			memcpy(to, from, type_size(context.program, type));
 		}
@@ -167,8 +167,8 @@ namespace interpreter
 		-> expected<void, UnmetPrecondition>
 	{
 		FunctionId const move_constructor = move_constructor_for(context.program, type);
-		assert(move_constructor != deleted_function_id);
-		if (move_constructor == invalid_function_id)
+		assert(move_constructor != function_id_constants::deleted);
+		if (move_constructor == function_id_constants::invalid)
 		{
 			memcpy(to, from, type_size(context.program, type));
 		}
