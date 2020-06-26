@@ -706,6 +706,7 @@ namespace instantiation
 	{
 		ProgramState const program_state = capture_state(*args.program);
 		ScopeState const top_scope_state = capture_state(top(args.scope_stack));
+		TemplateCache const template_cache_state = args.template_cache;
 		size_t const scope_stack_size = args.scope_stack.size();
 
 		auto expr = instantiate_expression(expression_to_test.expression, args, current_scope_return_type);
@@ -714,6 +715,7 @@ namespace instantiation
 			args.scope_stack.resize(scope_stack_size);
 			restore_state(args.program, program_state);
 			restore_state(out(top(args.scope_stack)), top_scope_state);
+			args.template_cache = template_cache_state;
 			return false;
 		}
 
@@ -2562,6 +2564,7 @@ namespace instantiation
 			{
 				ProgramState const program_state = capture_state(*complete_program);
 				ScopeState const global_scope_state = capture_state(top(scope_stack));
+				TemplateCache const template_cache_state = template_cache;
 
 				auto complete_statement = instantiate_statement(incomplete_program[i], SemanticAnalysisArgs{template_parameters, scope_stack, out(complete_program), template_cache}, nullptr);
 				if (complete_statement.has_value())
@@ -2581,6 +2584,7 @@ namespace instantiation
 					template_parameters.clear();
 					restore_state(complete_program, program_state);
 					restore_state(out(top(scope_stack)), global_scope_state);
+					template_cache = template_cache_state;
 					return false;
 				}
 			});

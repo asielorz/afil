@@ -3898,28 +3898,6 @@ TEST_CASE("Template instantiations are cached")
 }
 
 #if 0
-TEST_CASE("Test that crashes because of template cache")
-{
-	auto const src = R"(
-		struct<T> Test {}
-
-		let f1 = fn() -> int32
-		{
-			let x = Test<int32>();
-			return data(x);
-		};
-
-		let main = fn() -> int32
-		{
-			return 0;
-		};
-	)"sv;
-
-	REQUIRE(tests::parse_and_run(src) == 4);
-}
-#endif
-
-#if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {
 	auto const src = R"(
