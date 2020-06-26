@@ -429,7 +429,8 @@ namespace complete
 	IntrinsicFunctionTemplate const intrinsic_function_templates[] = {
 		intrinsic_function_template_descriptor<Param<0> &>("destroy", template_intrinsics::instantiate_destroy_function_template),
 		intrinsic_function_template_descriptor<Param<0> &>("data", template_intrinsics::instantiate_data_function_template_mutable, {function_id_constants::is_array}),
-		intrinsic_function_template_descriptor<Param<0> const &>("data", template_intrinsics::instantiate_data_function_template, {function_id_constants::is_array})
+		intrinsic_function_template_descriptor<Param<0> const &>("data", template_intrinsics::instantiate_data_function_template, {function_id_constants::is_array}),
+		intrinsic_function_template_descriptor<Param<0> const &>("size", template_intrinsics::instantiate_size_function_template, {function_id_constants::is_array}),
 	};
 
 	Program::Program()
@@ -1282,10 +1283,31 @@ namespace complete
 			return instantiate_data_function_template_impl<true>(parameters, program);
 		}
 
-		//auto instantiate_size_function_template(span<TypeId const> parameters, Program & program) noexcept -> Function
-		//{
-		//
-		//}
+		auto instantiate_size_function_template(span<TypeId const> parameters, Program & program) noexcept -> Function
+		{
+			TypeId const parameter_type = make_reference(parameters[0]);
+
+			Function size_function;
+			size_function.ABI_name = "size";
+			size_function.is_callable_at_compile_time = true;
+			size_function.is_callable_at_runtime = true;
+			size_function.parameter_count = 1;
+			size_function.parameter_size = sizeof(void *);
+			size_function.return_type = TypeId::int32;
+
+			add_variable_to_scope(size_function, "t", parameter_type, 0, program);
+
+			expression::Literal<int> size_constant;
+			size_constant.value = array_size(type_with_id(program, parameters[0]));
+
+			statement::Return return_statement;
+			return_statement.destroyed_stack_frame_size = sizeof(void *);
+			return_statement.returned_expression = size_constant;
+
+			size_function.statements.push_back(return_statement);
+
+			return size_function;
+		}
 
 	} // namespace template_intrinsics
 

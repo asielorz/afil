@@ -113,16 +113,6 @@ namespace incomplete
 			std::vector<DesignatedInitializer> parameters;
 		};
 
-		struct DataCall
-		{
-			value_ptr<Expression> operand;
-		};
-
-		struct SizeCall
-		{
-			value_ptr<Expression> operand;
-		};
-
 		struct Compiles
 		{
 			std::vector<CompilesFakeVariable> variables;
@@ -137,7 +127,7 @@ namespace incomplete
 			FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 			If, StatementBlock,
 			DesignatedInitializerConstructor,
-			DataCall, SizeCall, Compiles
+			Compiles
 		>;
 
 	} // namespace expression

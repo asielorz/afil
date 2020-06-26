@@ -939,28 +939,6 @@ namespace parser
 		}
 		else if (tokens[index].source == "compiles")
 			return parse_compiles_expression(tokens, index, type_names);
-		//else if (tokens[index].source == "data")
-		//{
-		//	index++;
-		//	incomplete::expression::DataCall data_node;
-		//	if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after data.");
-		//	index++;
-		//	try_call(assign_to(data_node.operand), parse_expression(tokens, index, type_names));
-		//	if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after operand for data.");
-		//	index++;
-		//	return std::move(data_node);
-		//}
-		else if (tokens[index].source == "size")
-		{
-			index++;
-			incomplete::expression::SizeCall size_node;
-			if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after size.");
-			index++;
-			try_call(assign_to(size_node.operand), parse_expression(tokens, index, type_names));
-			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after operand for size.");
-			index++;
-			return std::move(size_node);
-		}
 		else if (tokens[index].type == TokenType::identifier)
 		{
 			// It can be either a constructor call or the naming of a variable/function

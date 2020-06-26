@@ -3852,6 +3852,31 @@ TEST_CASE("User can specialize data for their types")
 	REQUIRE(tests::parse_and_run(src) == 3);
 }
 
+TEST_CASE("User can specialize size for their types")
+{
+	auto const src = R"(
+		struct<T> span
+		{
+			T[] data;
+			int32 size;
+		}
+
+		let size = fn<T>(span<T> s) -> int32
+		{
+			return s.size;
+		};
+
+		let main = fn() -> int32
+		{
+			let x = int32[](1, 2, 3, 4);
+			let s = span<int32>(data(x), size(x));
+			return size(s);
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 4);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {

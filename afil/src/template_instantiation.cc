@@ -2093,36 +2093,6 @@ namespace instantiation
 				complete_expression.parameters = std::move(complete_parameters);
 				return std::move(complete_expression);
 			},
-			[&](incomplete::expression::DataCall const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
-			{
-				complete::expression::ReinterpretCast complete_expression;
-				try_call(assign_to(complete_expression.operand), instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
-				complete::TypeId const operand_type_id = expression_type_id(*complete_expression.operand, *program);
-				complete::Type const & operand_type = type_with_id(*program, operand_type_id);
-
-				if (!is_array(operand_type))
-					return make_syntax_error(incomplete_expression.operand->source, "Operand of data must be of array type.");
-				if (!operand_type_id.is_reference) 
-					return make_syntax_error(incomplete_expression.operand->source, "Operand of data must be of reference to array type.");
-
-				complete::TypeId value_type = array_value_type(operand_type);
-				value_type.is_mutable = operand_type_id.is_mutable;
-				complete_expression.return_type = array_pointer_type_for(value_type, *program);
-				return std::move(complete_expression);
-			},
-			[&](incomplete::expression::SizeCall const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
-			{
-				complete::expression::Literal<int> complete_expression;
-				try_call_decl(complete::Expression operand, instantiate_expression(*incomplete_expression.operand, template_parameters, scope_stack, program, current_scope_return_type));
-				complete::TypeId const operand_type_id = expression_type_id(operand, *program);
-				complete::Type const & operand_type = type_with_id(*program, operand_type_id);
-
-				if (!is_array(operand_type)) 
-					return make_syntax_error(incomplete_expression.operand->source, "Operand of size must be of array type.");
-
-				complete_expression.value = array_size(operand_type);
-				return std::move(complete_expression);
-			},
 			[&](incomplete::expression::Compiles const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
 			{
 				std::vector<complete::CompilesFakeVariable> complete_fake_variables;
