@@ -17,3 +17,7 @@ target_compile_definitions(afil
 		$<$<CONFIG:Debug>:AFIL_DEBUG>
 		AFIL_BUILD_TYPE=$<CONFIG>
 )
+
+set_target_properties(afil PROPERTIES
+	UNITY_BUILD OFF # Single-file target
+)

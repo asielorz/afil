@@ -1,7 +1,7 @@
-#pragma once
-
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
+
+#include <Windows.h>
 
 auto run_tests(int argc, char const * const argv[]) noexcept -> int
 {

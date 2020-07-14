@@ -544,7 +544,7 @@ namespace interpreter
 			{
 				complete::Type const & param_type_data = type_with_id(context.program, param_type);
 				size_of_temporaries_passed_by_reference = add_size_aligned(size_of_temporaries_passed_by_reference, param_type_data.size, param_type_data.alignment);
-				alignment_of_temporaries_passed_by_reference = std::max(alignment_of_temporaries_passed_by_reference, param_type_data.alignment);
+				alignment_of_temporaries_passed_by_reference = (std::max)(alignment_of_temporaries_passed_by_reference, param_type_data.alignment);
 			}
 		}
 		int const temporaries_start = alloc(stack, size_of_temporaries_passed_by_reference, alignment_of_temporaries_passed_by_reference);

@@ -91,8 +91,9 @@ target_compile_definitions(afil_lib
 )
 
 if (MSVC)
-  target_compile_options(afil_lib
-    PRIVATE # igual quieres PUBLIC aqui? No estoy seguro. Prueba a ver si funciona con PRIVATE primero si eso
-      /bigobj
-  )
+	target_compile_options(afil_lib
+		PRIVATE
+			/bigobj
+			/MP # Multi-core compilation
+  	)
 endif()
