@@ -85,6 +85,8 @@ target_compile_features(afil_lib
 )
 
 target_compile_definitions(afil_lib
+	PUBLIC
+		NOMINMAX # For Windows.h not to defined 'min' and 'max' macros
 	PRIVATE
 		$<$<CONFIG:Debug>:AFIL_DEBUG>
 		AFIL_BUILD_TYPE=$<CONFIG>

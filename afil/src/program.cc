@@ -419,7 +419,7 @@ namespace complete
 		template_descriptor.ABI_name = name;
 		template_descriptor.instantiation_function = instantiation_function;
 		template_descriptor.parameter_types = {parameter_type_for(box<Params>)...};
-		constexpr int template_parameter_count = (std::max)({highest_template_parameter(box<Params>)...});
+		constexpr int template_parameter_count = std::max({highest_template_parameter(box<Params>)...});
 		static_assert(template_parameter_count > 0);
 		template_descriptor.template_parameter_count = template_parameter_count;
 		template_descriptor.concepts.assign(concepts.begin(), concepts.end());

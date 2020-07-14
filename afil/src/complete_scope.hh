@@ -146,7 +146,7 @@ namespace complete
 		var.type = type_id;
 		var.offset = scope_offset + align(scope_size, alignment);
 		scope_size = var.offset + size;
-		scope_alignment = (std::max)(scope_alignment, alignment);
+		scope_alignment = std::max(scope_alignment, alignment);
 		variables.push_back(std::move(var));
 		return var.offset;
 	}
