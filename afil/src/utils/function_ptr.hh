@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include "utils/compatibility.hh"
 
 template <typename T>
 using function_ptr = T *;
@@ -67,7 +68,7 @@ constexpr auto cast_to_function_pointer(F f) noexcept -> typename function_point
 
 // Operator for easily converting lambdas to function pointers. This is only necessary for MSVC compiler.
 // GCC and clang do it by default.
-#ifdef _MSC_VER
+#if AFIL_MSVC
 	template <typename F>
 	constexpr auto operator +(F f) noexcept -> typename function_pointer_type<F>::type
 	{

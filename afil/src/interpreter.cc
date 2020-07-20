@@ -48,7 +48,10 @@ namespace interpreter
 	auto call_extern_function(complete::ExternFunction const & function, ProgramStack & stack, CompileTimeContext context, char * return_address)
 		->expected<void, UnmetPrecondition>
 	{
-		static_cast<void>(function, stack, context, return_address);
+		static_cast<void>(function);
+		static_cast<void>(stack);
+		static_cast<void>(context);
+		static_cast<void>(return_address);
 		declare_unreachable();
 	}
 

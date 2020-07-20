@@ -2593,7 +2593,10 @@ namespace instantiation
 
 		// If any statement was left without parsing, compilation failed.
 		if (unparsed_statements.size() > 0)
-			return Error(std::get<PartialSyntaxError>(complete_statements[unparsed_statements[0]])); TODO("Returning multiple errors");
+		{
+			TODO("Returning multiple errors");
+			return Error(std::get<PartialSyntaxError>(complete_statements[unparsed_statements[0]]));
+		}
 
 		for (size_t i = 0; i < incomplete_program.size(); ++i)
 		{

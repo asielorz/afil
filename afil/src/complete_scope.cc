@@ -1,5 +1,3 @@
-#pragma once
-
 #include "complete_scope.hh"
 #include "program.hh"
 

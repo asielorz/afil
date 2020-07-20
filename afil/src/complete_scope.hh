@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils/compatibility.hh"
 #include "function_id.hh"
 #include "utils/utils.hh"
 #include <algorithm>
@@ -13,9 +14,9 @@ namespace complete
 
 	struct TypeId
 	{
-		#pragma warning (disable : 4201)
 		union
 		{
+			AFIL_IGNORE_WARNING_NAMELESS_STRUCT()
 			struct
 			{
 				unsigned is_mutable : 1;
@@ -23,6 +24,7 @@ namespace complete
 				unsigned is_function : 1;
 				unsigned index : 29;
 			};
+			AFIL_WARNING_POP()
 			unsigned flat_value;
 		};
 
@@ -50,8 +52,8 @@ namespace complete
 		static TypeId const deduce;
 	};
 
-	constexpr auto operator == (TypeId a, TypeId b) noexcept -> bool { return a.flat_value == b.flat_value; };
-	constexpr auto operator != (TypeId a, TypeId b) noexcept -> bool { return !(a == b); };
+	constexpr auto operator == (TypeId a, TypeId b) noexcept -> bool { return a.flat_value == b.flat_value; }
+	constexpr auto operator != (TypeId a, TypeId b) noexcept -> bool { return !(a == b); }
 
 	auto is_data_type(TypeId id) noexcept -> bool;
 	auto is_convertible(TypeId from, TypeId to, Program const & program) noexcept -> bool;
@@ -88,8 +90,8 @@ namespace complete
 	};
 
 	struct StructTemplateId { unsigned index; };
-	constexpr auto operator == (StructTemplateId a, StructTemplateId b) noexcept -> bool { return a.index == b.index; };
-	constexpr auto operator != (StructTemplateId a, StructTemplateId b) noexcept -> bool { return !(a == b); };
+	constexpr auto operator == (StructTemplateId a, StructTemplateId b) noexcept -> bool { return a.index == b.index; }
+	constexpr auto operator != (StructTemplateId a, StructTemplateId b) noexcept -> bool { return !(a == b); }
 
 	struct StructTemplateName
 	{

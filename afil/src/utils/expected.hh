@@ -95,7 +95,7 @@ private:
 			static_cast<void>(result_function(std::move(zzzResult.value())));			\
 		else																			\
 			return Error(std::move(zzzResult.error()));									\
-	}																					\
+	}
 
 
 #define CONCAT2(x, y) x ## y
@@ -105,11 +105,11 @@ private:
 	auto CONCAT(zzzResult, __LINE__) = expression;										\
 	if (!CONCAT(zzzResult, __LINE__).has_value())										\
 		return Error(std::move(CONCAT(zzzResult, __LINE__).error()));					\
-	result_declaration = std::move(CONCAT(zzzResult, __LINE__).value());				\
+	result_declaration = std::move(CONCAT(zzzResult, __LINE__).value());
 
 
 #define try_call_void(expression)														\
 	{																					\
 		if (auto zzzResult = expression; !zzzResult.has_value())						\
 			return Error(std::move(zzzResult.error()));									\
-	}																					\
+	}

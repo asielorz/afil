@@ -31,10 +31,15 @@ TEST_CASE("const span")
 	REQUIRE(s[2] == 3);
 }
 
+// For whatever reason, if the constexpr array
+// that is used to construct span is a local
+// variable, clang and gcc say the operation is
+// not constexpr. Same happens with std::span:
+// https://gcc.godbolt.org/z/jnY3b3
+constexpr int some_constexpr_array[] = { 1, 2, 3 };
 TEST_CASE("constexpr span")
 {
-	constexpr int some_array[] = { 1, 2, 3 };
-	constexpr auto s = span<int const>(some_array);
+	constexpr auto s = span<int const>(some_constexpr_array);
 	static_assert(s.size() == 3);
 	static_assert(s[0] == 1);
 	static_assert(s[1] == 2);

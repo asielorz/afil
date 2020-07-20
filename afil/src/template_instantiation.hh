@@ -7,6 +7,7 @@
 #include "syntax_error.hh"
 #include <vector>
 #include <variant>
+#include <cstring>
 
 namespace incomplete { struct Module; }
 namespace complete { struct Module; }

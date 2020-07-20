@@ -77,9 +77,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GN
 		-Wextra
 		-pedantic
 		-Wdouble-promotion
-		-Wconversion
-		-Wnull-dereference
-		-Wsign-conversion
+		#-Wconversion
+		#-Wnull-dereference
+		#-Wsign-conversion
 	)
 endif()
 

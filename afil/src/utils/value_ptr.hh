@@ -1,5 +1,6 @@
 #pragma once
 
+#include "compatibility.hh"
 #include <memory>
 
 // unique_ptr but it's copyable and does deep copy.
@@ -13,11 +14,15 @@ struct value_ptr : public std::unique_ptr<T>
 	value_ptr(value_ptr &&) noexcept = default;
 	value_ptr & operator = (value_ptr &&) noexcept = default;
 
+	value_ptr(std::unique_ptr<T> && ptr) noexcept : std::unique_ptr<T>(std::move(ptr)) {}
+
 	value_ptr(value_ptr const & other)
+		: std::unique_ptr<T>() // Silence gcc warning 'base class should be explicitly initialized in the copy constructor'
 	{
 		if (other)
 			this->reset(new T(*other));
 	}
+
 	value_ptr & operator = (value_ptr const & other)
 	{
 		if (other)

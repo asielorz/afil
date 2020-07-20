@@ -10,8 +10,9 @@
 #include "utils/string.hh"
 #include "utils/unreachable.hh"
 #include "utils/variant.hh"
+#include "utils/warning_macro.hh"
 #include <cassert>
-#include <charconv>
+#include "utils/charconv.hh"
 #include <optional>
 #include <filesystem>
 #include <string>
@@ -92,7 +93,7 @@ namespace parser
 
 	auto is_keyword(std::string_view name) noexcept -> bool
 	{
-		// TODO: Binary search
+		TODO("Binary search")
 		return std::find(keywords, std::end(keywords), name) != std::end(keywords) || 
 			std::find(built_in_type_name_keywords, std::end(built_in_type_name_keywords), name) != std::end(built_in_type_name_keywords);
 	}
@@ -161,8 +162,11 @@ namespace parser
 	auto parse_number_literal(std::string_view token_source) noexcept -> T
 	{
 		T value;
-		std::from_chars(token_source.data(), token_source.data() + token_source.size(), value);
+
+		from_chars(token_source, out(value));
+
 		return value;
+
 	}
 
 	auto parse_string_literal(std::string_view token_source) noexcept -> std::string
@@ -1350,7 +1354,8 @@ namespace parser
 	{
 		// Should check if parsing a loop and otherwise give an error.
 
-		static_cast<void>(tokens, type_names);
+		static_cast<void>(tokens);
+		static_cast<void>(type_names);
 		index++;
 		return Stmt();
 	}

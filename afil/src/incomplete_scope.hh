@@ -13,7 +13,6 @@ namespace incomplete
 
 	struct TypeId
 	{
-		#pragma warning (disable : 4201)
 		struct BaseCase
 		{
 			std::vector<std::string_view> namespaces;

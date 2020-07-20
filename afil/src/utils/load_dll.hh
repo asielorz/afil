@@ -1,17 +1,18 @@
-#pragma  once
+#pragma once
 
 #include <string_view>
+#include <utility>
 
 struct DLL
 {
-	DLL(void const * h) noexcept : handle(h) {}
+	DLL(void * h) noexcept : handle(h) {}
 	DLL(DLL const & other) = delete;
 	DLL & operator = (DLL const & other) = delete;
 	DLL(DLL && other) noexcept : handle(std::exchange(other.handle, nullptr)) {}
 	DLL & operator = (DLL && other) noexcept { handle = std::exchange(other.handle, nullptr); return *this; }
 	~DLL() noexcept;
 
-	void const * handle;
+	void * handle;
 };
 
 DLL load_library(std::string_view path);
