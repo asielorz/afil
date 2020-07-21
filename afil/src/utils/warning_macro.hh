@@ -6,7 +6,7 @@
 	__FILE__ "(" AFIL_INVOKE_UNARY(AFIL_STRINGIZE, __LINE__) ") : Warning " warning_code " : "
 
 
-#define WARNING(WarningCode, WarningText) AFIL_MESSAGE_INFO(AFIL_WARNING_HEADER(WarningCode) WarningText)
+#define WARNING(WarningCode, WarningText) AFIL_MSVC_PRAGMA(message(AFIL_WARNING_HEADER(WarningCode) WarningText))
 
 #define TODO(WarningText) WARNING("TODO", WarningText)
 #define HACK(WarningText) WARNING("HACK", WarningText)

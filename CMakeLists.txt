@@ -80,6 +80,20 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GN
 		#-Wconversion
 		#-Wnull-dereference
 		#-Wsign-conversion
+		#-Wno-redundant-move
+		#-fno-strict-aliasing
+	)
+endif()
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+	add_compile_options(
+		#-Wno-missing-braces
+	)
+endif()
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	add_compile_options(
+		#-fno-lifetime-dse
 	)
 endif()
 

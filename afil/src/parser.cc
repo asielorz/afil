@@ -151,11 +151,11 @@ namespace parser
 	auto is_unary_operator(lex::Token const & token) noexcept -> bool
 	{
 		return token.type == lex::Token::Type::operator_ &&
-			token.source == "-"sv ||
+			(token.source == "-"sv ||
 			token.source == "&"sv ||
 			token.source == "*"sv ||
 			token.source == "~"sv ||
-			token.source == "not"sv;
+			token.source == "not"sv);
 	}
 
 	template <typename T>
@@ -1379,7 +1379,6 @@ namespace parser
 		else
 		{
 			incomplete::Function destructor;
-			std::string_view const first_param_source = tokens[index + 1].source;
 			try_call_void(parse_function_prototype(tokens, index, type_names, out(destructor)));
 			try_call_void(parse_function_body(tokens, index, type_names, out(destructor)));
 
