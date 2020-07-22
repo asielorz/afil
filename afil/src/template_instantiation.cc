@@ -2687,7 +2687,7 @@ namespace instantiation
 			for (complete::Variable const & var : module_global_scope.variables)
 				add_variable_to_scope(program.global_scope, var.name, var.type, 0, program);
 
-			TODO("Merge namespaces with equal nanes");
+			TODO("Merge namespaces with equal names");
 			for (complete::Namespace & nested_namespace : module_global_scope.nested_namespaces)
 				program.global_scope.nested_namespaces.push_back(std::move(nested_namespace));
 		}

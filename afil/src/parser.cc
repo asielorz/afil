@@ -16,7 +16,6 @@
 #include <filesystem>
 #include <string>
 
-using TokenType = lex::Token::Type;
 using namespace std::literals;
 
 namespace parser
@@ -132,17 +131,17 @@ namespace parser
 
 	auto parse_operator_tokens(span<lex::Token const> tokens, size_t & index) noexcept -> expected<std::string_view, PartialSyntaxError>
 	{
-		if (tokens[index].type == TokenType::open_bracket)
+		if (tokens[index].type == lex::Token::Type::open_bracket)
 		{
 			index++;
-			if (tokens[index].type != TokenType::close_bracket) 
+			if (tokens[index].type != lex::Token::Type::close_bracket) 
 				return make_syntax_error(tokens[index], "Expected operator after '(' in function declaration.");
 			index++;
 			return "[]"sv;
 		}
 		else
 		{
-			if (tokens[index].type != TokenType::operator_) 
+			if (tokens[index].type != lex::Token::Type::operator_) 
 				return make_syntax_error(tokens[index], "Expected operator name after keyword \"operator\".");
 			return tokens[index++].source;
 		}
@@ -150,7 +149,7 @@ namespace parser
 
 	auto is_unary_operator(lex::Token const & token) noexcept -> bool
 	{
-		return token.type == TokenType::operator_ &&
+		return token.type == lex::Token::Type::operator_ &&
 			token.source == "-"sv ||
 			token.source == "&"sv ||
 			token.source == "*"sv ||
@@ -257,12 +256,12 @@ namespace parser
 	{
 		std::vector<std::string_view> namespaces;
 
-		while (tokens[index + 1].type == TokenType::scope_resolution)
+		while (tokens[index + 1].type == lex::Token::Type::scope_resolution)
 		{
 			namespaces.push_back(tokens[index].source);
 			index += 2;
 
-			if (tokens[index].type != TokenType::identifier)
+			if (tokens[index].type != lex::Token::Type::identifier)
 				return make_syntax_error(tokens[index].source, "Expected identifier after \"::\".");
 		}
 
@@ -288,11 +287,11 @@ namespace parser
 		}
 
 		// Look for array type
-		if (tokens[index].type == TokenType::open_bracket)
+		if (tokens[index].type == lex::Token::Type::open_bracket)
 		{
 			index++;
 
-			if (tokens[index].type == TokenType::close_bracket)
+			if (tokens[index].type == lex::Token::Type::close_bracket)
 			{
 				incomplete::TypeId pointer_type = array_pointer_type_for(std::move(type));
 				index++;
@@ -301,7 +300,7 @@ namespace parser
 			else
 			{
 				try_call_decl(incomplete::Expression size, parse_expression(tokens, index, type_names));
-				if (tokens[index].type != TokenType::close_bracket) return make_syntax_error(tokens[index], "Expected ] after array size.");
+				if (tokens[index].type != lex::Token::Type::close_bracket) return make_syntax_error(tokens[index], "Expected ] after array size.");
 				index++;
 				incomplete::TypeId array_type = array_type_for(std::move(type), std::move(size));
 				return parse_mutable_pointer_and_array(tokens, index, type_names, std::move(array_type));
@@ -343,7 +342,7 @@ namespace parser
 			if (tokens[index].source == ">")
 				break;
 
-			if(!(tokens[index].type == TokenType::comma)) return make_syntax_error(tokens[index], "Expected comma ',' after template parameter.");
+			if(!(tokens[index].type == lex::Token::Type::comma)) return make_syntax_error(tokens[index], "Expected comma ',' after template parameter.");
 			index++;
 		}
 
@@ -362,7 +361,7 @@ namespace parser
 
 		while (true)
 		{
-			if (tokens[index].type != TokenType::identifier)
+			if (tokens[index].type != lex::Token::Type::identifier)
 				return make_syntax_error(tokens[index].source, "Expected identifier after \"::\".");
 
 			std::string_view const name_to_look_up = tokens[index].source;
@@ -377,7 +376,7 @@ namespace parser
 			}
 
 			// Found a namespace. Add it to the list of namespaces and continue.
-			if (tokens[index].type == TokenType::scope_resolution)
+			if (tokens[index].type == lex::Token::Type::scope_resolution)
 			{
 				index++;
 				namespaces.push_back(name_to_look_up);
@@ -445,14 +444,14 @@ namespace parser
 
 		for (;;)
 		{
-			if (tokens[index].type != TokenType::identifier) 
+			if (tokens[index].type != lex::Token::Type::identifier) 
 				return make_syntax_error(tokens[index], "Expected identifier.");
 
 			incomplete::TemplateParameter param;
 			param.name = tokens[index].source;
 			index++;
 
-			if (tokens[index].type == TokenType::identifier)
+			if (tokens[index].type == lex::Token::Type::identifier)
 			{
 				param.concept = param.name;
 				param.name = tokens[index].source;
@@ -471,7 +470,7 @@ namespace parser
 				index++;
 				break;
 			}
-			if (tokens[index].type != TokenType::comma) return make_syntax_error(tokens[index], "Expected '>' or ',' after template parameter.");
+			if (tokens[index].type != lex::Token::Type::comma) return make_syntax_error(tokens[index], "Expected '>' or ',' after template parameter.");
 			index++;
 		}
 
@@ -485,7 +484,7 @@ namespace parser
 	//******************************************************************************************************************************************************************
 
 	auto parse_comma_separated_expression_list(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names,
-		TokenType opener = TokenType::open_parenthesis, TokenType delimiter = TokenType::close_parenthesis) noexcept -> expected<std::vector<incomplete::Expression>, PartialSyntaxError>
+		lex::Token::Type opener = lex::Token::Type::open_parenthesis, lex::Token::Type delimiter = lex::Token::Type::close_parenthesis) noexcept -> expected<std::vector<incomplete::Expression>, PartialSyntaxError>
 	{
 		std::vector<incomplete::Expression> parsed_expressions;
 
@@ -493,7 +492,7 @@ namespace parser
 		index++;
 
 		// Check for empty list.
-		if (tokens[index].type == TokenType::close_parenthesis)
+		if (tokens[index].type == lex::Token::Type::close_parenthesis)
 		{
 			index++;
 			return parsed_expressions;
@@ -511,7 +510,7 @@ namespace parser
 				break;
 			}
 			// If we find a comma, parse next parameter.
-			else if (tokens[index].type == TokenType::comma)
+			else if (tokens[index].type == lex::Token::Type::comma)
 				index++;
 			// Anything else we find is wrong.
 			else
@@ -525,7 +524,7 @@ namespace parser
 		-> expected<std::vector<incomplete::DesignatedInitializer>, PartialSyntaxError>
 	{
 		// Parameter list starts with (
-		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after type name in struct constructor.");
+		if (tokens[index].type != lex::Token::Type::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after type name in struct constructor.");
 		index++;
 
 		std::vector<incomplete::DesignatedInitializer> initializers;
@@ -533,13 +532,13 @@ namespace parser
 		for (;;)
 		{
 			// A member initializer by name starts with a period.
-			if (tokens[index].type != TokenType::period) return make_syntax_error(tokens[index], "Expected '.' in designated initializer.");
+			if (tokens[index].type != lex::Token::Type::period) return make_syntax_error(tokens[index], "Expected '.' in designated initializer.");
 			index++;
 
 			incomplete::DesignatedInitializer parameter;
 
 			// Find the member to initialize.
-			if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected member name after '.' in designated initializer.");
+			if (tokens[index].type != lex::Token::Type::identifier) return make_syntax_error(tokens[index], "Expected member name after '.' in designated initializer.");
 			parameter.member_name = tokens[index].source;
 			index++;
 
@@ -553,13 +552,13 @@ namespace parser
 			initializers.push_back(std::move(parameter));
 
 			// If after a parameter we find a close parenthesis, end parameter list.
-			if (tokens[index].type == TokenType::close_parenthesis)
+			if (tokens[index].type == lex::Token::Type::close_parenthesis)
 			{
 				index++;
 				break;
 			}
 			// If we find a comma, parse next parameter.
-			else if (tokens[index].type == TokenType::comma)
+			else if (tokens[index].type == lex::Token::Type::comma)
 				index++;
 			// Anything else we find is wrong.
 			else
@@ -573,36 +572,36 @@ namespace parser
 		-> expected<void, PartialSyntaxError>
 	{
 		// Parameters must be between parenthesis.
-		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after fn.");
+		if (tokens[index].type != lex::Token::Type::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after fn.");
 		index++;
 
 		// Parse arguments.
-		while (tokens[index].type == TokenType::identifier)
+		while (tokens[index].type == lex::Token::Type::identifier)
 		{
 			incomplete::FunctionParameter var;
 			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (!type.has_value()) return make_syntax_error(tokens[index], "Parameter type not found.");
 			var.type = std::move(*type);
 
-			if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after function parameter type.");
+			if (tokens[index].type != lex::Token::Type::identifier) return make_syntax_error(tokens[index], "Expected identifier after function parameter type.");
 			if (is_keyword(tokens[index].source)) return make_syntax_error(tokens[index], "Cannot use a keyword as function parameter name.");
 			var.name = tokens[index].source;
 			function->parameters.push_back(std::move(var));
 			index++;
 
-			if (tokens[index].type == TokenType::close_parenthesis)
+			if (tokens[index].type == lex::Token::Type::close_parenthesis)
 				break;
 
-			if (tokens[index].type != TokenType::comma) return make_syntax_error(tokens[index], "Expected ',' or ')' after function parameter.");
+			if (tokens[index].type != lex::Token::Type::comma) return make_syntax_error(tokens[index], "Expected ',' or ')' after function parameter.");
 			index++;
 		}
 
 		// After parameters close parenthesis.
-		if (tokens[index].type != TokenType::close_parenthesis)  return make_syntax_error(tokens[index], "Expected ')' after function parameter list.");
+		if (tokens[index].type != lex::Token::Type::close_parenthesis)  return make_syntax_error(tokens[index], "Expected ')' after function parameter list.");
 		index++;
 
 		// Return type is introduced with an arrow (optional).
-		if (tokens[index].type == TokenType::arrow)
+		if (tokens[index].type == lex::Token::Type::arrow)
 		{
 			index++;
 			try_call(assign_to(function->return_type), parse_type_name(tokens, index, type_names));
@@ -617,15 +616,15 @@ namespace parser
 		{
 			index++;
 
-			if (tokens[index].type != TokenType::open_brace)
+			if (tokens[index].type != lex::Token::Type::open_brace)
 				return make_syntax_error(tokens[index].source, "Expected '{' after \"assert\" keyword.");
 			index++;
 
-			while (tokens[index].type != TokenType::close_brace)
+			while (tokens[index].type != lex::Token::Type::close_brace)
 			{
 				try_call(function->preconditions.push_back, parse_expression(tokens, index, type_names));
 				
-				if (tokens[index].type != TokenType::semicolon)
+				if (tokens[index].type != lex::Token::Type::semicolon)
 					return make_syntax_error(tokens[index].source, "Expected ';' after expression in assert block.");
 				index++;
 			}
@@ -639,11 +638,11 @@ namespace parser
 	[[nodiscard]] auto parse_function_body(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names, out<incomplete::Function> function) noexcept -> expected<void, PartialSyntaxError>
 	{
 		// Body of the function is enclosed by braces.
-		if (tokens[index].type != TokenType::open_brace) return make_syntax_error(tokens[index], "Expected '{' at start of function body.");
+		if (tokens[index].type != lex::Token::Type::open_brace) return make_syntax_error(tokens[index], "Expected '{' at start of function body.");
 		index++;
 
 		// Parse all statements in the function.
-		while (tokens[index].type != TokenType::close_brace)
+		while (tokens[index].type != lex::Token::Type::close_brace)
 		{
 			try_call(function->statements.push_back, parse_statement(tokens, index, type_names));
 		}
@@ -680,12 +679,12 @@ namespace parser
 			return make_syntax_error(tokens[index], "Cannot omit return type of imported extern function.");
 
 		index++;
-		if (tokens[index].type != TokenType::open_parenthesis)
+		if (tokens[index].type != lex::Token::Type::open_parenthesis)
 			return make_syntax_error(tokens[index], "Expected '(' after extern_symbol.");
 		index++;
 		std::string_view const extern_symbol_name = tokens[index].source;
 		index++;
-		if (tokens[index].type != TokenType::close_parenthesis)
+		if (tokens[index].type != lex::Token::Type::close_parenthesis)
 			return make_syntax_error(tokens[index], "Expected ')' after extern_symbol name.");
 		index++;
 
@@ -725,13 +724,13 @@ namespace parser
 		index++;
 
 		// Condition goes between parenthesis.
-		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after if.");
+		if (tokens[index].type != lex::Token::Type::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after if.");
 		index++;
 
 		incomplete::expression::If if_node;
 		try_call(assign_to(if_node.condition), parse_expression(tokens, index, type_names));
 
-		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after if condition.");
+		if (tokens[index].type != lex::Token::Type::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after if condition.");
 		index++;
 
 		try_call(assign_to(if_node.then_case), parse_expression(tokens, index, type_names));
@@ -773,7 +772,7 @@ namespace parser
 
 		// Parse all statements in the function.
 		size_t const stack_size = type_names.size();
-		while (tokens[index].type != TokenType::close_brace)
+		while (tokens[index].type != lex::Token::Type::close_brace)
 		{
 			try_call(node.statements.push_back, parse_statement(tokens, index, type_names));
 		}
@@ -783,7 +782,7 @@ namespace parser
 		if (!all_branches_return(node.statements.back().variant)) return make_syntax_error(tokens[index], "Not all branches of statement block expression return.");
 
 		// Skip closing brace.
-		if (tokens[index].type != TokenType::close_brace) return make_syntax_error(tokens[index], "Expected '}' at the end of statement block expression.");
+		if (tokens[index].type != lex::Token::Type::close_brace) return make_syntax_error(tokens[index], "Expected '}' at the end of statement block expression.");
 		index++;
 
 		return node;
@@ -798,7 +797,7 @@ namespace parser
 		incomplete::expression::Compiles compiles_expr;
 
 		// Variable list.
-		if (tokens[index].type == TokenType::open_parenthesis)
+		if (tokens[index].type == lex::Token::Type::open_parenthesis)
 		{
 			// Skip open parenthesis.
 			index++;
@@ -807,17 +806,17 @@ namespace parser
 			{
 				try_call_decl(auto type_expr, parse_expression(tokens, index, type_names));
 
-				if (tokens[index].type != TokenType::identifier || is_keyword(tokens[index].source))
+				if (tokens[index].type != lex::Token::Type::identifier || is_keyword(tokens[index].source))
 					return make_syntax_error(tokens[index].source, "Expected name after type in parameter list of compiles expression.");
 
 				compiles_expr.variables.push_back({std::move(type_expr), tokens[index].source});
 				index++;
 
-				if (tokens[index].type == TokenType::comma)
+				if (tokens[index].type == lex::Token::Type::comma)
 				{
 					index++;
 				}
-				else if (tokens[index].type == TokenType::close_parenthesis)
+				else if (tokens[index].type == lex::Token::Type::close_parenthesis)
 				{
 					index++;
 					break;
@@ -830,7 +829,7 @@ namespace parser
 		}
 
 		// Expect { after compiles.
-		if (tokens[index].type != TokenType::open_brace)
+		if (tokens[index].type != lex::Token::Type::open_brace)
 			return make_syntax_error(tokens[index].source, "Expected '{' after \"compiles\" keyword.");
 		index++;
 
@@ -838,16 +837,16 @@ namespace parser
 		{
 			incomplete::ExpressionToTest expr_to_test;
 
-			if (tokens[index].type == TokenType::open_brace)
+			if (tokens[index].type == lex::Token::Type::open_brace)
 			{
 				index++;
 				try_call(assign_to(expr_to_test.expression), parse_expression(tokens, index, type_names));
 
-				if (tokens[index].type != TokenType::close_brace)
+				if (tokens[index].type != lex::Token::Type::close_brace)
 					return make_syntax_error(tokens[index].source, "Expected '}' after expression in body of compiles expression.");
 				index++;
 
-				if (tokens[index].type != TokenType::arrow)
+				if (tokens[index].type != lex::Token::Type::arrow)
 					return make_syntax_error(tokens[index].source, "Expected \"->\" after '}' in body of compiles expression.");
 				index++;
 
@@ -859,11 +858,11 @@ namespace parser
 			}
 			compiles_expr.body.push_back(std::move(expr_to_test));
 
-			if (tokens[index].type == TokenType::semicolon)
+			if (tokens[index].type == lex::Token::Type::semicolon)
 			{
 				index++;
 			}
-			else if (tokens[index].type == TokenType::close_brace)
+			else if (tokens[index].type == lex::Token::Type::close_brace)
 			{
 				index++;
 				break;
@@ -912,17 +911,17 @@ namespace parser
 			return parse_function_expression(tokens, index, type_names);
 		else if (tokens[index].source == "if")
 			return parse_if_expression(tokens, index, type_names);
-		else if (tokens[index].type == TokenType::open_brace)
+		else if (tokens[index].type == lex::Token::Type::open_brace)
 			return parse_statement_block_expression(tokens, index, type_names);
-		else if (tokens[index].type == TokenType::literal_int)
+		else if (tokens[index].type == lex::Token::Type::literal_int)
 			return incomplete::expression::Literal<int>(parse_number_literal<int>(tokens[index++].source));
-		else if (tokens[index].type == TokenType::literal_float)
+		else if (tokens[index].type == lex::Token::Type::literal_float)
 			return incomplete::expression::Literal<float>(parse_number_literal<float>(tokens[index++].source));
-		else if (tokens[index].type == TokenType::literal_bool)
+		else if (tokens[index].type == lex::Token::Type::literal_bool)
 			return incomplete::expression::Literal<bool>(tokens[index++].source[0] == 't');
-		else if (tokens[index].type == TokenType::literal_string)
+		else if (tokens[index].type == lex::Token::Type::literal_string)
 			return incomplete::expression::Literal<std::string>(parse_string_literal(tokens[index++].source));
-		else if (tokens[index].type == TokenType::literal_char)
+		else if (tokens[index].type == lex::Token::Type::literal_char)
 			return incomplete::expression::Literal<char_t>(parse_char_literal(tokens[index++].source));
 		else if (tokens[index].source == "null")
 		{
@@ -939,16 +938,16 @@ namespace parser
 		}
 		else if (tokens[index].source == "compiles")
 			return parse_compiles_expression(tokens, index, type_names);
-		else if (tokens[index].type == TokenType::identifier)
+		else if (tokens[index].type == lex::Token::Type::identifier)
 		{
 			// It can be either a constructor call or the naming of a variable/function
 			try_call_decl(auto type, parse_type_name(tokens, index, type_names));
 			if (type.has_value())
 			{
-				if (tokens[index].type == TokenType::scope_resolution)
+				if (tokens[index].type == lex::Token::Type::scope_resolution)
 				{
 					index++;
-					if (tokens[index].type != TokenType::identifier)
+					if (tokens[index].type != lex::Token::Type::identifier)
 						return make_syntax_error(tokens[index].source, "Expected identifier after ::.");
 
 					incomplete::expression::IdentifierInsideStruct id_node;
@@ -978,13 +977,13 @@ namespace parser
 
 	auto parse_single_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::Expression, PartialSyntaxError>
 	{
-		if (tokens[index].type == TokenType::open_parenthesis)
+		if (tokens[index].type == lex::Token::Type::open_parenthesis)
 		{
 			index++;
 			auto expr = parse_expression(tokens, index, type_names);
 
 			// Next token must be close parenthesis.
-			if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after parenthesized expression.");
+			if (tokens[index].type != lex::Token::Type::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after parenthesized expression.");
 			index++;
 
 			return expr;
@@ -1005,11 +1004,11 @@ namespace parser
 		while (index < tokens.size())
 		{
 			// Loop to possibly parse chains of member accesses.
-			if (tokens[index].type == TokenType::period)
+			if (tokens[index].type == lex::Token::Type::period)
 			{
 				index++;
 
-				if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected member name after '.'.");
+				if (tokens[index].type != lex::Token::Type::identifier) return make_syntax_error(tokens[index], "Expected member name after '.'.");
 				std::string_view const member_name = tokens[index].source;
 				index++;
 
@@ -1022,9 +1021,9 @@ namespace parser
 				tree = incomplete::Expression(std::move(var_node), make_string_view(expr_source_start, expr_source_end));
 			}
 			// Subscript
-			else if (tokens[index].type == TokenType::open_bracket)
+			else if (tokens[index].type == lex::Token::Type::open_bracket)
 			{
-				try_call_decl(std::vector<incomplete::Expression> params, parse_comma_separated_expression_list(tokens, index, type_names, TokenType::open_bracket, TokenType::close_bracket));
+				try_call_decl(std::vector<incomplete::Expression> params, parse_comma_separated_expression_list(tokens, index, type_names, lex::Token::Type::open_bracket, lex::Token::Type::close_bracket));
 
 				auto const expr_source_start = begin_ptr(tree.source);
 				auto const expr_source_end = end_ptr(tokens[index - 1].source);
@@ -1048,9 +1047,9 @@ namespace parser
 				}
 			}
 			// Function call
-			else if (tokens[index].type == TokenType::open_parenthesis)
+			else if (tokens[index].type == lex::Token::Type::open_parenthesis)
 			{
-				if (tokens[index + 1].type == TokenType::period)
+				if (tokens[index + 1].type == lex::Token::Type::period)
 				{
 					incomplete::expression::DesignatedInitializerConstructor ctor_node;
 					ctor_node.constructed_type = allocate(std::move(tree));
@@ -1092,7 +1091,7 @@ namespace parser
 			try_call(operands.push_back, parse_expression_and_trailing_subexpressions(tokens, index, type_names));
 
 			// If the next token is an operator, parse the operator and repeat. Otherwise end the loop and return the expression.
-			if (index < tokens.size() && tokens[index].type == TokenType::operator_)
+			if (index < tokens.size() && tokens[index].type == lex::Token::Type::operator_)
 			{
 				operators.push_back(tokens[index].source);
 				index++;
@@ -1118,7 +1117,7 @@ namespace parser
 		incomplete::statement::PlacementLet placement_let_statement;
 		try_call(assign_to(placement_let_statement.address_expression), parse_expression(tokens, index, type_names));
 
-		if (tokens[index].type != TokenType::close_parenthesis)
+		if (tokens[index].type != lex::Token::Type::close_parenthesis)
 			return make_syntax_error(tokens[index].source, "Expected ')' after address expression in placement let statement.");
 		index++;
 
@@ -1137,7 +1136,7 @@ namespace parser
 		// Skip let token.
 		index++;
 
-		if (tokens[index].type == TokenType::open_parenthesis)
+		if (tokens[index].type == lex::Token::Type::open_parenthesis)
 			return parse_placement_let_statement(tokens, index, type_names);
 
 		bool is_mutable = false;
@@ -1167,7 +1166,7 @@ namespace parser
 		}
 		else
 		{
-			if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after let.");
+			if (tokens[index].type != lex::Token::Type::identifier) return make_syntax_error(tokens[index], "Expected identifier after let.");
 			name = tokens[index].source;
 			index++;
 		}
@@ -1203,7 +1202,7 @@ namespace parser
 			return make_syntax_error(type_source, "uninit implies mutable. Redundant mut keyword.");
 
 
-		if (tokens[index].type != TokenType::identifier)
+		if (tokens[index].type != lex::Token::Type::identifier)
 			return make_syntax_error(tokens[index].source, "Expected identifier after type name.");
 
 		std::string_view const variable_name = tokens[index].source;
@@ -1235,13 +1234,13 @@ namespace parser
 		// Skip the if
 		index++;
 
-		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after if.");
+		if (tokens[index].type != lex::Token::Type::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after if.");
 		index++;
 
 		incomplete::statement::If statement;
 		try_call(assign_to(statement.condition), parse_expression(tokens, index, type_names));
 
-		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after condition in if statement.");
+		if (tokens[index].type != lex::Token::Type::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after condition in if statement.");
 		index++;
 
 		try_call(assign_to(statement.then_case), parse_statement(tokens, index, type_names));
@@ -1267,7 +1266,7 @@ namespace parser
 		size_t const stack_size = type_names.size();
 
 		// Parse all statements in the function.
-		while (tokens[index].type != TokenType::close_brace)
+		while (tokens[index].type != lex::Token::Type::close_brace)
 		{
 			try_call(statement_block.statements.push_back, parse_statement(tokens, index, type_names));
 		}
@@ -1285,7 +1284,7 @@ namespace parser
 		index++;
 
 		// Condition goes inside parenthesis.
-		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after while.");
+		if (tokens[index].type != lex::Token::Type::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after while.");
 		index++;
 
 		incomplete::statement::While statement;
@@ -1293,7 +1292,7 @@ namespace parser
 		// Parse condition. Must return bool.
 		try_call(assign_to(statement.condition), parse_expression(tokens, index, type_names));
 
-		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after condition in while statement.");
+		if (tokens[index].type != lex::Token::Type::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after condition in while statement.");
 		index++;
 
 		// Parse body
@@ -1312,7 +1311,7 @@ namespace parser
 		index++;
 
 		// Condition goes inside parenthesis.
-		if (tokens[index].type != TokenType::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after for.");
+		if (tokens[index].type != lex::Token::Type::open_parenthesis) return make_syntax_error(tokens[index], "Expected '(' after for.");
 		index++;
 
 		incomplete::statement::For for_statement;
@@ -1329,13 +1328,13 @@ namespace parser
 		try_call(assign_to(for_statement.condition), parse_expression(tokens, index, type_names));
 
 		// Parse ; after condition.
-		if (tokens[index].type != TokenType::semicolon) return make_syntax_error(tokens[index], "Expected ';' after for statement condition.");
+		if (tokens[index].type != lex::Token::Type::semicolon) return make_syntax_error(tokens[index], "Expected ';' after for statement condition.");
 		index++;
 
 		// Parse end expression.
 		try_call(assign_to(for_statement.end_expression), parse_expression(tokens, index, type_names));
 
-		if (tokens[index].type != TokenType::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after for statement end expression.");
+		if (tokens[index].type != lex::Token::Type::close_parenthesis) return make_syntax_error(tokens[index], "Expected ')' after for statement end expression.");
 		index++;
 
 		// Parse body
@@ -1366,7 +1365,7 @@ namespace parser
 				return make_syntax_error(tokens[index].source, "Expected keyword \"default\" after '='.");
 			index++;
 
-			if (tokens[index].type != TokenType::semicolon)
+			if (tokens[index].type != lex::Token::Type::semicolon)
 				return make_syntax_error(tokens[index].source, "Expected ';' after keyword \"default\".");
 			index++;
 
@@ -1388,25 +1387,25 @@ namespace parser
 		incomplete::Struct declared_struct;
 
 		// Parse name
-		if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after struct.");
+		if (tokens[index].type != lex::Token::Type::identifier) return make_syntax_error(tokens[index], "Expected identifier after struct.");
 		if (is_keyword(tokens[index].source)) return make_syntax_error(tokens[index], "Cannot use a keyword as struct name.");
 		auto const type_name = tokens[index].source;
 		index++;
 
 		// Skip { token.
-		if (tokens[index].type != TokenType::open_brace) return make_syntax_error(tokens[index], "Expected '{' after struct name.");
+		if (tokens[index].type != lex::Token::Type::open_brace) return make_syntax_error(tokens[index], "Expected '{' after struct name.");
 		index++;
 
 		declared_struct.name = type_name;
 
 		// Parse member variables.
-		while (tokens[index].type != TokenType::close_brace)
+		while (tokens[index].type != lex::Token::Type::close_brace)
 		{
 			if (tokens[index].source == "constructor")
 			{
 				index++;
 				
-				if (tokens[index].type != TokenType::identifier)
+				if (tokens[index].type != lex::Token::Type::identifier)
 					return make_syntax_error(tokens[index].source, "Expected identifier after keyword \"constructor\".");
 				if (is_keyword(tokens[index].source))
 					return make_syntax_error(tokens[index].source, "Cannot use a keyword as constructor name.");
@@ -1520,7 +1519,7 @@ namespace parser
 				if (var.type.is_reference) return make_syntax_error(tokens[index], "Member variable cannot be reference.");
 				if (var.type.is_mutable) return make_syntax_error(tokens[index], "Member variable cannot be mutable. Mutability of members is inherited from mutability of object that contains them.");
 
-				if (tokens[index].type != TokenType::identifier) return make_syntax_error(tokens[index], "Expected identifier after type name in member variable declaration.");
+				if (tokens[index].type != lex::Token::Type::identifier) return make_syntax_error(tokens[index], "Expected identifier after type name in member variable declaration.");
 				if (is_keyword(tokens[index].source)) return make_syntax_error(tokens[index], "Cannot use a keyword as member variable name.");
 				if (is_name_locally_taken(tokens[index].source, declared_struct.member_variables)) return make_syntax_error(tokens[index], "More than one member variable with the same name.");
 				var.name = tokens[index].source;
@@ -1533,7 +1532,7 @@ namespace parser
 					try_call(assign_to(var.initializer_expression), parse_expression(tokens, index, type_names));
 				}
 
-				if (tokens[index].type != TokenType::semicolon) return make_syntax_error(tokens[index], "Expected semicolon after struct member.");
+				if (tokens[index].type != lex::Token::Type::semicolon) return make_syntax_error(tokens[index], "Expected semicolon after struct member.");
 				declared_struct.member_variables.push_back(std::move(var));
 				index++;
 			}
@@ -1583,7 +1582,7 @@ namespace parser
 		// Skip type token.
 		index++;
 
-		if (tokens[index].type != TokenType::identifier)
+		if (tokens[index].type != lex::Token::Type::identifier)
 			return make_syntax_error(tokens[index].source, "Expected identifier after \"type\" keyword.");
 
 		std::string_view const alias_name = tokens[index].source;
@@ -1613,15 +1612,15 @@ namespace parser
 
 		incomplete::statement::NamespaceDeclaration namespace_declaration;
 
-		if (tokens[index].type != TokenType::identifier)
+		if (tokens[index].type != lex::Token::Type::identifier)
 			return make_syntax_error(tokens[index].source, "Expected identifier after keyword \"namespace\".");
 		namespace_declaration.names.push_back(tokens[index].source);
 		index++;
 
-		while (tokens[index].type == TokenType::scope_resolution)
+		while (tokens[index].type == lex::Token::Type::scope_resolution)
 		{
 			index++;
-			if (tokens[index].type != TokenType::identifier)
+			if (tokens[index].type != lex::Token::Type::identifier)
 				return make_syntax_error(tokens[index].source, "Expected identifier after \"::\".");
 			namespace_declaration.names.push_back(tokens[index].source);
 			index++;
@@ -1631,11 +1630,11 @@ namespace parser
 			if (is_keyword(namespace_name))
 				return make_syntax_error(namespace_name, "Cannot use a keyword as namespace name.");
 
-		if (tokens[index].type != TokenType::open_brace)
+		if (tokens[index].type != lex::Token::Type::open_brace)
 			return make_syntax_error(tokens[index].source, "Expected '{' after namespace name.");
 		index++;
 
-		while (tokens[index].type != TokenType::close_brace)
+		while (tokens[index].type != lex::Token::Type::close_brace)
 			try_call(namespace_declaration.statements.push_back, parse_statement(tokens, index, type_names));
 		index++;
 
@@ -1691,7 +1690,7 @@ namespace parser
 			// With if, {}, while and for statements, return to avoid checking for final ';' because it is not needed.
 		else if (tokens[index].source == "if")
 			return parse_if_statement(tokens, index, type_names);
-		else if (tokens[index].type == TokenType::open_brace)
+		else if (tokens[index].type == lex::Token::Type::open_brace)
 			return parse_statement_block(tokens, index, type_names);
 		else if (tokens[index].source == "while")
 			return parse_while_statement(tokens, index, type_names);
@@ -1715,7 +1714,7 @@ namespace parser
 			try_call(assign_to(result), parse_expression_statement(tokens, index, type_names));
 
 		// A statement must end with a semicolon.
-		if (tokens[index].type != TokenType::semicolon) return make_syntax_error(tokens[index], "Expected ';' after statement.");
+		if (tokens[index].type != lex::Token::Type::semicolon) return make_syntax_error(tokens[index], "Expected ';' after statement.");
 		index++;
 
 		return std::move(result);
@@ -1755,11 +1754,11 @@ namespace parser
 
 		for (size_t i = 0; i < tokens.size(); ++i)
 		{
-			if (tokens[i].type == TokenType::open_brace)
+			if (tokens[i].type == lex::Token::Type::open_brace)
 			{
 				brace_level++;
 			}
-			else if (tokens[i].type == TokenType::close_brace)
+			else if (tokens[i].type == lex::Token::Type::close_brace)
 			{
 				brace_level--;
 			}
@@ -1774,14 +1773,14 @@ namespace parser
 							i++;
 						i++;
 
-						if (i < tokens.size() && tokens[i].type == TokenType::identifier && !is_keyword(tokens[i].source))
+						if (i < tokens.size() && tokens[i].type == lex::Token::Type::identifier && !is_keyword(tokens[i].source))
 						{
 							type_names.push_back({tokens[i].source, TypeName::Type::struct_template});
 						}
 					}
 					else
 					{
-						if (tokens[i].type == TokenType::identifier && !is_keyword(tokens[i].source))
+						if (tokens[i].type == lex::Token::Type::identifier && !is_keyword(tokens[i].source))
 						{
 							type_names.push_back({tokens[i].source, TypeName::Type::type});
 						}
