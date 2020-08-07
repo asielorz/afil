@@ -1,12 +1,12 @@
-#pragma once
 #include "afil.hh"
 #include "interpreter.hh"
+#include "utils/compatibility.hh"
 #include <iostream>
-#include <Windows.h>
 
 auto main(int argc, char const * const argv[]) -> int
 {
-	(void)(argc, argv);
+	(void)(argc);
+	(void)(argv);
 	
 	auto program = afil::parse_module("main");
 	if (program.has_value())
@@ -25,7 +25,7 @@ auto main(int argc, char const * const argv[]) -> int
 	else
 	{
 		std::cout << program.error() << '\n';
-		system("pause");
+		system_pause();
 		return -1;
 	}
 }

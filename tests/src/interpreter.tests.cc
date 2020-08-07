@@ -1,4 +1,5 @@
 #include <catch2/catch.hpp>
+#include "utils/compatibility.hh"
 #include "interpreter.hh"
 #include "incomplete_module.hh"
 #include "parser.hh"
@@ -62,7 +63,7 @@ namespace tests
 	{
 		complete::Program const program = assert_get(parse_source(src));
 		printf("%s", pretty_print(program).c_str());
-		system("pause");
+		system_pause();
 	}
 }
 
@@ -84,7 +85,7 @@ auto fib(int i) -> int
 		return i;
 	else
 		return fib(i - 1) + fib(i - 2);
-};
+}
 
 TEST_CASE("Main function that calls another function.")
 {

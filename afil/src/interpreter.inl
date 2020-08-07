@@ -624,9 +624,9 @@ namespace interpreter
 		{
 			return [](complete::expression::Literal<complete::TypeId>) { declare_unreachable(); };
 		}
-		inline auto eval_type_literal_expression(ProgramStack & stack, CompileTimeContext, char * return_address)
+		inline auto eval_type_literal_expression(ProgramStack &, CompileTimeContext, char * return_address)
 		{
-			return [&stack, return_address](complete::expression::Literal<complete::TypeId> literal) { write(return_address, literal.value); };
+			return [return_address](complete::expression::Literal<complete::TypeId> literal) { write(return_address, literal.value); };
 		}
 
 		inline auto eval_compiles_expression(ProgramStack &, RuntimeContext, char *) noexcept
@@ -680,7 +680,6 @@ namespace interpreter
 				// If the owner is an rvalue, return the member by value.
 				else
 				{
-					int const variable_size = type_size(context.program, var_node.variable_type);
 					char * const owner_ptr = pointer_at_address(stack, owner_address);
 					move_variable(owner_ptr + var_node.variable_offset, return_address, var_node.variable_type, stack, context);
 					destroy_variable(owner_ptr, owner_type, stack, context);

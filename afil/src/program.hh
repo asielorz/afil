@@ -96,7 +96,6 @@ namespace complete
 
 	struct FunctionTemplateParameterType
 	{
-		#pragma warning (disable : 4201)
 		struct BaseCase
 		{
 			TypeId type;

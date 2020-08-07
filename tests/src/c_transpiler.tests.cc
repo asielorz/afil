@@ -1,5 +1,6 @@
 #include "c_transpiler.hh"
 #include "program.hh"
+#include "utils/compatibility.hh"
 #include <catch2/catch.hpp>
 #include <fstream>
 
@@ -54,6 +55,6 @@ TEST_CASE("Fibonacci deleteme")
 	file << c_transpiler::transpile_to_c(program);
 	std::cout << "**************************************************************************************\n";
 
-	system("pause");
+	system_pause();
 }
 #endif

@@ -3,7 +3,7 @@
 #include "utils/string.hh"
 #include <cstdlib>
 #include <cassert>
-#include <Windows.h>
+#include <algorithm>
 
 auto make_syntax_error(
 	std::string_view error_in_source,

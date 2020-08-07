@@ -20,20 +20,20 @@ namespace complete
 	auto built_in_types() noexcept -> std::vector<std::pair<std::string_view, Type>>
 	{
 		return {
-			{"void",		{0, 1}},
-			{"int8",		{1, 1}},
-			{"int16",		{2, 2}},
-			{"int32",		{4, 4}},
-			{"int64",		{8, 8}},
-			{"uint8",		{1, 1}},
-			{"uint16",		{2, 2}},
-			{"uint32",		{4, 4}},
-			{"uint64",		{8, 8}},
-			{"float32",		{4, 4}},
-			{"float64",		{8, 8}},
-			{"bool",		{1, 1}},
-			{"type",		{4, 4}},
-			{"null_t",		{0, 1}},
+			{"void",		{0, 1, {}, {}, {}}},
+			{"int8",		{1, 1, {}, {}, {}}},
+			{"int16",		{2, 2, {}, {}, {}}},
+			{"int32",		{4, 4, {}, {}, {}}},
+			{"int64",		{8, 8, {}, {}, {}}},
+			{"uint8",		{1, 1, {}, {}, {}}},
+			{"uint16",		{2, 2, {}, {}, {}}},
+			{"uint32",		{4, 4, {}, {}, {}}},
+			{"uint64",		{8, 8, {}, {}, {}}},
+			{"float32",		{4, 4, {}, {}, {}}},
+			{"float64",		{8, 8, {}, {}, {}}},
+			{"bool",		{1, 1, {}, {}, {}}},
+			{"type",		{4, 4, {}, {}, {}}},
+			{"null_t",		{0, 1, {}, {}, {}}},
 		};
 	}
 
@@ -766,8 +766,8 @@ namespace complete
 	auto pointee_type(Type const & pointer_type) noexcept->TypeId
 	{
 		assert(is_pointer(pointer_type) || is_array_pointer(pointer_type));
-		if (is_pointer(pointer_type))
-			return try_get<Type::Pointer>(pointer_type.extra_data)->value_type;
+		if (auto * const pointer_data = try_get<Type::Pointer>(pointer_type.extra_data))
+			return pointer_data->value_type;
 		else
 			return try_get<Type::ArrayPointer>(pointer_type.extra_data)->value_type;
 	}
@@ -1629,7 +1629,7 @@ namespace complete
 			}
 			best_template_candidate = template_candidates[0];
 
-			if (template_candidate_count == 0 || candidate_count > 0 && best_candidate.conversions < best_template_candidate.conversions)
+			if (template_candidate_count == 0 || (candidate_count > 0 && best_candidate.conversions < best_template_candidate.conversions))
 				return best_candidate.function_id;
 			else
 			{
@@ -1756,7 +1756,7 @@ namespace complete
 			}
 			best_template_candidate = template_candidates[0];
 
-			if (template_candidate_count == 0 || candidate_count > 0 && best_candidate.conversions < best_template_candidate.conversions)
+			if (template_candidate_count == 0 || (candidate_count > 0 && best_candidate.conversions < best_template_candidate.conversions))
 				return best_candidate.function_id;
 			else
 			{

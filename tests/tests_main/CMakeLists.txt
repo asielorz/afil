@@ -5,6 +5,8 @@ add_library(tests_main OBJECT
 target_link_libraries(tests_main
     PUBLIC
         CONAN_PKG::catch2
+    PRIVATE
+        afil_lib
 )
 
 target_compile_features(tests_main

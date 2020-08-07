@@ -27,6 +27,9 @@ auto precedence(Operator op) noexcept -> int
 		case Operator::xor_:				return 1;
 		case Operator::or_:					return 0;
 		case Operator::assign:				return -1;
+
+		case Operator::bitwise_not:
+			break; // Unary operators have no precendence value
 	}
 	declare_unreachable();
 }

@@ -3,6 +3,8 @@ set(UTILS_FILES
 	src/utils/callc.cc
 	src/utils/callc.hh
 	src/utils/callc.inl
+	src/utils/charconv.hh
+	src/utils/compatibility.hh
 	src/utils/expected.hh
 	src/utils/function_ptr.hh
 	src/utils/half.hh
@@ -98,4 +100,11 @@ if (MSVC)
 			/bigobj
 			/MP # Multi-core compilation
   	)
+endif()
+
+if (UNIX)
+	target_link_libraries(afil_lib
+		PRIVATE
+			${CMAKE_DL_LIBS} # For 'dlopen' and related
+	)
 endif()

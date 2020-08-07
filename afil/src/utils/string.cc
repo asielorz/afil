@@ -1,5 +1,6 @@
 #include "string.hh"
 #include <fstream>
+#include <algorithm>
 
 auto is_null_terminated(std::string_view str) noexcept -> bool
 {

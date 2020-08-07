@@ -1343,7 +1343,6 @@ namespace instantiation
 			if (constructor_function.return_type != new_type_id)
 				return make_syntax_error(incomplete_constructor.name, "Return type of constructor must be constructed type.");
 
-			span<complete::Variable> const constructor_parameters = constructor_function.variables;
 			FunctionId const constructor_function_id = add_function(*program, std::move(constructor_function));
 
 			complete::Constructor constructor;
@@ -2593,7 +2592,10 @@ namespace instantiation
 
 		// If any statement was left without parsing, compilation failed.
 		if (unparsed_statements.size() > 0)
-			return Error(std::get<PartialSyntaxError>(complete_statements[unparsed_statements[0]])); TODO("Returning multiple errors");
+		{
+			TODO("Returning multiple errors");
+			return Error(std::get<PartialSyntaxError>(complete_statements[unparsed_statements[0]]));
+		}
 
 		for (size_t i = 0; i < incomplete_program.size(); ++i)
 		{
