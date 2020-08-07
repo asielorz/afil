@@ -1718,7 +1718,8 @@ namespace parser
 			try_call(assign_to(result), parse_expression_statement(tokens, index, type_names));
 
 		// A statement must end with a semicolon.
-		if (tokens[index].type != lex::Token::Type::semicolon) return make_syntax_error(tokens[index], "Expected ';' after statement.");
+		if (tokens[index].type != lex::Token::Type::semicolon)
+			return make_syntax_error(tokens[index], "Expected ';' after statement.");
 		index++;
 
 		return std::move(result);

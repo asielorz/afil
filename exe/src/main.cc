@@ -14,6 +14,7 @@ auto main(int argc, char const * const argv[]) -> int
 		auto result = interpreter::run(*program);
 		if (result.has_value())
 		{
+			system_pause();
 			return *result;
 		}
 		else

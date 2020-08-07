@@ -454,37 +454,37 @@ namespace interpreter
 		}
 		else if (function_id.type == FunctionId::Type::program)
 		{
-			complete::Function const & func = context.program.functions[function_id.index];
+			auto const func = [&context, function_id]() -> complete::Function const & { return context.program.functions[function_id.index]; };
 
 			// Run the preconditions
 			int const parameters_start = stack.base_pointer;
-			int const precondition_count = static_cast<int>(func.preconditions.size());
+			int const precondition_count = static_cast<int>(func().preconditions.size());
 			for (int i = 0; i < precondition_count; ++i)
 			{
-				try_call_decl(int const precondition_return_address, eval_expression(func.preconditions[i], stack, context));
+				try_call_decl(int const precondition_return_address, eval_expression(func().preconditions[i], stack, context));
 				bool const precondition_ok = read<bool>(stack, precondition_return_address);
 				if (!precondition_ok)
 					return Error(UnmetPrecondition{ function_id, i });
 			}
-			stack.top_pointer = parameters_start + func.stack_frame_size;
+			stack.top_pointer = parameters_start + func().stack_frame_size;
 
 			bool returned = false;
 
 			// Run the function.
-			for (auto const & statement : func.statements)
+			for (auto const & statement : func().statements)
 			{
 				try_call_decl(ControlFlow const cf, run_statement(statement, stack, context, return_address));
 				if (cf.type == ControlFlowType::Return)
 				{
 					returned = true;
-					destroy_variables_in_scope_up_to(func, cf.destroyed_stack_frame_size, stack, context);
+					destroy_variables_in_scope_up_to(func(), cf.destroyed_stack_frame_size, stack, context);
 					break;
 				}
 			}
 
 			// If function did not return early, destroy all variables at the end of the function.
 			if (!returned)
-				destroy_all_variables_in_scope(func, stack, context);
+				destroy_all_variables_in_scope(func(), stack, context);
 		}
 		else
 		{

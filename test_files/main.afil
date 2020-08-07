@@ -1,5 +1,7 @@
 let main = fn() -> int32
 {
 	let v = vector<int32>::with_capacity(uint64(10));
+	print(size(v));
+	putchar(newline);
 	return int32(v.capacity);
 };

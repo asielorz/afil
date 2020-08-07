@@ -1,0 +1,67 @@
+let putchar = fn(char c) -> int32 extern_symbol("putchar");
+
+let newline = char(10);
+
+let is_string = fn(type t) -> bool
+{
+	return compiles(t x)
+	{
+		{data(x)} -> char[];
+		{size(x)} -> int32
+	};
+};
+
+let is_number = fn(type t)
+{
+	return t == int8 or t == int16 or t == int32 or t == int64 or
+		t == uint8 or t == uint16 or t == uint32 or t == uint64;
+};
+let is_signed = fn(type t)
+{
+	return t == int8 or t == int16 or t == int32 or t == int64;
+};
+
+let print_chars = fn(char[] s, int32 n)
+{
+	for (let mut i = 0; i < n; i = i + 1)
+		putchar(s[i]);
+};
+
+let print = fn<is_string S>(S & s)
+{
+	print_chars(data(s), size(s));
+};
+
+let print = fn<is_number T>(T x)
+{
+	if (x == T(0))
+	{	
+		print("0");
+	}
+	else
+	{
+		let mut digits = 0;
+		let mut chars = char[32]('0');
+		let mut number = x;
+		
+		if (is_signed(T))
+		{
+			if (number < T(0))
+			{
+				putchar('-');
+				number = -number;
+			}
+		}
+		
+		while (number > T(0))
+		{
+			let least_significant_digit = number % T(10);
+			chars[digits] = char(least_significant_digit + T('0'));
+			digits = digits + 1;
+			number = number / T(10);
+		}
+		
+		for (let mut i = digits - 1; i >= 0; i = i - 1)
+			putchar(chars[i]);
+	}
+};

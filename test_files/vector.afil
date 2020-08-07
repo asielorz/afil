@@ -30,3 +30,6 @@ struct<T> vector
 		}
 	}
 }
+
+let size = fn<T>(vector<T> & v) { return v.size; };
+let data = fn<T>(vector<T> & v) { return v.data; };
