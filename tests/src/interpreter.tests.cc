@@ -3924,8 +3924,6 @@ TEST_CASE("A function pointer type may point to any function with its signature 
 
 /*****************************************************************
 Backlog
-- data and size as built in function templates instead of rules of the parser
-- clearing the template caches on an error
 - dynamic memory allocation
 - reflection
 - argument dependent lookup (depends on namespaces, sort of)
