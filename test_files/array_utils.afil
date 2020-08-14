@@ -6,16 +6,8 @@ let is_arraylike = fn(type T)
 	};
 };
 
-let abort = fn() -> void extern_symbol("abort");
-
-let assert = fn(bool condition) 
-{
-	if (not condition) 
-		abort(); 
-};
-
 let operator [] = fn<is_arraylike T>(T & t, int32 i)
+	assert{i < int32(size(t));}
 {
-	assert(i < int32(size(t)));
 	return data(t)[i]; // Here it decays. I need value type or decltype(auto)
 };

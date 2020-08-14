@@ -20,6 +20,7 @@ auto main(int argc, char const * const argv[]) -> int
 		else
 		{
 			std::cout << "Unmet precondition: " << reinterpret_cast<int &>(result.error().function) << ", " << result.error().precondition << '\n';
+			system_pause();
 			return -1;
 		}
 	}
