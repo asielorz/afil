@@ -1,7 +1,15 @@
+let printline = fn<A>(A & a) { print(a); putchar(newline); };
+let printline = fn<A, B>(A & a, B & b) { print(a); print(b); putchar(newline); };
+let printline = fn<A, B, C>(A & a, B & b, C & c) { print(a); printline(b, c); putchar(newline); };
+let printline = fn<A, B, C, D>(A & a, B & b, C & c, D & d) { print(a); printline(b, c, d); };
+
 let main = fn() -> int32
 {
-	let v = vector<int32>::with_capacity(uint64(10));
-	print(size(v));
-	putchar(newline);
+	let mut v = vector<int32>::with_capacity(uint64(10));
+	printline("Size before push_back: ", size(v));
+	push_back(v, 5);
+	printline("Size after push_back: ", size(v));
+	printline("v[0] = ", v[0]);
+	
 	return int32(v.capacity);
 };

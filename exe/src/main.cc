@@ -1,5 +1,6 @@
 #include "afil.hh"
 #include "interpreter.hh"
+#include "pretty_print.hh"
 #include "utils/compatibility.hh"
 #include <iostream>
 

@@ -2253,13 +2253,14 @@ namespace instantiation
 				complete::Type const & address_expression_type = type_with_id(*program, address_expression_type_id);
 
 				if (!((is_array_pointer(address_expression_type) && pointee_type(address_expression_type) == make_mutable(complete::TypeId::byte)) ||
-					(is_pointer(address_expression_type) && pointee_type(address_expression_type) == make_mutable(decay(assigned_expression_type_id)))))
+					(is_pointer_or_array_pointer(address_expression_type) && pointee_type(address_expression_type) == make_mutable(decay(assigned_expression_type_id)))))
 					return make_syntax_error(incomplete_statement.address_expression.source, "Address of placement let statement must be of type byte[] or pointer to assigned type.");
 
 				complete::statement::PlacementLet complete_placement_let;
 				try_call(assign_to(complete_placement_let.address_expression), insert_implicit_conversion_node(
 					std::move(address_expression), address_expression_type_id, decay(address_expression_type_id), args, incomplete_statement.address_expression.source));
-				complete_placement_let.assigned_expression = std::move(assigned_expression);
+				try_call(assign_to(complete_placement_let.assigned_expression), insert_implicit_conversion_node(
+					std::move(assigned_expression), assigned_expression_type_id, decay(assigned_expression_type_id), args, incomplete_statement.assigned_expression.source));
 				return std::move(complete_placement_let);
 			},
 			[&](incomplete::statement::UninitDeclaration const & incomplete_statement) -> expected<std::optional<complete::Statement>, PartialSyntaxError>
