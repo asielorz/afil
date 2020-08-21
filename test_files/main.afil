@@ -12,6 +12,8 @@ let main = fn() -> int32
 	printline("v[0] = ", v[0]);
 	v[0] = 7;
 	printline("v[0] = ", v[0]);
+	pop_back(v);
+	printline("Size after pop_back: ", size(v));
 	
 	return int32(v.capacity);
 };
