@@ -608,7 +608,7 @@ namespace parser
 		if (tokens[index].type == lex::Token::Type::arrow)
 		{
 			index++;
-			try_call(assign_to(function->return_type), parse_type_name(tokens, index, type_names));
+			try_call(assign_to(function->return_type), parse_expression(tokens, index, type_names));
 		}
 
 		return success;
@@ -679,7 +679,7 @@ namespace parser
 	auto parse_extern_function_expression(span<lex::Token const> tokens, size_t & index, incomplete::FunctionPrototype function_prototype) noexcept
 		-> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
-		if (!function_prototype.return_type.has_value()) 
+		if (!function_prototype.return_type) 
 			return make_syntax_error(tokens[index], "Cannot omit return type of imported extern function.");
 
 		index++;

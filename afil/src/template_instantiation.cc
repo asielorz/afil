@@ -1020,8 +1020,12 @@ namespace instantiation
 		function->parameter_count = static_cast<int>(incomplete_function.parameters.size());
 		function->parameter_size = function->stack_frame_size;
 
-		if (incomplete_function.return_type.has_value())
-			try_call(assign_to(function->return_type), resolve_dependent_type(*incomplete_function.return_type, args))
+        if (incomplete_function.return_type)
+        {
+            args.scope_stack.push_back({&*function, ScopeType::function, 0});
+            try_call(assign_to(function->return_type), instantiate_and_evaluate_type_expression(*incomplete_function.return_type, args));
+            args.scope_stack.pop_back();
+        }
 		else
 			function->return_type = complete::TypeId::deduce;
 
@@ -2646,11 +2650,13 @@ namespace instantiation
 					complete::FunctionTemplate & function_template = program->function_templates[function_id.index];
 					if (function_template.parameter_types.size() != 1)
 						return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function must take exactly one parameter.");
-					if (!function_template.incomplete_function.return_type.has_value())
+					if (!function_template.incomplete_function.return_type)
 						return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function template must define its return type explicitly.");
+                    if (!has_type<incomplete::expression::Literal<incomplete::TypeId>>(function_template.incomplete_function.return_type->variant))
+                        return make_syntax_error(incomplete_statement.conversion_function.source, "The return type of a conversion function template must be a type literal.");
 
 					try_call(function_template.parameter_types.push_back, resolve_function_template_parameter_type(
-						*function_template.incomplete_function.return_type,
+						try_get<incomplete::expression::Literal<incomplete::TypeId>>(function_template.incomplete_function.return_type->variant)->value,
 						function_template.incomplete_function.template_parameters,
 						args
 					));

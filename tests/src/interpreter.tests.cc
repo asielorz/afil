@@ -4029,7 +4029,7 @@ TEST_CASE("type_of can be used to return references from function templates")
 
         let main = fn() -> int32
 		{
-            int mut i = 5;
+            let mut i = 5;
             let pi = &i;
             dereference(pi) = 6;
 
