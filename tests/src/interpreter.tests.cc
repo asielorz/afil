@@ -3898,6 +3898,148 @@ TEST_CASE("Template instantiations are cached")
 	REQUIRE(tests::parse_and_run(src) == 1);
 }
 
+TEST_CASE("Implicit conversions between CONSTANT EXPRESSIONS of integral types as long as the value is representable")
+{
+    auto const src = R"(
+        let square = fn<T>(T x) { return x * x; };
+
+        let main = fn() -> int32
+		{
+            let mut x = uint8(0);
+			x = 0; // Literals are of type int32, but 0 is representable by uint8
+			x = 255; 
+			x = square(10); // Results of constexpr functions are constant expressions. In this case square(10) = 100 is representable by uint8 
+            
+            let mut something_failed = false;
+
+            if (compiles{x = -1}) // -1 is not representable by uint8 so no implicit conversion
+                something_failed = true;
+            
+            if (compiles{x = 256}) // Same for 256
+                something_failed = true;
+
+            if (something_failed)
+                return 1;
+            else
+                return 0;
+		};
+	)"sv;
+
+    REQUIRE(tests::parse_and_run(src) == 0);
+}
+
+TEST_CASE("Overloading on mutability of reference")
+{
+    auto const src = R"(
+        let foo = fn(int32 & x) { return x - 1; };
+        let foo = fn(int32 mut & x) { x = x + 1; return x + 1; };
+
+        let main = fn() -> int32
+		{
+            let constant = 5;
+            let mut mutable = 5;
+
+            let a = foo(constant);
+            let b = foo(mutable);
+
+            let mut result = 0;
+            
+            if (mutable == 6) result = result + 1;
+            if (a == 4) result = result + 2;
+            if (b == 7) result = result + 4;
+
+            return result;
+		};
+	)"sv;
+
+    REQUIRE(tests::parse_and_run(src) == 7);
+}
+
+TEST_CASE("Overloading on mutability of reference with a template")
+{
+    auto const src = R"(
+        struct<T> Test
+        {
+            T value;
+        }
+        
+        let foo = fn<T>(Test<T> & x) { return Test<T>(x.value - 1); };
+        let foo = fn<T>(Test<T> mut & x) { x.value = x.value + 1; return Test<T>(x.value + 1); };
+
+        let main = fn() -> int32
+		{
+            let constant = Test<int32>(5);
+            let mut mutable = Test<int32>(5);
+
+            let a = foo(constant);
+            let b = foo(mutable);
+
+            let mut result = 0;
+            
+            if (mutable.value == 6) result = result + 1;
+            if (a.value == 4) result = result + 2;
+            if (b.value == 7) result = result + 4;
+
+            return result;
+		};
+	)"sv;
+
+    REQUIRE(tests::parse_and_run(src) == 7);
+}
+
+TEST_CASE("type_of evaluates to a type literal of the type of the expression inside")
+{
+    auto const src = R"(
+        let main = fn() -> int32
+		{
+            if (type_of(0) == int32)
+                return 1;
+            else
+                return 0;
+		};
+	)"sv;
+
+    REQUIRE(tests::parse_and_run(src) == 1);
+}
+
+TEST_CASE("type_of preserves mutability and references")
+{
+    auto const src = R"(
+        let main = fn() -> int32
+		{
+            let mut i = 5;
+            let mut & ri = i;
+            if (type_of(ri) == int32 mut &)
+                return 1;
+            else
+                return 0;
+		};
+	)"sv;
+
+    REQUIRE(tests::parse_and_run(src) == 1);
+}
+
+TEST_CASE("type_of can be used to return references from function templates")
+{
+    auto const src = R"(
+        let dereference = fn<Pointer>(Pointer p) -> type_of(*p)
+        {
+            return *p;
+        };
+
+        let main = fn() -> int32
+		{
+            int mut i = 5;
+            let pi = &i;
+            dereference(pi) = 6;
+
+            return i;
+		};
+	)"sv;
+
+    REQUIRE(tests::parse_and_run(src) == 6);
+}
+
 #if 0
 TEST_CASE("A function pointer type may point to any function with its signature and dispatch at runtime")
 {

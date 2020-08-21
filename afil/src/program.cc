@@ -1363,10 +1363,37 @@ namespace complete
 					return Error(ConversionNotFound(from, to, "Cannot take address of temporary."));
 			}
 		}
-		else if (is_pointer(type_with_id(program, from)) && is_pointer(type_with_id(program, to)) && !from.is_reference && !to.is_reference)
-		{
-			return std::move(expr);
-		}
+        else
+        {
+            Type const & from_type = type_with_id(program, from);
+            Type const & to_type = type_with_id(program, to);
+
+            if (((is_pointer(from_type) && is_pointer(to_type)) || (is_array_pointer(from_type) && is_array_pointer(to_type))) && 
+                decay(pointee_type(from_type)) == decay(pointee_type(to_type)) &&
+                is_mutability_conversion_legal(pointee_type(from_type).is_mutable, pointee_type(to_type).is_mutable))
+            {
+                if (from.is_reference == to.is_reference)
+                    return std::move(expr);
+
+                if (from.is_reference && !to.is_reference)
+                {
+                    expression::Dereference deref_node;
+                    deref_node.expression = allocate(std::move(expr));
+                    deref_node.return_type = to;
+                    return std::move(deref_node);
+                }
+                else
+                {
+                    if (to.is_mutable)
+                        return Error(ConversionNotFound(from, to, "Can't bind a temporary to a mutable reference."));
+
+                    if (allow_address_of_temporary)
+                        return std::move(expr);
+                    else
+                        return Error(ConversionNotFound(from, to, "Cannot take address of temporary."));
+                }
+            }
+        }
 		return Error(ConversionNotFound(from, to, "Conversion between types does not exist."));
 	}
 
@@ -1524,14 +1551,14 @@ namespace complete
 
 		for (FunctionId function_id : overload_set.function_ids)
 		{
-			auto const param_types = parameter_types_of(program, function_id);
-			if (param_types.size() == parameters.size())
+			auto const required_param_types = parameter_types_of(program, function_id);
+			if (required_param_types.size() == parameters.size())
 			{
 				int conversions = 0;
 				bool discard = false;
-				for (size_t i = 0; i < param_types.size(); ++i)
+				for (size_t i = 0; i < required_param_types.size(); ++i)
 				{
-					if (!check_type_validness_as_overload_candidate(param_types[i], parameters[i], program, conversions))
+					if (!check_type_validness_as_overload_candidate(required_param_types[i], parameters[i], program, conversions))
 					{
 						discard = true;
 						break;
