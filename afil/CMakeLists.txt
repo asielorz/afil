@@ -8,6 +8,7 @@ set(UTILS_FILES
 	src/utils/expected.hh
 	src/utils/function_ptr.hh
 	src/utils/half.hh
+	src/utils/intcmp.hh
 	src/utils/load_dll.cc
 	src/utils/load_dll.hh
 	src/utils/map.hh
