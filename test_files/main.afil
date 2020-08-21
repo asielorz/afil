@@ -10,6 +10,8 @@ let main = fn() -> int32
 	push_back(v, 5);
 	printline("Size after push_back: ", size(v));
 	printline("v[0] = ", v[0]);
+	v[0] = 7;
+	printline("v[0] = ", v[0]);
 	
 	return int32(v.capacity);
 };
