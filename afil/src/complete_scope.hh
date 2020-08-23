@@ -57,12 +57,13 @@ namespace complete
 
 	auto is_data_type(TypeId id) noexcept -> bool;
 	auto is_convertible(TypeId from, TypeId to, Program const & program) noexcept -> bool;
-	auto make_reference(TypeId type, bool is_reference = true) noexcept->TypeId;
-	auto make_mutable(TypeId type, bool is_mutable = true) noexcept->TypeId;
-	auto remove_reference(TypeId type) noexcept->TypeId;
-	auto decay(TypeId type) noexcept->TypeId;
-	auto common_type(TypeId a, TypeId b, Program const & program) noexcept->TypeId; // Returns TypeID::none if there is no common type.
+	auto make_reference(TypeId type, bool is_reference = true) noexcept -> TypeId;
+	auto make_mutable(TypeId type, bool is_mutable = true) noexcept -> TypeId;
+	auto remove_reference(TypeId type) noexcept -> TypeId;
+	auto decay(TypeId type) noexcept -> TypeId;
+	auto common_type(TypeId a, TypeId b, Program const & program) noexcept -> TypeId; // Returns TypeID::none if there is no common type.
 	auto assign_without_qualifiers(TypeId & dst, TypeId src) noexcept -> void;
+    auto is_numeric(TypeId type) noexcept -> bool;
 
 	struct Variable
 	{

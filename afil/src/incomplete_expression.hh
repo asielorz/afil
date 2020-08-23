@@ -119,6 +119,11 @@ namespace incomplete
 			std::vector<ExpressionToTest> body;
 		};
 
+        struct TypeOf
+        {
+            value_ptr<Expression> parameter;
+        };
+
 		using Variant = std::variant<
 			Literal<int>, Literal<float>, Literal<bool>, Literal<std::string>, Literal<char_t>, Literal<null_t>, Literal<TypeId>,
 			Dereference, Addressof, Subscript,
@@ -127,7 +132,7 @@ namespace incomplete
 			FunctionCall, UnaryOperatorCall, BinaryOperatorCall,
 			If, StatementBlock,
 			DesignatedInitializerConstructor,
-			Compiles
+			Compiles, TypeOf
 		>;
 
 	} // namespace expression

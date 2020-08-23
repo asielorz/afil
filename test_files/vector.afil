@@ -32,12 +32,21 @@ struct<T> vector
 }
 
 let size = fn<T>(vector<T> & v) { return v.size; };
-let data = fn<T>(vector<T> & v) { return v.data; };
+let data = fn<T>(vector<T> & v) -> T[] { return v.data; };
+let data = fn<T>(vector<T> mut & v) { return v.data; };
 let capacity = fn<T>(vector<T> & v) { return v.capacity; };
+let is_empty = fn<T>(vector<T> & v) { return v.size == uint64(0); };
 
 let push_back = fn<T>(vector<T> mut & v, T t)
 	assert{size(v) < capacity(v);}
 {
 	let (v.data + int32(v.size)) = t;
 	v.size = v.size + uint64(1);
+};
+
+let pop_back = fn<T>(vector<T> mut & v)
+	assert{not is_empty(v);}
+{
+	destroy(v[int32(size(v)) - 1]);
+	v.size = v.size - uint64(1);
 };

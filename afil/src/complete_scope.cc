@@ -120,6 +120,12 @@ namespace complete
 		dst.index = src.index;
 	}
 
+    auto is_numeric(TypeId type) noexcept -> bool
+    {
+        return type == TypeId::int8 || type == TypeId::int16 || type == TypeId::int32 || type == TypeId::int64 ||
+            type == TypeId::uint8 || type == TypeId::uint16 || type == TypeId::uint32 || type == TypeId::uint64;
+    }
+
 	auto add_variable_to_scope(complete::Scope & scope, std::string_view name, complete::TypeId type_id, int scope_offset, complete::Program const & program) -> int
 	{
 		return add_variable_to_scope(scope.variables, scope.stack_frame_size, scope.stack_frame_alignment, name, type_id, scope_offset, program);

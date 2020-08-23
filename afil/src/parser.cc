@@ -608,7 +608,7 @@ namespace parser
 		if (tokens[index].type == lex::Token::Type::arrow)
 		{
 			index++;
-			try_call(assign_to(function->return_type), parse_type_name(tokens, index, type_names));
+			try_call(assign_to(function->return_type), parse_expression(tokens, index, type_names));
 		}
 
 		return success;
@@ -679,7 +679,7 @@ namespace parser
 	auto parse_extern_function_expression(span<lex::Token const> tokens, size_t & index, incomplete::FunctionPrototype function_prototype) noexcept
 		-> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
-		if (!function_prototype.return_type.has_value()) 
+		if (!function_prototype.return_type) 
 			return make_syntax_error(tokens[index], "Cannot omit return type of imported extern function.");
 
 		index++;
@@ -880,6 +880,26 @@ namespace parser
 		return std::move(compiles_expr);
 	}
 
+    auto parse_type_of_expression(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept
+        -> expected<incomplete::expression::TypeOf, PartialSyntaxError>
+    {
+        // Skip type_of token.
+        index++;
+
+        if (tokens[index].type != lex::Token::Type::open_parenthesis)
+            return make_syntax_error(tokens[index].source, "Expected '(' after \"type_of\" keyword.");
+        index++;
+
+        incomplete::expression::TypeOf type_of_expression;
+        try_call(assign_to(type_of_expression.parameter), parse_expression(tokens, index, type_names));
+
+        if (tokens[index].type != lex::Token::Type::close_parenthesis)
+            return make_syntax_error(tokens[index].source, "Expected ')' after operand of type_of expression.");
+        index++;
+
+        return std::move(type_of_expression);
+    }
+
 	auto parse_unary_operator(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
 		Operator const op = parse_operator(tokens[index].source);
@@ -911,37 +931,39 @@ namespace parser
 
 	auto parse_expression_variant(span<lex::Token const> tokens, size_t & index, std::vector<TypeName> & type_names) noexcept -> expected<incomplete::expression::Variant, PartialSyntaxError>
 	{
-		if (tokens[index].source == "fn")
-			return parse_function_expression(tokens, index, type_names);
-		else if (tokens[index].source == "if")
-			return parse_if_expression(tokens, index, type_names);
-		else if (tokens[index].type == lex::Token::Type::open_brace)
-			return parse_statement_block_expression(tokens, index, type_names);
-		else if (tokens[index].type == lex::Token::Type::literal_int)
-			return incomplete::expression::Literal<int>(parse_number_literal<int>(tokens[index++].source));
-		else if (tokens[index].type == lex::Token::Type::literal_float)
-			return incomplete::expression::Literal<float>(parse_number_literal<float>(tokens[index++].source));
-		else if (tokens[index].type == lex::Token::Type::literal_bool)
-			return incomplete::expression::Literal<bool>(tokens[index++].source[0] == 't');
-		else if (tokens[index].type == lex::Token::Type::literal_string)
-			return incomplete::expression::Literal<std::string>(parse_string_literal(tokens[index++].source));
-		else if (tokens[index].type == lex::Token::Type::literal_char)
-			return incomplete::expression::Literal<char_t>(parse_char_literal(tokens[index++].source));
-		else if (tokens[index].source == "null")
-		{
-			index++;
-			return incomplete::expression::Literal<null_t>();
-		}
-		else if (tokens[index].source == "operator")
-		{
-			index++;
-			try_call_decl(std::string_view const name, parse_operator_tokens(tokens, index));
-			incomplete::expression::Identifier id_node;
-			id_node.name = name;
-			return std::move(id_node);
-		}
-		else if (tokens[index].source == "compiles")
-			return parse_compiles_expression(tokens, index, type_names);
+        if (tokens[index].source == "fn")
+            return parse_function_expression(tokens, index, type_names);
+        else if (tokens[index].source == "if")
+            return parse_if_expression(tokens, index, type_names);
+        else if (tokens[index].type == lex::Token::Type::open_brace)
+            return parse_statement_block_expression(tokens, index, type_names);
+        else if (tokens[index].type == lex::Token::Type::literal_int)
+            return incomplete::expression::Literal<int>(parse_number_literal<int>(tokens[index++].source));
+        else if (tokens[index].type == lex::Token::Type::literal_float)
+            return incomplete::expression::Literal<float>(parse_number_literal<float>(tokens[index++].source));
+        else if (tokens[index].type == lex::Token::Type::literal_bool)
+            return incomplete::expression::Literal<bool>(tokens[index++].source[0] == 't');
+        else if (tokens[index].type == lex::Token::Type::literal_string)
+            return incomplete::expression::Literal<std::string>(parse_string_literal(tokens[index++].source));
+        else if (tokens[index].type == lex::Token::Type::literal_char)
+            return incomplete::expression::Literal<char_t>(parse_char_literal(tokens[index++].source));
+        else if (tokens[index].source == "null")
+        {
+            index++;
+            return incomplete::expression::Literal<null_t>();
+        }
+        else if (tokens[index].source == "operator")
+        {
+            index++;
+            try_call_decl(std::string_view const name, parse_operator_tokens(tokens, index));
+            incomplete::expression::Identifier id_node;
+            id_node.name = name;
+            return std::move(id_node);
+        }
+        else if (tokens[index].source == "compiles")
+            return parse_compiles_expression(tokens, index, type_names);
+        else if (tokens[index].source == "type_of")
+            return parse_type_of_expression(tokens, index, type_names);
 		else if (tokens[index].type == lex::Token::Type::identifier)
 		{
 			// It can be either a constructor call or the naming of a variable/function

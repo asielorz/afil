@@ -7,6 +7,7 @@
 #include "interpreter.hh"
 #include "constexpr.hh"
 #include "utils/algorithm.hh"
+#include "utils/intcmp.hh"
 #include "utils/load_dll.hh"
 #include "utils/map.hh"
 #include "utils/out.hh"
@@ -126,6 +127,77 @@ namespace instantiation
 
 	constexpr char null[sizeof(void *)] = {0};
 
+    template <typename To, typename From>
+    auto try_constant_integer_conversion_to(From expr_value, complete::TypeId to) noexcept -> std::optional<complete::Expression>
+    {
+        if (intcmp::in_range<To>(expr_value))
+        {
+            complete::expression::ConstantTemporary constant_node;
+            constant_node.type = to;
+            constant_node.value.resize(sizeof(To));
+            To const converted_value = static_cast<To>(expr_value);
+            memcpy(constant_node.value.data(), &converted_value, sizeof(To));
+            return std::move(constant_node);
+        }
+        return std::nullopt;
+    }
+
+    template <typename From>
+    auto try_constant_integer_conversion_from(
+        complete::Expression const & expr,
+        complete::TypeId to,
+        SemanticAnalysisArgs args
+    ) noexcept -> std::optional<complete::Expression>
+    {
+        auto const result = interpreter::evaluate_constant_expression_as<From>(expr, args);
+        if (result.has_value())
+        {
+            From const expr_value = *result;
+
+            if (to == complete::TypeId::int8)
+            {
+                if (auto x = try_constant_integer_conversion_to<int8_t>(expr_value, to))
+                    return x;
+            }
+            else if (to == complete::TypeId::int16)
+            {
+                if (auto x = try_constant_integer_conversion_to<int16_t>(expr_value, to))
+                    return x;
+            }
+            else if (to == complete::TypeId::int32)
+            {
+                if (auto x = try_constant_integer_conversion_to<int32_t>(expr_value, to))
+                    return x;
+            }
+            else if (to == complete::TypeId::int64)
+            {
+                if (auto x = try_constant_integer_conversion_to<int64_t>(expr_value, to))
+                    return x;
+            }
+            else if (to == complete::TypeId::uint8)
+            {
+                if (auto x = try_constant_integer_conversion_to<uint8_t>(expr_value, to))
+                    return x;
+            }
+            else if (to == complete::TypeId::uint16)
+            {
+                if (auto x = try_constant_integer_conversion_to<uint16_t>(expr_value, to))
+                    return x;
+            }
+            else if (to == complete::TypeId::uint32)
+            {
+                if (auto x = try_constant_integer_conversion_to<uint32_t>(expr_value, to))
+                    return x;
+            }
+            else if (to == complete::TypeId::uint64)
+            {
+                if (auto x = try_constant_integer_conversion_to<uint64_t>(expr_value, to))
+                    return x;
+            }
+        }
+        return std::nullopt;
+    }
+
 	auto insert_implicit_conversion_node(
 		complete::Expression && expr, 
 		complete::TypeId from, 
@@ -159,6 +231,50 @@ namespace instantiation
 				return insert_mutref_conversion_node(std::move(conversion_call), to, *program);
 			}
 		}
+        
+        if (is_numeric(from) && is_numeric(to) && is_constant_expression(expr, *program, next_block_scope_offset(args.scope_stack)))
+        {
+            if (from == complete::TypeId::int8)
+            {
+                if (auto x = try_constant_integer_conversion_from<int8_t>(expr, to, args))
+                    return std::move(*x);
+            }
+            else if (from == complete::TypeId::int16)
+            {
+                if (auto x = try_constant_integer_conversion_from<int16_t>(expr, to, args))
+                    return std::move(*x);
+            }
+            else if (from == complete::TypeId::int32)
+            {
+                if (auto x = try_constant_integer_conversion_from<int32_t>(expr, to, args))
+                    return std::move(*x);
+            }
+            else if (from == complete::TypeId::int64)
+            {
+                if (auto x = try_constant_integer_conversion_from<int64_t>(expr, to, args))
+                    return std::move(*x);
+            }
+            else if (from == complete::TypeId::uint8)
+            {
+                if (auto x = try_constant_integer_conversion_from<uint8_t>(expr, to, args))
+                    return std::move(*x);
+            }
+            else if (from == complete::TypeId::uint16)
+            {
+                if (auto x = try_constant_integer_conversion_from<uint16_t>(expr, to, args))
+                    return std::move(*x);
+            }
+            else if (from == complete::TypeId::uint32)
+            {
+                if (auto x = try_constant_integer_conversion_from<uint32_t>(expr, to, args))
+                    return std::move(*x);
+            }
+            else if (from == complete::TypeId::uint64)
+            {
+                if (auto x = try_constant_integer_conversion_from<uint64_t>(expr, to, args))
+                    return std::move(*x);
+            }
+        }
 
 		return insert_mutref_conversion_node(std::move(expr), from, to, *program);
 	}
@@ -904,8 +1020,12 @@ namespace instantiation
 		function->parameter_count = static_cast<int>(incomplete_function.parameters.size());
 		function->parameter_size = function->stack_frame_size;
 
-		if (incomplete_function.return_type.has_value())
-			try_call(assign_to(function->return_type), resolve_dependent_type(*incomplete_function.return_type, args))
+        if (incomplete_function.return_type)
+        {
+            args.scope_stack.push_back({&*function, ScopeType::function, 0});
+            try_call(assign_to(function->return_type), instantiate_and_evaluate_type_expression(*incomplete_function.return_type, args));
+            args.scope_stack.pop_back();
+        }
 		else
 			function->return_type = complete::TypeId::deduce;
 
@@ -2097,7 +2217,14 @@ namespace instantiation
 					complete_expression.body = incomplete_expression.body;
 					return std::move(complete_expression);
 				}
-			}
+			},
+            [&](incomplete::expression::TypeOf const & incomplete_expression) -> expected<complete::Expression, PartialSyntaxError>
+            {
+                try_call_decl(complete::Expression expression_to_take_the_type_of, 
+                    instantiate_expression(*incomplete_expression.parameter, args, current_scope_return_type));
+
+                return complete::expression::Literal<complete::TypeId>{expression_type_id(expression_to_take_the_type_of, *args.program)};
+            }
 		);
 
 		// If a expression can only be run at compile time, 
@@ -2523,11 +2650,13 @@ namespace instantiation
 					complete::FunctionTemplate & function_template = program->function_templates[function_id.index];
 					if (function_template.parameter_types.size() != 1)
 						return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function must take exactly one parameter.");
-					if (!function_template.incomplete_function.return_type.has_value())
+					if (!function_template.incomplete_function.return_type)
 						return make_syntax_error(incomplete_statement.conversion_function.source, "A conversion function template must define its return type explicitly.");
+                    if (!has_type<incomplete::expression::Literal<incomplete::TypeId>>(function_template.incomplete_function.return_type->variant))
+                        return make_syntax_error(incomplete_statement.conversion_function.source, "The return type of a conversion function template must be a type literal.");
 
 					try_call(function_template.parameter_types.push_back, resolve_function_template_parameter_type(
-						*function_template.incomplete_function.return_type,
+						try_get<incomplete::expression::Literal<incomplete::TypeId>>(function_template.incomplete_function.return_type->variant)->value,
 						function_template.incomplete_function.template_parameters,
 						args
 					));

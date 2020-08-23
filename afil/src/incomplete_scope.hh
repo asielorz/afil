@@ -73,7 +73,7 @@ namespace incomplete
 	struct FunctionPrototype
 	{
 		std::vector<FunctionParameter> parameters;
-		std::optional<TypeId> return_type;
+		value_ptr<Expression> return_type;
 	};
 	struct Function : FunctionPrototype
 	{

@@ -6,7 +6,13 @@ let is_arraylike = fn(type T)
 	};
 };
 
-let operator [] = fn<is_arraylike T>(T & t, int32 i)
+let operator [] = fn<is_arraylike T>(T & t, int32 i) -> type_of(data(t)[i])
+	assert{i < int32(size(t));}
+{
+	return data(t)[i]; // Here it decays. I need value type or decltype(auto)
+};
+
+let operator [] = fn<is_arraylike T>(T mut & t, int32 i) -> type_of(data(t)[i])
 	assert{i < int32(size(t));}
 {
 	return data(t)[i]; // Here it decays. I need value type or decltype(auto)
