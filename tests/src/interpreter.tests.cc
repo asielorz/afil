@@ -3535,6 +3535,34 @@ TEST_CASE("Placement let to a memory block allocated with malloc")
 	REQUIRE(tests::parse_and_run(src) == 1073741824);
 }
 
+TEST_CASE("Placement let but making an implicit conversion because it reads a reference")
+{
+	auto const src = R"(
+		let malloc = fn(uint64 size) -> byte mut[]
+			extern_symbol("malloc");
+
+		let free = fn<T>(T mut * memory)
+		{
+			let free_impl = fn(byte mut[] memory) -> void
+				extern_symbol("free");
+			
+			free_impl(byte mut[](memory));
+		};
+
+		let main = fn() -> int32
+		{
+			let mut i = 1073741824;
+			let pi = int32 mut*(malloc(uint64(4)));
+			let(pi) = i;
+			let x = *pi;
+			free(pi);
+			return x;
+		};
+	)"sv;
+
+	REQUIRE(tests::parse_and_run(src) == 1073741824);
+}
+
 TEST_CASE("destroy invokes the destructor on an object")
 {
 	auto const src = R"(
