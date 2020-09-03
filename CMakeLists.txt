@@ -23,17 +23,31 @@ if(ENABLE_IPO)
 endif()
 
 set(CMAKE_CONFIGURATION_TYPES Debug Release)
-# Download automatically, you can also just copy the conan.cmake file
-if (NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-	message(STATUS
-	  "Downloading conan.cmake from https://github.com/conan-io/cmake-conan"
-	)
-	file(DOWNLOAD "https://github.com/conan-io/cmake-conan/raw/v0.15/conan.cmake"
-	   "${CMAKE_BINARY_DIR}/conan.cmake"
-	)
-endif()
 
-include(${CMAKE_BINARY_DIR}/conan.cmake)
+function(download_file url destination_file)
+	if (EXISTS ${destination_file})
+		message(STATUS "Already downloaded: ${url}")
+		return()
+	endif()
+  
+	message(STATUS "Downloading from ${url}")
+	file(DOWNLOAD ${url} ${destination_file} STATUS result LOG download_log ${ARGN})
+
+	list(GET result 0 result_code)
+	if (result_code EQUAL 0)
+		return()
+	endif()
+
+	# Cmake leaves an empty file if the download failed
+	file(REMOVE ${destination_file})
+	list(GET result 1 result_message)
+	message(FATAL_ERROR "Failed to download from ${url}.\n${download_log}Error code: ${result_code}\n${result_message}")
+endfunction()
+
+# Download automatically, you can also just copy the conan.cmake file
+download_file("https://github.com/conan-io/cmake-conan/raw/v0.15/conan.cmake" "${CMAKE_BINARY_DIR}/conan.cmake")
+
+include("${CMAKE_BINARY_DIR}/conan.cmake")
 
 enable_testing()
 
