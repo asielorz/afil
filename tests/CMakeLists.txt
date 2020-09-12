@@ -34,9 +34,26 @@ if (MSVC)
 		PRIVATE
 			/MP # Multi-core compilation
   	)
+	set_target_properties(afil_tests
+		PROPERTIES
+			# Enable message box and system("")
+			VS_DEBUGGER_COMMAND_ARGUMENTS "--afil-interactive-tests"
+	)
 endif()
 
-add_test(
-	NAME unit_tests
-	COMMAND afil_tests
+# Automatically enable catch2 to generate ctest targets
+if(CONAN_CATCH2_ROOT_DEBUG)
+  include(${CONAN_CATCH2_ROOT_DEBUG}/lib/cmake/Catch2/Catch.cmake)
+else()
+  include(${CONAN_CATCH2_ROOT}/lib/cmake/Catch2/Catch.cmake)
+endif()
+
+# automatically discover tests that are defined in catch.
+# Set TEST_PREFIX to whatever you want
+catch_discover_tests(
+  afil_tests
+  TEST_PREFIX "tests."
+  EXTRA_ARGS # Arguments for each test executable (arguments for catch2)
+  	--reporter=xml
+	--out=tests.xml
 )
