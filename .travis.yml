@@ -1,0 +1,11 @@
+language: cpp
+
+services:
+  - docker
+
+before_install:
+- docker build . --tag afil-unit-tests
+- docker run --volume ${PWD}:/usr/src  afil-unit-tests bash -c "cmake . -Bbuild -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_UNITY_BUILD=ON -DENABLE_IPO=OFF -DTREAT_WARNINGS_AS_ERRORS=OFF && cmake --build build/"
+
+script:
+- docker run afil-unit-tests bash -c "cd build; ctest --output-on-failure"
