@@ -42,18 +42,17 @@ if (MSVC)
 endif()
 
 # Automatically enable catch2 to generate ctest targets
-if(CONAN_CATCH2_ROOT_DEBUG)
-  include(${CONAN_CATCH2_ROOT_DEBUG}/lib/cmake/Catch2/Catch.cmake)
-else()
-  include(${CONAN_CATCH2_ROOT}/lib/cmake/Catch2/Catch.cmake)
-endif()
+
+foreach(catch2_root CONAN_CATCH2_ROOT CONAN_CATCH2_ROOT_DEBUG CONAN_CATCH2_ROOT_RELEASE CONAN_CATCH2_ROOT_RELWITHDEBINFO CONAN_CATCH2_ROOT_MINSIZEREL)
+	if (EXISTS ${${catch2_root}})
+		include(${${catch2_root}}/lib/cmake/Catch2/Catch.cmake)
+		break()
+	endif()
+endforeach()
 
 # automatically discover tests that are defined in catch.
 # Set TEST_PREFIX to whatever you want
 catch_discover_tests(
-  afil_tests
-  TEST_PREFIX "tests."
-  EXTRA_ARGS # Arguments for each test executable (arguments for catch2)
-  	--reporter=xml
-	--out=tests.xml
+	afil_tests
+	TEST_PREFIX "tests."
 )

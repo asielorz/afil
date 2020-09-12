@@ -1,0 +1,19 @@
+image:
+  - Visual Studio 2019
+clone_folder: c:\projects\source
+build_script:
+- cmd: >-
+    mkdir build
+
+    cd build
+
+    pip install --user conan
+
+    set PATH=%PATH%;C:\Users\appveyor\AppData\Roaming\Python\Scripts
+
+    cmake c:\projects\source -G "Visual Studio 16 2019" -DAFIL_CONFIGURATION_TYPES:STRING=Release -DCMAKE_UNITY_BUILD=ON
+
+    cmake --build . --config "Release" --target afil_tests
+
+test_script:
+- cmd: ctest --build-config "Release" --output-on-failure
