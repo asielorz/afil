@@ -101,6 +101,7 @@ endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	add_compile_options(
+		-Wunreachable-code
 		#-Wno-missing-braces
 	)
 endif()
