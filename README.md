@@ -1,4 +1,4 @@
-[![Build status](https://ci.appveyor.com/api/projects/status/0jps94ju95n864yx?svg=true)](https://ci.appveyor.com/project/andoalon97/afil)
+[![Build status](https://ci.appveyor.com/api/projects/status/mk71gyvitsg7w3om?svg=true)](https://ci.appveyor.com/project/asielorz/afil)
 master:
 [![Build Status](https://travis-ci.com/andoalon/afil.svg?branch=master)](https://travis-ci.com/andoalon/afil)
 
