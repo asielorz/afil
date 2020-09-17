@@ -105,6 +105,16 @@
 	AFIL_CLANG_PRAGMA(clang diagnostic ignored "-Wgnu-anonymous-struct") \
 	AFIL_CLANG_PRAGMA(clang diagnostic ignored "-Wnested-anon-types")
 
+#define AFIL_IGNORE_WARNING_UNREACHABLE_CODE() \
+	AFIL_WARNING_PUSH() \
+	AFIL_MSVC_PRAGMA(warning(disable : 4702)) /* unreachable code */ \
+	/* The -Wunreachable-code warning was removed after gcc 4.4 */ \
+	/* (https://stackoverflow.com/questions/17249934/why-does-gcc-not-warn-for-unreachable-code) */ \
+	/* We will not bother supporting those versions of gcc */ \
+	/*AFIL_GCC_PRAGMA(GCC diagnostic ignored "-Wunreachable-code") */ \
+	AFIL_CLANG_PRAGMA(clang diagnostic ignored "-Wunreachable-code")
+	
+
 #ifdef _WIN32
 #	define AFIL_WINDOWS true
 #else

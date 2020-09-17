@@ -22,8 +22,6 @@ if(ENABLE_IPO)
 	endif()
 endif()
 
-set(CMAKE_CONFIGURATION_TYPES Debug Release)
-
 function(download_file url destination_file)
 	if (EXISTS ${destination_file})
 		message(STATUS "Already downloaded: ${url}")
@@ -56,12 +54,23 @@ enable_testing()
 #	URL https://api.bintray.com/conan/bincrafters/public-conan
 #)
 
+get_property(is_multi_config_generator GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if (NOT is_multi_config_generator)
+	set(AFIL_CONFIGURATION_TYPES "")
+else()
+	set(AFIL_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Build configurations to be available (conan will have to install dependencies for all of them)")
+	set(CMAKE_CONFIGURATION_TYPES ${AFIL_CONFIGURATION_TYPES})
+endif()
+
 conan_cmake_run(
 	CONANFILE tests/conanfile.txt
 	BASIC_SETUP
 	CMAKE_TARGETS # individual targets to link to
 	BUILD missing
+	CONFIGURATION_TYPES ${AFIL_CONFIGURATION_TYPES} # Tell conan which configurations it needs to install
 )
+
+include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
 
 option(TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" TRUE)
 
@@ -101,6 +110,7 @@ endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	add_compile_options(
+		-Wunreachable-code
 		#-Wno-missing-braces
 	)
 endif()

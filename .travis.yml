@@ -1,0 +1,13 @@
+language: cpp
+
+services:
+  - docker
+
+jobs:
+  include:
+    - stage: Build and test
+      script:
+        - docker build . --tag afil-unit-tests
+        - docker run --volume ${PWD}:/usr/src afil-unit-tests bash -c "chmod +x ./configure-linux.sh && ./configure-linux.sh"
+        - docker run --volume ${PWD}:/usr/src afil-unit-tests bash -c "cmake --build build/ -- --jobs $(nproc)"
+        - docker run --volume ${PWD}:/usr/src afil-unit-tests bash -c "cd build && ctest --output-on-failure --parallel $(nproc)"

@@ -7,6 +7,9 @@
 #	include <Windows.h>
 #endif
 
+#include <cstring>
+#include <cstdio>
+
 static void message_box(char const * title, char const * message) noexcept
 {
 #if AFIL_WINDOWS
@@ -21,10 +24,25 @@ static void message_box(char const * title, char const * message) noexcept
 #endif
 }
 
-auto run_tests(int argc, char const * const argv[]) noexcept -> int
+static auto run_tests(int argc, char const * argv[]) noexcept -> int
 {
+	bool interactive = false;
+	for (int i = 1; i < argc; ++i)
+	{
+		if (std::strcmp("--afil-interactive-tests", argv[i]) != 0)
+			continue;
+
+		interactive = true;
+
+		for (int j = i; j < argc; ++j)
+			argv[j] = argv[j + 1];
+
+		--argc;
+		break;
+	}
+
 	int const result = Catch::Session().run(argc, argv);
-	if (result != 0)
+	if (result != 0 && interactive)
 	{
 		message_box("A test failed", "One of the tests failed. Look at the console for more information.");
 		system_pause();
@@ -32,7 +50,7 @@ auto run_tests(int argc, char const * const argv[]) noexcept -> int
 	return result;
 }
 
-auto main(int argc, char const * const argv[]) -> int
+auto main(int argc, char const * argv[]) -> int
 {
 	return run_tests(argc, argv);
 }

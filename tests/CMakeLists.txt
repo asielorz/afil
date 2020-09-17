@@ -34,9 +34,19 @@ if (MSVC)
 		PRIVATE
 			/MP # Multi-core compilation
   	)
+	set_target_properties(afil_tests
+		PROPERTIES
+			# Enable message box and system("")
+			VS_DEBUGGER_COMMAND_ARGUMENTS "--afil-interactive-tests"
+	)
 endif()
 
-add_test(
-	NAME unit_tests
-	COMMAND afil_tests
+# Catch should be in CMAKE_MODULE_PATH
+include(Catch)
+
+# automatically discover tests that are defined in catch.
+# Set TEST_PREFIX to whatever you want
+catch_discover_tests(
+	afil_tests
+	TEST_PREFIX "tests."
 )
