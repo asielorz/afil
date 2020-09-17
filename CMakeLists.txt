@@ -70,6 +70,8 @@ conan_cmake_run(
 	CONFIGURATION_TYPES ${AFIL_CONFIGURATION_TYPES} # Tell conan which configurations it needs to install
 )
 
+include(${CMAKE_BINARY_DIR}/conan_paths.cmake)
+
 option(TREAT_WARNINGS_AS_ERRORS "Treat warnings as errors" TRUE)
 
 if (MSVC)

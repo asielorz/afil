@@ -41,14 +41,8 @@ if (MSVC)
 	)
 endif()
 
-# Automatically enable catch2 to generate ctest targets
-
-foreach(catch2_root CONAN_CATCH2_ROOT CONAN_CATCH2_ROOT_DEBUG CONAN_CATCH2_ROOT_RELEASE CONAN_CATCH2_ROOT_RELWITHDEBINFO CONAN_CATCH2_ROOT_MINSIZEREL)
-	if (EXISTS ${${catch2_root}})
-		include(${${catch2_root}}/lib/cmake/Catch2/Catch.cmake)
-		break()
-	endif()
-endforeach()
+# Catch should be in CMAKE_MODULE_PATH
+include(Catch)
 
 # automatically discover tests that are defined in catch.
 # Set TEST_PREFIX to whatever you want
